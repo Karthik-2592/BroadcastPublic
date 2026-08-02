@@ -1,0 +1,13 @@
+import { Router } from "express";
+import * as h from "./handlers.ts";
+import commentRouter from "../comments/routes.ts";
+const router = Router();
+router.get("/feed", h.feed);
+router.post("/", h.createPost);
+router.get("/:id", h.getPost);
+router.put("/:id", h.updatePost);
+router.delete("/:id", h.deletePost);
+router.post("/:id/favorites", h.favorite);
+router.delete("/:id/favorites", h.unfavorite);
+router.use("/:id/comments", commentRouter);
+export default router;

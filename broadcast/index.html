@@ -4,10 +4,61 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>broadcast</title>
+    <title>Broadcast API verification</title>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <h1>Broadcast API verification</h1>
+    <p>Plain manual test page for the in-memory route handlers.</p>
+    <label>API base URL <input id="apiBase" value="http://localhost:3000/v1" size="35" /></label>
+    <button type="button" onclick="callApi('/../health' , 'GET')">Check health</button>
+    <hr />
+
+    <h2>Users</h2>
+    <form onsubmit="submitForm(event, '/users', 'POST', normalizeUser)">
+      <input name="username" placeholder="username" required /> <input name="email" type="email" placeholder="email" required /> <input name="password" placeholder="password" required /> <input name="interests" placeholder="interests,comma,separated" /> <button>Create user</button>
+    </form>
+    <form onsubmit="submitForm(event, '/users/' + valueOf(this, 'id'), 'DELETE')"><input name="id" placeholder="user id" required /> <button>Delete user</button></form>
+
+    <h2>Posts</h2>
+    <form onsubmit="submitForm(event, '/posts', 'POST', normalizePost)">
+      <input name="user_id" placeholder="user id" required /> <input name="content" placeholder="content" required /> <input name="user_summary" placeholder='user summary JSON' required size="30" /> <input name="tags" placeholder="tags,comma,separated" /> <input name="visibility" value="public" /> <button>Create post</button>
+    </form>
+    <form onsubmit="submitForm(event, '/posts/' + valueOf(this, 'id'), 'DELETE')"><input name="id" placeholder="post id" required /> <input name="user_id" placeholder="owner user id" /> <button>Delete post</button></form>
+
+    <h2>Comments</h2>
+    <form onsubmit="submitForm(event, '/posts/' + valueOf(this, 'post_id') + '/comments', 'POST', normalizeComment)"><input name="post_id" placeholder="post id" required /> <input name="user_id" placeholder="user id" required /> <input name="content" placeholder="comment content" required /> <input name="root" placeholder="root comment id (optional)" /> <button>Create comment</button></form>
+    <form onsubmit="submitForm(event, '/comments/' + valueOf(this, 'id'), 'DELETE')"><input name="id" placeholder="comment id" required /> <input name="user_id" placeholder="comment owner user id" /> <button>Delete comment</button></form>
+
+    <h2>Communities</h2>
+    <form onsubmit="submitForm(event, '/communities', 'POST', normalizeCommunity)"><input name="user_id" placeholder="admin user id" required /> <input name="community_name" placeholder="community name" required /> <input name="community_desc" placeholder="description" required /> <input name="tags" placeholder="tags,comma,separated" /> <button>Create community</button></form>
+    <form onsubmit="submitForm(event, '/communities/' + valueOf(this, 'id'), 'DELETE')"><input name="id" placeholder="community id" required /> <input name="admin_id" placeholder="admin user id" required /> <button>Delete community</button></form>
+
+    <h2>Relations and actions</h2>
+    <form onsubmit="submitForm(event, '/users/' + valueOf(this, 'target_id') + '/followers', 'POST')"><input name="user_id" placeholder="follower user id" required /> <input name="target_id" placeholder="followed user id" required /> <button>Follow</button></form>
+    <form onsubmit="submitForm(event, '/users/' + valueOf(this, 'target_id') + '/followers', 'DELETE')"><input name="user_id" placeholder="follower user id" required /> <input name="target_id" placeholder="followed user id" required /> <button>Unfollow</button></form>
+    <form onsubmit="submitForm(event, '/posts/' + valueOf(this, 'post_id') + '/favorites', 'POST')"><input name="post_id" placeholder="post id" required /> <input name="user_id" placeholder="user id" required /> <button>Favorite post</button></form>
+    <form onsubmit="submitForm(event, '/posts/' + valueOf(this, 'post_id') + '/favorites', 'DELETE')"><input name="post_id" placeholder="post id" required /> <input name="user_id" placeholder="user id" required /> <button>Unfavorite post</button></form>
+    <form onsubmit="submitForm(event, '/users/' + valueOf(this, 'user_id') + '/saved-posts/' + valueOf(this, 'post_id'), 'POST')"><input name="post_id" placeholder="post id" required /> <input name="user_id" placeholder="user id" required /> <button>Save post</button></form>
+    <form onsubmit="submitForm(event, '/users/' + valueOf(this, 'user_id') + '/saved-posts/' + valueOf(this, 'post_id'), 'DELETE')"><input name="post_id" placeholder="post id" required /> <input name="user_id" placeholder="user id" required /> <button>Unsave post</button></form>
+    <form onsubmit="submitForm(event, '/communities/' + valueOf(this, 'community_id') + '/members', 'POST')"><input name="community_id" placeholder="community id" required /> <input name="user_id" placeholder="user id" required /> <button>Join community</button></form>
+    <form onsubmit="submitForm(event, '/communities/' + valueOf(this, 'community_id') + '/members', 'DELETE')"><input name="community_id" placeholder="community id" required /> <input name="user_id" placeholder="user id" required /> <button>Leave community</button></form>
+
+    <h2>Notifications</h2>
+    <p>Notifications currently have no public creation route; existing notifications can be listed or deleted.</p>
+    <form onsubmit="submitForm(event, '/notifications?user_id=' + encodeURIComponent(valueOf(this, 'user_id')), 'GET')"><input name="user_id" placeholder="user id (optional)" /> <button>List notifications</button></form>
+    <form onsubmit="submitForm(event, '/notifications/' + valueOf(this, 'id'), 'DELETE')"><input name="id" placeholder="notification id" required /> <button>Delete notification</button></form>
+
+    <h2>Response</h2><pre id="response">No request made.</pre>
+    <script>
+      function valueOf(form, name) { return form.elements[name].value.trim(); }
+      function fields(form) { const data = {}; for (const element of form.elements) if (element.name && !['id','post_id','community_id','target_id'].includes(element.name)) data[element.name] = element.value.trim(); return data; }
+      function normalizePost(data) { data.tags = data.tags ? data.tags.split(',').map(x => x.trim()).filter(Boolean) : []; data.user_summary = JSON.parse(data.user_summary); return data; }
+      function normalizeUser(data) { data.interests = data.interests ? data.interests.split(',').map(x => x.trim()).filter(Boolean) : []; return data; }
+      function normalizeComment(data) { if (!data.root) data.root = null; return data; }
+      function normalizeCommunity(data) { data.tags = data.tags ? data.tags.split(',').map(x => x.trim()).filter(Boolean) : []; return data; }
+      async function submitForm(event, path, method, transform) { event.preventDefault(); try { const data = fields(event.target); await callApi(path, method, transform ? transform(data) : data); } catch (error) { show({ success: false, message: error.message }); } }
+      async function callApi(path, method, body) { const base = document.getElementById('apiBase').value.replace(/\/$/, ''); const options = { method, headers: {} }; if (method !== 'GET' && body) { options.headers['Content-Type'] = 'application/json'; options.body = JSON.stringify(body); } const response = await fetch(base + path, options); const text = await response.text(); let result; try { result = JSON.parse(text); } catch { result = { status: response.status, body: text }; } show(result); }
+      function show(result) { document.getElementById('response').textContent = JSON.stringify(result, null, 2); }
+    </script>
   </body>
 </html>
