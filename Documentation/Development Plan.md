@@ -161,7 +161,7 @@ Results:
 
 | ADMIN\_OF (membership/role)  |          —         |                  ✓                  |
 
-| BELONGS\_TO (Post–Community) | ✓ (`community\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\_id`) | ✓ (recommended dual representation) |
+| BELONGS\_TO (Post–Community) | ✓ (`community\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\_id`) | ✓ (recommended dual representation) |
 
 
 
@@ -400,6 +400,12 @@ Validation is implemented both in application side as well as DBMS side (for ext
 &#x20;     favorite\_count: {
 
 &#x20;       bsonType: 'int'
+
+&#x20;     },
+
+&#x20;     popularity\_score: {
+
+&#x09;bsonType: 'NumberDouble'
 
 &#x20;     },
 
@@ -692,12 +698,6 @@ Validation is implemented both in application side as well as DBMS side (for ext
 &#x20;     post\_id: {
 
 &#x20;       bsonType: 'objectId'
-
-&#x20;     },
-
-&#x20;     type: {
-
-&#x20;       bsonType: 'bool'
 
 &#x20;     },
 
@@ -1062,101 +1062,6 @@ Experimentation with Neo4j complete
 
 
 
-##### FOLLOW RELATION MANAGEMENT:
-
-1. ###### Follow edge creation: POST method
-
-   1. request object contains mandatory
-
-      1. user\_id (follower) #
-      2. user\_id (followed)
-2. ###### Follow edge deletion: DELETE method
-
-   1. request object contains mandatory
-
-      1. user\_id (follower) #
-      2. user\_id (followed)
-
-
-
-##### LIKE (POST/COMMENT) RELATION MANAGEMENT:
-
-1. ###### Like edge creation for posts: POST method
-
-   1. request object contains mandatory
-
-      1. user\_id #
-      2. post\_id
-2. ###### Like edge creation for comments: POST method
-
-   1. request object contains mandatory
-
-      1. user\_id #
-      2. post\_id
-      3. comment\_id
-3. ###### Like edge deletion for posts: DELETE method
-
-   1. request object contains mandatory:
-
-      1. user\_id #
-      2. post\_id
-      3. comment\_id
-
-
-
-##### SAVE RELATION MANAGEMENT:
-
-1. ###### Save edge creation: POST method
-
-   1. request object contains mandatory
-
-      1. user\_id (follower) #
-      2. post\_id
-2. ###### Save edge deletion: DELETE method
-
-   1. request object contains mandatory
-
-      1. user\_id (follower) #
-      2. post\_id
-
-
-
-##### MODERATOR RELATION MANAGEMENT:
-
-1. ###### Moderation edge creation: POST method
-
-   1. request object contains mandatory:
-
-      1. admin\_id #
-      2. user\_id
-      3. community\_id
-2. ###### Moderation edge deletion: DELETE method
-
-   1. request object contains mandatory:
-
-      1. admin\_id #
-      2. user\_id
-      3. community\_id
-
-
-
-##### MEMBERSHIP RELATION MANAGEMENT:
-
-1. ###### Membership edge creation: POST method
-
-   1. request object contains mandatory:
-
-      1. user\_id #
-      2. community\_id
-2. ###### Membership edge deletion: DELETE method
-
-   1. request object contains mandatory:
-
-      1. user\_id #
-      2. community\_id
-
-
-
 *Note:*
 
 1. *Debounced API calls and Batched actions are to used where suitable. Use JWT for authentication, instead of just using client supplied identity fields (marked # in the requirements)*
@@ -1212,8 +1117,289 @@ Experimentation with Neo4j complete
 * Importantly, during the development period, additional logging of result of database queries is required, whether an addition was successful, or if a certain query failed, etc..
 
   * This logging is not permanent, rather temporary to the current backend session. Thus logging can be implemented with just console.log(). (This will be removed in production).
+* For increased robustness, transactions server and database occur with 'typed JSON objects', that is clearly annotate the type each handler returns/ receives via corresponding typescript interfaces. Note that transactions from client to server (or) server to database need not be the same. Implement interfaces for within-server object passing as of now.
+* Use the RESTful API.md as reference for the collections present and the fields within each collection (and its validators).
+* Remove the redundant "in-memory" database implementation
+
+
+
+\---
+
+
+
+* Relation storage is the task of Neo4j DBMS, not MongoDB. Remove the relation collection as well as the subroutines handling relations from backend. Verification will be done only for entity storage (via collections) and this is done manually (no need to perform automated checks).
+* The backend assumes that all necessary indices and collections are already present. Separate the index creation, and collection creation from the query logic and place it in a separate initialization script. (Also, ignore the location of index.ts file, it is present in a separate directory).
 
 
 
 
+
+*Additional:*
+
+* Posts to be displayed in order of their popularity? (favorites). There are implementations, such as sorting on the client side given a group of posts, but this does not guarantee a 'global' best is displayed to the user. One interesting feature is that; this method reflects actual region/interest based ranking of posts rather than global count.
+* Popularity of posts will be used in both public/user feed or when a user visits a community. Until a custom algorithm is created, feed generation will be based on the popularity. Furthermore, introduction of "Trending" page requires this feature be a must.
+* Comments too need to be sorted based on their popularity within posts. (Assume 'Oldest first' order is not required). Since update costs are expensive, suggest a solution / search for solutions where this updating a highly volatile indexed field does not incur heavy write penalty.
+* Notifications are expected to be the very volatile, as in they experience insertions and deletions just as often (i.e an object does not have a long lifespan within this collection). Choice of index should consider this.
+* As for Post filtering by community: all posts with community\_id field are public (GLOBAL\_COMMUNITY is a special community that everyone belongs to 'logically (it does not exist actually, but illusion is created by server logic), while any other community\_id refers to a specific community). A null field indicates a private posts, and is never accessed for feed generation until it is made public.
+* Communities are also sorted by their population. This is required as a "TOP communities" feature will be implemented. The same issue of indexing volatile field is present here.
+
+
+
+Results:
+
+* Popularity score added as a field for posts, which is a time-decaying field that is updated periodically instead of every interaction.
+* Comments and Communities will be ranked based purely on the magnitude of the their likes and population respectively.\\
+
+\---
+
+
+
+* Consider this approach: With the relaxation that comments and community ranking need not be globally correct, what can be said about client side sorting? Precisely, a fixed amount of comment and community objects will be returned as response to a request from client. Client then sorts the objects based on the required field, and when client demands more, new objects will be responded. This will create bursts of sorted sequences but not once contiguous sorted sequence.
+* Note: This approach seems favorable for comments as comments are not as important entities as communities. However ranking communities needs to be global and purely based on magnitude of population, not some composite factor such as popularity score. Give your thoughts on this.
+
+
+
+Results:
+
+* Use client side sorting to rank comments under posts. Deemed acceptable under any implementation.
+* Community popularity is based on total population, and the tradeoff of write performance is assumed to be negligible due to the lower volatility of the field.
+
+\---
+
+
+
+An important consideration: Comments are classified as 'Comments' and 'Replies'.
+
+**Current implementation:**
+
+* A self referencing relation between comments: N replies can point to 1 Comment.
+* This is implemented via the 'root' attribute within each comment: 'null' value indicates a post comment, while 'comment\_id' indicates a reply belonging to comment with comment\_id.
+* Furthermore, each comment has a 'post\_id' which is used to retrieve comments for a post.
+* Since comment is a weak entity, (dependent on post\_id) replies cannot have 'null' post\_id.
+
+*Note: Replies still count towards the 'comment\_count' of post. Cascade update is required when a reply is favorited.*
+
+Question is: How can index take into account the difference between comment and reply
+
+
+
+Another question: Implementation of "popularity\_score"?
+
+* MongoDB data type?
+* Expression?
+* Update period
+* Update mechanism
+* Update subroutine location
+
+
+
+Result:
+
+* Composite index (post\_id, comment\_id), this also takes 'null' values into considerations.
+* Popularity scores includes both 'favorites' and 'comment count' with 'age decay factor'.
+* Expression is as follows: (favorites \* comment\_count)\* e^(-age); where unit of age is decided later.
+* Update period is every 10-30 minutes. (Favorites for posts and comments are updated instantly, it is only the 'popularity\_score' field that requires a scheduler task)
+* Update mechanism is via a scheduled task (period 15 minutes as of now)
+* Update subroutine is located in backend-server and works via a server-maintained 'recently\_modified\_queue' which contains all the post\_ids that need their popularity\_score updated.
+
+
+
+Changes to POST entity:
+
+* The popularity\_score attributes serves as a field to rank posts instead of favorites. Reason being that indexing a high volatile field is bad for performance.
+* popularity\_score for a post is calculated as follows: (post-favorites + post-comment\_count)\*e^(-age), where unit of age will be decided later (for now assume months). The rationale is that posts' popularity decays with age: this prevents a old post with large amount of favorites to dominate over small posts in ranking
+* Unlike favorites, popularity\_score is indiced and is updated via a background process in the server. The process is as follows:
+
+  * Server maintains a queue/set of posts that had their favorites\_count changed.
+  * Whenever a post is favorited by a user, its id is added to this set. (same for a comment/reply made)
+  * The favorite\_count of the post is incremented immediately and the corresponding relation edge is also created (same for a comment/reply made)
+  * However its popularity\_score remains the same
+  * When a predetermined timer expires (assume a period of 15 minutes) or when the set/queue becomes large enough (past a threshold) the background task executes.
+  * This task then queries each post in the set (via its id), gets its favorites and comment-count, calculates its new popularity\_score and updates it.
+
+
+
+Make the following changes.
+
+Backend acts as the intermediate between both databases as well as the client. Although earlier, relations and their handlers were removed, they will be present in the final build, though they will be introduced later down the development timeline. Until a detailed behaviour on management of each relation is given, implementing relation handlers should be paused.
+
+
+
+\---
+
+
+
+### RELATIONS MANAGEMENT
+
+1. All nodes representing entities of a collection, use the objectID of the corresponding entity they represent.
+2. Few edges store the "timestamp" as an relation attribute
+3. Only 'Moderates' relation stores an attribute other than timestamp in the edge. This attribute is the authorization level for a user within a community
+4. Debounced API calls are necessary to prevent overloading server with useless writes. (This is frontend task, ignored when dealing with backend).
+
+
+
+##### FOLLOW RELATION MANAGEMENT <Edge label: FOLLOWS>
+
+1. ###### Follow edge creation: POST method
+
+   1. request object contains mandatory
+
+      1. user\_id (follower) #
+      2. user\_id (followed)
+   2. Behaviour:
+
+      1. A new relation edge from follower\_user to followed\_user is created. (Node label: USER)
+      2. To prevent erroneous subsequent request from creating multiple edges between 2 nodes, MERGE is used.
+      3. No data is associated with this edge
+      4. The 'follower\_count' derived attribute is incremented for the follower\_user document (MongoDB).
+2. ###### Follow edge deletion: DELETE method
+
+   1. request object contains mandatory
+
+      1. user\_id (follower) #
+      2. user\_id (followed)
+   2. Behaviour:
+
+      1. A existing relation edge from follower\_user to follower\_user is deleted.
+      2. The derived attribute 'follower\_count' is decremted for the follower\_user document (MongoDB)
+
+
+
+##### LIKE (POST/COMMENT) RELATION MANAGEMENT <Edge label: LIKES>
+
+1. ###### Like edge creation for posts: POST method
+
+   1. request object contains mandatory
+
+      1. user\_id #
+      2. post\_id
+   2. Behaviour:
+
+      1. A new relation edge from user to post is created (Node label: POST)
+      2. To prevent erroneous subsequent request from creating multiple edges between 2 nodes, MERGE is used.
+      3. No data is associated with this edge
+      4. The 'favorite\_count' derived attribute is incremented for the post  document (MongoDB).
+
+
+
+2. ###### Like edge creation for comments: POST method
+
+   1. request object contains mandatory
+
+      1. user\_id #
+      2. post\_id
+      3. comment\_id
+   2. Behaviour:
+
+      1. A new relation edge from user to comment is created (Node label: COMMENT)
+      2. To prevent erroneous subsequent request from creating multiple edges between 2 nodes, MERGE is used.
+      3. No data is associated with this edge
+      4. The 'favorite\_count' derived attribute is incremented for the comment document (MongoDB).
+
+
+
+3. ###### Like edge deletion for posts: DELETE method
+
+   1. request object contains mandatory:
+
+      1. user\_id #
+      2. post\_id
+      3. comment\_id?
+   2. Behaviour:
+
+      1. An existing relation edge from user to post/comment is deleted
+      2. The 'favorite\_count' derived attribute is decremented for the comment/post document (MongoDB).
+
+
+
+##### SAVE RELATION MANAGEMENT <Edge label: SAVES>
+
+1. ###### Save edge creation: POST method
+
+   1. request object contains mandatory
+
+      1. user\_id (follower) #
+      2. post\_id
+   2. Behaviour:
+
+      1. A new relation edge from user to post is created
+      2. To prevent erroneous subsequent request from creating multiple edges between 2 nodes, MERGE is used.
+      3. Timestamp is associated with this edge
+
+
+
+2. ###### Save edge deletion: DELETE method
+
+   1. request object contains mandatory
+
+      1. user\_id (follower) #
+      2. post\_id
+   2. Behaviour:
+
+      1. An existing relation edge from user to post is deleted
+
+
+
+##### MODERATOR RELATION MANAGEMENT <Edge label: MODERATES>
+
+1. ###### Moderation edge creation: POST method
+
+   1. request object contains mandatory:
+
+      1. admin\_id #
+      2. user\_id
+      3. community\_id
+   2. Behaviour:
+
+      1. A new relation edge from user to community <Node label: COMMUNITY> is created
+      2. Authorization data is added to this edge
+      3. To prevent erroneous subsequence request from creating multiple edges between 2 nodes, MERGE is used.
+
+
+
+2. ###### Moderation edge deletion: DELETE method
+
+   1. request object contains mandatory:
+
+      1. admin\_id #
+      2. user\_id
+      3. community\_id
+   2. Behaviour:
+
+      1. An existing relation between user and community is removed.
+
+
+
+##### MEMBERSHIP RELATION MANAGEMENT <Edge label: PARTICIPATES>
+
+1. ###### Membership edge creation: POST method
+
+   1. request object contains mandatory:
+
+      1. user\_id #
+      2. community\_id
+   2. Behaviour:
+
+      1. A new relation between user and community nodes is created
+      2. To prevent erroneous subsequence request from creating multiple edges between 2 nodes, MERGE is used.
+      3. timestamp is added to this edge.
+      4. 'population' of the community document is incremented.
+2. ###### Membership edge deletion: DELETE method
+
+   1. request object contains mandatory:
+
+      1. user\_id #
+      2. community\_id
+   2. Behaviour:
+
+      1. An existing edge between user and community is deleted.
+      2. 'population' of the community document is decremented.
+
+
+
+* Since there is no concrete schema / constraint that can be imposed on the node labels and edges in Neo4j, this falls under backend's responsibility. 
+* Also, delete operations are now cascading: deleting entity documents will result in nodes and corresponding edges connected to the document (via objectID) be deleted as well.
+* Cascading nature for each entity deletion procedure will be mentioned in detail later.
+
+\---
 

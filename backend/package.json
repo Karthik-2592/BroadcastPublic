@@ -6,6 +6,7 @@
     "neo4j-driver": "^6.2.0"
   },
   "scripts": {
+    "db:init": "node --experimental-strip-types scripts/initialize-mongodb.ts",
     "start": "node --experimental-strip-types src/index.ts",
     "typecheck": "tsc --noEmit"
   },

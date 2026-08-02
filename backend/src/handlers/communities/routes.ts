@@ -6,6 +6,4 @@ r.post("/", h.create);
 r.get("/:id", h.get);
 r.put("/:id", h.update);
 r.delete("/:id", h.remove);
-r.post("/:id/members", h.join);
-r.delete("/:id/members", h.leave);
 export default r;

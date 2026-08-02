@@ -1,21 +1,22 @@
 import type { Request, Response } from "express";
 import { fail, id, ok } from "../../http.ts";
 import { store } from "../../store.ts";
-export function list(req: Request, res: Response) {
-  const u = String(req.query.user_id ?? "");
+export async function list(req: Request, res: Response) {
   return ok(
     res,
-    [...store.notifications.values()].filter((n) => !u || n.user_id === u),
+    await store.notifications(
+      req.query.user_id ? String(req.query.user_id) : undefined,
+    ),
   );
 }
-export function read(req: Request, res: Response) {
-  const n = store.notifications.get(id(req));
-  if (!n) return fail(res, 404, "Notification not found.");
-  n.read = true;
-  return ok(res, n);
+export async function read(req: Request, res: Response) {
+  const notification = await store.notification(id(req), true);
+  return notification
+    ? ok(res, notification)
+    : fail(res, 404, "Notification not found.");
 }
-export function remove(req: Request, res: Response) {
-  if (!store.notifications.delete(id(req)))
+export async function remove(req: Request, res: Response) {
+  if (!(await store.deleteNotification(id(req))))
     return fail(res, 404, "Notification not found.");
   return ok(res, null, "Notification deleted successfully.");
 }

@@ -4,7 +4,6 @@ export interface User {
   id: Id;
   username: string;
   email: string;
-  password: string;
   interests: string[];
   profile_name?: string;
   profile_picture?: unknown;
@@ -15,12 +14,13 @@ export interface User {
 }
 export interface Post {
   id: Id;
-  user_id: Id;
+  user_id: Id | null;
   content: string;
   user_summary: unknown;
   tags: string[];
   media: unknown[];
   visibility: string | null;
+  popularity_score: number;
   favorite_count: number;
   comment_count: number;
   created_at: string;
@@ -29,7 +29,6 @@ export interface Comment {
   id: Id;
   post_id: Id;
   user_id: Id | null;
-  type: boolean;
   root: Id | null;
   content: string;
   user_summary?: unknown;
@@ -56,4 +55,44 @@ export interface Notification {
   read: boolean;
   timestamp: string;
 }
-export type Relation = "follow" | "favorite" | "save" | "member" | "moderator";
+
+export interface ApiResult<T> {
+  success: boolean;
+  message: string;
+  data?: T;
+}
+export interface RegisterRequest {
+  username: string;
+  email: string;
+  password: string;
+  interests?: string[];
+  profile_name?: string;
+  profile_picture?: unknown;
+  profile_description?: string;
+}
+export interface LoginRequest {
+  username?: string;
+  email?: string;
+  password: string;
+}
+export interface PostCreateRequest {
+  user_id: Id;
+  content: string;
+  user_summary: unknown;
+  tags?: string[];
+  media?: unknown[];
+  visibility?: string | null;
+}
+export interface CommentCreateRequest {
+  user_id: Id;
+  content: string;
+  root?: Id | null;
+  user_summary?: unknown;
+}
+export interface CommunityCreateRequest {
+  user_id: Id;
+  community_name: string;
+  community_desc: string;
+  tags?: string[];
+  community_banner?: unknown;
+}
