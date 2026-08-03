@@ -6,8 +6,17 @@ export const ok = (
   message = "Operation completed successfully.",
   status = 200,
 ) => res.status(status).json({ success: true, message, data });
-export const fail = (res: Response, status: number, message: string) =>
-  res.status(status).json({ success: false, message });
+export const logFailure = (
+  req: Request,
+  status: number,
+  message: string,
+) => {
+  console.log(`[http] ${req.method} ${req.originalUrl}: ${status} ${message}`);
+};
+export const fail = (res: Response, status: number, message: string) => {
+  logFailure(res.req, status, message);
+  return res.status(status).json({ success: false, message });
+};
 export const id = (req: Request, name = "id") => String(req.params[name] ?? "");
 export const required = (
   body: Record<string, unknown> = {},

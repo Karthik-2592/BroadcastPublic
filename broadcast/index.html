@@ -1,216 +1,343 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Broadcast API verification</title>
-  </head>
-  <body>
-    <h1>Broadcast API verification</h1>
-    <p>Plain manual test page for the MongoDB-backed entity handlers.</p>
-    <label
-      >API base URL
-      <input id="apiBase" value="http://localhost:3000/v1" size="35"
-    /></label>
-    <button type="button" onclick="callApi('/../health', 'GET')">
-      Check health
-    </button>
-    <hr />
 
-    <h2>Users</h2>
-    <form onsubmit="submitForm(event, '/users', 'POST', normalizeUser)">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Broadcast API verification</title>
+  <style>
+    :root { font: 15px system-ui, sans-serif; color: #203047; background: #f3f6fa; }
+    body { max-width: 1180px; margin: 0 auto; padding: 24px; }
+    h1 { margin-bottom: 4px; } h2 { color: #173b67; margin-top: 24px; }
+    section, .toolbar { background: white; border: 1px solid #d7e0eb; border-radius: 10px; padding: 16px; margin: 16px 0; box-shadow: 0 2px 8px #18324a0d; }
+    .toolbar, form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .relation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+    input, textarea, select, button { border: 1px solid #b9c8d8; border-radius: 6px; padding: 8px; font: inherit; }
+    input, textarea, select { flex: 1 1 145px; min-width: 0; } button { cursor: pointer; background: #e9f1fb; color: #173b67; font-weight: 600; }
+    button:hover { background: #d5e6fa; } .danger { color: #9b2226; } .hint { color: #5e7187; font-size: .9rem; }
+    #session { color: #1d6b43; font-weight: 700; } #response { min-height: 120px; overflow: auto; background: #17212b; color: #d8f3dc; padding: 14px; border-radius: 8px; }
+  </style>
+</head>
+
+<body>
+  <h1>Broadcast API verification</h1>
+  <p>Plain manual test page for the MongoDB-backed entity handlers.</p>
+  <label>API base URL
+    <input id="apiBase" value="http://localhost:3000/v1" size="35" /></label>
+  <button type="button" onclick="callApi('/../health', 'GET')">
+    Check health
+  </button>
+  <hr />
+
+  <section>
+    <h2>Login / registration</h2>
+    <p class="hint">The active user is used automatically for relation requests.</p>
+    <span id="session">No active user</span>
+    <form onsubmit="authSubmit(event, '/users', 'POST', normalizeUser)">
       <input name="username" placeholder="username" required />
       <input name="email" type="email" placeholder="email" required />
       <input name="password" placeholder="password" required />
-      <input name="interests" placeholder="interests,comma,separated" />
-      <button>Create user</button>
+      <input name="interests" placeholder="interests,a,b" />
+      <button>Register and use user</button>
     </form>
-    <form
-      onsubmit="submitForm(event, '/users/' + valueOf(this, 'id'), 'DELETE')"
-    >
-      <input name="id" placeholder="user id" required />
-      <button>Delete user</button>
+    <form onsubmit="authSubmit(event, '/sessions', 'POST')">
+      <input name="username" placeholder="username or email" required />
+      <input name="password" placeholder="password" required />
+      <button>Login and use user</button>
+      <button type="button" onclick="logout()">Clear local session</button>
     </form>
+  </section>
 
-    <h2>Posts</h2>
-    <form onsubmit="submitForm(event, '/posts', 'POST', normalizePost)">
-      <input name="user_id" placeholder="user id" required />
-      <input name="content" placeholder="content" required />
-      <input
-        name="user_summary"
-        placeholder="user summary JSON"
-        required
-        size="30"
-      />
-      <input name="tags" placeholder="tags,comma,separated" />
-      <input name="visibility" value="public" /> <button>Create post</button>
-    </form>
-    <form
-      onsubmit="submitForm(event, '/posts/' + valueOf(this, 'id'), 'DELETE')"
-    >
-      <input name="id" placeholder="post id" required />
-      <input name="user_id" placeholder="owner user id" />
-      <button>Delete post</button>
-    </form>
+  <h2>Users</h2>
+  <form onsubmit="submitForm(event, '/users', 'POST', normalizeUser)">
+    <input name="username" placeholder="username" required />
+    <input name="email" type="email" placeholder="email" required />
+    <input name="password" placeholder="password" required />
+    <input name="interests" placeholder="interests,comma,separated" />
+    <button>Create user</button>
+  </form>
+  <form onsubmit="submitForm(event, '/users/' + fieldValue(this, 'id'), 'DELETE')">
+    <input name="id" placeholder="user id" required />
+    <button>Delete user</button>
+  </form>
 
-    <h2>Comments</h2>
-    <form
-      onsubmit="
-        submitForm(
-          event,
-          '/posts/' + valueOf(this, 'post_id') + '/comments',
-          'POST',
-          normalizeComment,
-        )
-      "
-    >
-      <input name="post_id" placeholder="post id" required />
-      <input name="user_id" placeholder="user id" required />
-      <input name="content" placeholder="comment content" required />
-      <input name="root" placeholder="root comment id (optional)" />
-      <button>Create comment</button>
-    </form>
-    <form
-      onsubmit="submitForm(event, '/comments/' + valueOf(this, 'id'), 'DELETE')"
-    >
-      <input name="id" placeholder="comment id" required />
-      <input name="user_id" placeholder="comment owner user id" />
-      <button>Delete comment</button>
-    </form>
+  <h2>Posts</h2>
+  <form onsubmit="createPost(event)">
+    <input name="title" placeholder="title" maxlength="75" required />
+    <input name="content" placeholder="content" required />
+    <input name="tags" placeholder="tags,comma,separated" />
+    <button>Create post</button>
+  </form>
+  <form onsubmit="submitForm(event, '/posts/' + fieldValue(this, 'id'), 'DELETE')">
+    <input name="id" placeholder="post id" required />
+    <input name="user_id" placeholder="requesting user id" required />
+    <button>Delete post</button>
+  </form>
 
-    <h2>Communities</h2>
-    <form
-      onsubmit="submitForm(event, '/communities', 'POST', normalizeCommunity)"
-    >
-      <input name="user_id" placeholder="admin user id" required />
-      <input name="community_name" placeholder="community name" required />
-      <input name="community_desc" placeholder="description" required />
-      <input name="tags" placeholder="tags,comma,separated" />
-      <button>Create community</button>
-    </form>
-    <form
-      onsubmit="
-        submitForm(event, '/communities/' + valueOf(this, 'id'), 'DELETE')
-      "
-    >
-      <input name="id" placeholder="community id" required />
-      <input name="admin_id" placeholder="admin user id" required />
-      <button>Delete community</button>
-    </form>
+  <h2>Comments</h2>
+  <form onsubmit="createComment(event)">
+    <input name="post_id" placeholder="post id" required />
+    <input name="content" placeholder="comment content" required />
+    <input name="root" placeholder="root comment id (optional)" />
+    <button>Create comment</button>
+  </form>
+  <form onsubmit="submitForm(event, '/comments/' + fieldValue(this, 'id'), 'DELETE')">
+    <input name="id" placeholder="comment id" required />
+    <input name="user_id" placeholder="requesting user id" required />
+    <button>Delete comment</button>
+  </form>
 
-    <h2>Notifications</h2>
-    <p>
-      Notifications currently have no public creation route; existing
-      notifications can be listed or deleted.
-    </p>
-    <form
-      onsubmit="
+  <h2>Communities</h2>
+  <form onsubmit="submitForm(event, '/communities', 'POST', normalizeCommunity)">
+    <input name="user_id" placeholder="admin user id" required />
+    <input name="community_name" placeholder="community name" required />
+    <input name="community_desc" placeholder="description" required />
+    <input name="tags" placeholder="tags,comma,separated" />
+    <button>Create community</button>
+  </form>
+  <form onsubmit="
+        submitForm(event, '/communities/' + fieldValue(this, 'id'), 'DELETE')
+      ">
+    <input name="id" placeholder="community id" required />
+    <input name="admin_id" placeholder="admin user id" required />
+    <button>Delete community</button>
+  </form>
+
+  <h2>Notifications</h2>
+  <p>
+    Notifications currently have no public creation route; existing
+    notifications can be listed or deleted.
+  </p>
+  <form onsubmit="
         submitForm(
           event,
           '/notifications?user_id=' +
-            encodeURIComponent(valueOf(this, 'user_id')),
+            encodeURIComponent(fieldValue(this, 'user_id')),
           'GET',
         )
-      "
-    >
-      <input name="user_id" placeholder="user id (optional)" />
-      <button>List notifications</button>
-    </form>
-    <form
-      onsubmit="
-        submitForm(event, '/notifications/' + valueOf(this, 'id'), 'DELETE')
-      "
-    >
-      <input name="id" placeholder="notification id" required />
-      <button>Delete notification</button>
-    </form>
+      ">
+    <input name="user_id" placeholder="user id (optional)" />
+    <button>List notifications</button>
+  </form>
+  <form onsubmit="
+        submitForm(event, '/notifications/' + fieldValue(this, 'id'), 'DELETE')
+      ">
+    <input name="id" placeholder="notification id" required />
+    <button>Delete notification</button>
+  </form>
+
+    <section>
+      <h2>Relations</h2>
+      <p class="hint">Login first. The active user is automatically sent for these operations. Post likes are processed by the background worker.</p>
+      <div class="relation-grid">
+        <div><h3>Follow user</h3><form onsubmit="relation(event, '/relations/follows', 'followed_id')"><input name="followed_id" placeholder="followed user id" required /><button>Follow</button><button type="button" onclick="relation(event, '/relations/follows', 'followed_id', 'DELETE')">Unfollow</button></form></div>
+        <div><h3>Like post</h3><form onsubmit="relation(event, '/relations/posts/likes', 'post_id')"><input name="post_id" placeholder="post id" required /><button>Like</button><button type="button" onclick="relation(event, '/relations/posts/likes', 'post_id', 'DELETE')">Unlike</button></form></div>
+        <div><h3>Like comment</h3><form onsubmit="relation(event, '/relations/comments/likes', 'comment_id', 'POST', 'post_id')"><input name="post_id" placeholder="post id" required /><input name="comment_id" placeholder="comment id" required /><button>Like</button><button type="button" onclick="relation(event, '/relations/comments/likes', 'comment_id', 'DELETE', 'post_id')">Unlike</button></form></div>
+        <div><h3>Save post</h3><form onsubmit="relation(event, '/relations/saves', 'post_id')"><input name="post_id" placeholder="post id" required /><button>Save</button><button type="button" onclick="relation(event, '/relations/saves', 'post_id', 'DELETE')">Unsave</button></form></div>
+        <div><h3>Join community</h3><form onsubmit="relation(event, '/relations/memberships', 'community_id')"><input name="community_id" placeholder="community id" required /><button>Join</button><button type="button" onclick="relation(event, '/relations/memberships', 'community_id', 'DELETE')">Leave</button></form></div>
+        <div><h3>Moderate user</h3><form onsubmit="moderate(event, 'POST')"><input name="community_id" placeholder="community id" required /><input name="user_id" placeholder="user to moderate" required /><select name="authorization"><option>MODERATOR</option><option>ADMIN</option></select><button>Grant</button><button type="button" onclick="moderate(event, 'DELETE')">Revoke</button></form></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Additional entity operations</h2>
+      <div class="relation-grid">
+        <div><h3>Read / search users</h3><form onsubmit="submitForm(event, '/users/' + fieldValue(this, 'id'), 'GET')"><input name="id" placeholder="user id" required /><button>Get user</button></form><form onsubmit="submitForm(event, '/users/search?q=' + encodeURIComponent(fieldValue(this, 'q')), 'GET')"><input name="q" placeholder="username" required /><button>Search</button></form><form onsubmit="submitForm(event, '/users/' + fieldValue(this, 'id') + '/recommendations', 'GET')"><input name="id" placeholder="user id" required /><button>Recommendations</button></form></div>
+        <div><h3>Read posts</h3><form onsubmit="submitForm(event, '/posts/' + fieldValue(this, 'id'), 'GET')"><input name="id" placeholder="post id" required /><button>Get post</button></form><form onsubmit="submitForm(event, '/posts/feed', 'GET')"><button>Feed</button></form></div>
+        <div><h3>Read communities</h3><form onsubmit="submitForm(event, '/communities/' + fieldValue(this, 'id'), 'GET')"><input name="id" placeholder="community id" required /><button>Get community</button></form><form onsubmit="submitForm(event, '/communities/recommendations', 'GET')"><button>Recommendations</button></form></div>
+        <div><h3>Comments for post</h3><form onsubmit="submitForm(event, '/posts/' + fieldValue(this, 'post_id') + '/comments', 'GET')"><input name="post_id" placeholder="post id" required /><button>List comments</button></form></div>
+        <div><h3>Update user</h3><form onsubmit="submitForm(event, '/users/' + fieldValue(this, 'id'), 'PUT', jsonBody)"><input name="id" placeholder="user id" required /><textarea name="json" placeholder='{"profile_name":"Updated"}' required></textarea><button>Update</button></form></div>
+        <div><h3>Update post</h3><form onsubmit="submitForm(event, '/posts/' + fieldValue(this, 'id'), 'PUT', postUpdate)"><input name="id" placeholder="post id" required /><input name="user_id" placeholder="owner user id" required /><textarea name="json" placeholder='{"content":"Updated"}' required></textarea><button>Update</button></form></div>
+        <div><h3>Update community</h3><form onsubmit="submitForm(event, '/communities/' + fieldValue(this, 'id'), 'PUT', communityUpdate)"><input name="id" placeholder="community id" required /><input name="admin_id" placeholder="admin user id" required /><textarea name="json" placeholder='{"community_desc":"Updated"}' required></textarea><button>Update</button></form></div>
+        <div><h3>Update notification</h3><form onsubmit="submitForm(event, '/notifications/' + fieldValue(this, 'id'), 'PATCH', readNotification)"><input name="id" placeholder="notification id" required /><select name="read"><option value="true">Read</option><option value="false">Unread</option></select><button>Mark read</button></form></div>
+      </div>
+    </section>
 
     <h2>Response</h2>
-    <pre id="response">No request made.</pre>
-    <script>
-      function valueOf(form, name) {
-        return form.elements[name].value.trim();
-      }
-      function fields(form) {
-        const data = {};
-        for (const element of form.elements)
-          if (
-            element.name &&
-            !["id", "post_id", "community_id", "target_id"].includes(
-              element.name,
-            )
+  <pre id="response">No request made.</pre>
+  <script>
+    function fieldValue(form, name) {
+      return form.elements[name].value.trim();
+    }
+    function fields(form) {
+      const data = {};
+      for (const element of form.elements)
+        if (
+          element.name &&
+          !["id", "post_id", "target_id"].includes(
+            element.name,
           )
-            data[element.name] = element.value.trim();
-        return data;
+        )
+          data[element.name] = element.value.trim();
+      return data;
+    }
+    function normalizePost(data) {
+      data.tags = data.tags
+        ? data.tags
+          .split(",")
+          .map((x) => x.trim())
+          .filter(Boolean)
+        : [];
+      return data;
+    }
+    function normalizeUser(data) {
+      data.interests = data.interests
+        ? data.interests
+          .split(",")
+          .map((x) => x.trim())
+          .filter(Boolean)
+        : [];
+      return data;
+    }
+    function normalizeComment(data) {
+      if (!data.root) data.root = null;
+      return data;
+    }
+    async function currentUserSummary() {
+      if (!activeUserId) throw new Error("Register or login first.");
+      const result = await callApi(`/users/${activeUserId}`, "GET");
+      if (!result?.success) throw new Error(result?.message || "Unable to load active user.");
+      const user = result.data;
+      const picture = user.profile_picture;
+      return {
+        username: user.username,
+        profile_picture:
+          typeof picture === "string" ? picture : picture?.media_url || null,
+      };
+    }
+    async function createPost(event) {
+      event.preventDefault();
+      try {
+        const data = normalizePost(fields(event.target));
+        data.user_id = activeUserId;
+        data.user_summary = await currentUserSummary();
+        await callApi("/posts", "POST", data);
+      } catch (error) {
+        show({ success: false, message: error.message });
       }
-      function normalizePost(data) {
-        data.tags = data.tags
-          ? data.tags
-              .split(",")
-              .map((x) => x.trim())
-              .filter(Boolean)
-          : [];
-        data.user_summary = JSON.parse(data.user_summary);
-        return data;
+    }
+    async function createComment(event) {
+      event.preventDefault();
+      try {
+        const postId = fieldValue(event.target, "post_id");
+        const data = normalizeComment(fields(event.target));
+        data.user_id = activeUserId;
+        data.user_summary = await currentUserSummary();
+        await callApi(`/posts/${postId}/comments`, "POST", data);
+      } catch (error) {
+        show({ success: false, message: error.message });
       }
-      function normalizeUser(data) {
-        data.interests = data.interests
-          ? data.interests
-              .split(",")
-              .map((x) => x.trim())
-              .filter(Boolean)
-          : [];
-        return data;
+    }
+    function normalizeCommunity(data) {
+      data.tags = data.tags
+        ? data.tags
+          .split(",")
+          .map((x) => x.trim())
+          .filter(Boolean)
+        : [];
+      return data;
+    }
+    function jsonBody(data) {
+      return JSON.parse(data.json);
+    }
+    function postUpdate(data) {
+      return { ...JSON.parse(data.json), user_id: data.user_id };
+    }
+    function communityUpdate(data) {
+      return { ...JSON.parse(data.json), admin_id: data.admin_id };
+    }
+    function readNotification(data) {
+      return { read: data.read === "true" };
+    }
+    let activeUserId = localStorage.getItem("broadcast.activeUserId") || "";
+    function updateSession() {
+      document.getElementById("session").textContent = activeUserId
+        ? `Active user: ${activeUserId}`
+        : "No active user";
+    }
+    function formFromEvent(event) {
+      return event.currentTarget?.tagName === "FORM"
+        ? event.currentTarget
+        : event.currentTarget?.form || event.target.form;
+    }
+    async function authSubmit(event, path, method, transform) {
+      event.preventDefault();
+      const data = fields(event.target);
+      const result = await callApi(path, method, transform ? transform(data) : data);
+      if (result?.success) {
+        activeUserId = result.data?.user_id || result.data?.id || "";
+        localStorage.setItem("broadcast.activeUserId", activeUserId);
+        updateSession();
       }
-      function normalizeComment(data) {
-        if (!data.root) data.root = null;
-        return data;
+    }
+    async function logout() {
+      await callApi("/sessions/current", "DELETE");
+      activeUserId = "";
+      localStorage.removeItem("broadcast.activeUserId");
+      updateSession();
+      show({ success: true, message: "Local session cleared." });
+    }
+    async function relation(event, path, target, method = "POST", extra) {
+      event.preventDefault();
+      const form = formFromEvent(event);
+      if (!activeUserId)
+        return show({ success: false, message: "Register or login first." });
+      const body = { user_id: activeUserId };
+      body[target] = fieldValue(form, target);
+      if (extra) body[extra] = fieldValue(form, extra);
+      await callApi(path, method, body);
+    }
+    async function moderate(event, method) {
+      event.preventDefault();
+      const form = formFromEvent(event);
+      if (!activeUserId)
+        return show({ success: false, message: "Register or login first." });
+      await callApi("/relations/moderators", method, {
+        admin_id: activeUserId,
+        user_id: fieldValue(form, "user_id"),
+        community_id: fieldValue(form, "community_id"),
+        authorization: fieldValue(form, "authorization") || "MODERATOR",
+      });
+    }
+    async function submitForm(event, path, method, transform) {
+      event.preventDefault();
+      try {
+        const data = fields(event.target);
+        await callApi(path, method, transform ? transform(data) : data);
+      } catch (error) {
+        show({ success: false, message: error.message });
       }
-      function normalizeCommunity(data) {
-        data.tags = data.tags
-          ? data.tags
-              .split(",")
-              .map((x) => x.trim())
-              .filter(Boolean)
-          : [];
-        return data;
+    }
+    async function callApi(path, method, body) {
+      const base = document
+        .getElementById("apiBase")
+        .value.replace(/\/$/, "");
+      const options = { method, headers: {} };
+      if (method !== "GET" && body) {
+        options.headers["Content-Type"] = "application/json";
+        options.body = JSON.stringify(body);
       }
-      async function submitForm(event, path, method, transform) {
-        event.preventDefault();
-        try {
-          const data = fields(event.target);
-          await callApi(path, method, transform ? transform(data) : data);
-        } catch (error) {
-          show({ success: false, message: error.message });
-        }
+      const response = await fetch(base + path, options);
+      const text = await response.text();
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch {
+        result = { status: response.status, body: text };
       }
-      async function callApi(path, method, body) {
-        const base = document
-          .getElementById("apiBase")
-          .value.replace(/\/$/, "");
-        const options = { method, headers: {} };
-        if (method !== "GET" && body) {
-          options.headers["Content-Type"] = "application/json";
-          options.body = JSON.stringify(body);
-        }
-        const response = await fetch(base + path, options);
-        const text = await response.text();
-        let result;
-        try {
-          result = JSON.parse(text);
-        } catch {
-          result = { status: response.status, body: text };
-        }
-        show(result);
-      }
-      function show(result) {
-        document.getElementById("response").textContent = JSON.stringify(
-          result,
-          null,
-          2,
-        );
-      }
-    </script>
-  </body>
+      show(result);
+      return result;
+    }
+    function show(result) {
+      document.getElementById("response").textContent = JSON.stringify(
+        result,
+        null,
+        2,
+      );
+    }
+    updateSession();
+  </script>
+</body>
+
 </html>

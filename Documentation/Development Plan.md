@@ -161,7 +161,7 @@ Results:
 
 | ADMIN\_OF (membership/role)  |          —         |                  ✓                  |
 
-| BELONGS\_TO (Post–Community) | ✓ (`community\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\_id`) | ✓ (recommended dual representation) |
+| BELONGS\_TO (Post–Community) | ✓ (`community\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\_id`) | ✓ (recommended dual representation) |
 
 
 
@@ -1282,7 +1282,7 @@ Backend acts as the intermediate between both databases as well as the client. A
 
 
 
-2. ###### Like edge creation for comments: POST method
+1. ###### Like edge creation for comments: POST method
 
    1. request object contains mandatory
 
@@ -1298,7 +1298,7 @@ Backend acts as the intermediate between both databases as well as the client. A
 
 
 
-3. ###### Like edge deletion for posts: DELETE method
+1. ###### Like edge deletion for posts: DELETE method
 
    1. request object contains mandatory:
 
@@ -1328,7 +1328,7 @@ Backend acts as the intermediate between both databases as well as the client. A
 
 
 
-2. ###### Save edge deletion: DELETE method
+1. ###### Save edge deletion: DELETE method
 
    1. request object contains mandatory
 
@@ -1357,7 +1357,7 @@ Backend acts as the intermediate between both databases as well as the client. A
 
 
 
-2. ###### Moderation edge deletion: DELETE method
+1. ###### Moderation edge deletion: DELETE method
 
    1. request object contains mandatory:
 
@@ -1397,9 +1397,160 @@ Backend acts as the intermediate between both databases as well as the client. A
 
 
 
-* Since there is no concrete schema / constraint that can be imposed on the node labels and edges in Neo4j, this falls under backend's responsibility. 
+* Since there is no concrete schema / constraint that can be imposed on the node labels and edges in Neo4j, this falls under backend's responsibility.
 * Also, delete operations are now cascading: deleting entity documents will result in nodes and corresponding edges connected to the document (via objectID) be deleted as well.
 * Cascading nature for each entity deletion procedure will be mentioned in detail later.
+* 'Title' field added to the POST entity.
+* Schema validation ensured.
 
 \---
+
+
+
+##### **Insert sample documents into MongoDB:**
+
+1. For each collection, create a random set of values that can used for creating objects.
+
+   1. For USER collection:
+
+      1. User name can be a combination of <Random adjective + random noun + random 4 digit number>
+      2. Email can be any valid email address
+      3. Password can be random 8-12 letter string.
+      4. Follower count = following count = 0
+      5. Interests = empty
+      6. Pinned posts = empty
+      7. Profile picture = profile description = empty
+      8. Profile name = username
+   2. For COMMUNITY Collection:
+
+      1. Community name can be combination of <Random Noun+ Random Noun>
+      2. Community description = empty
+      3. Population = 0
+      4. Banner = null
+      5. Admin id = a random user id (after creating users)
+      6. tags = empty
+      7. post\_count = 0
+      8. timestamp = timestamp when object is created.
+      9. Note: Create one a special community (called public community, with community\_id = "public\_community)
+   3. For Post Collection:
+
+      1. Random user id (after creating users)
+      2. Community id = "public\_community"
+      3. favoritecount = comment\_count = 0
+      4. timestamp = timestamp when object is created
+      5. Title = <random noun + random noun + random noun>
+      6. Content = empty
+      7. Media = empty
+      8. user summary = {username/profilename= username of the random\_user\_id assigned, profilepicture = null}
+   4. For Comment Collection:
+
+      1. Random user\_id (after creating users)
+      2. Random post\_id (after creating posts)
+      3. Content = <Random Noun + Random noun + Random Noun>
+      4. Root = 'null'
+      5. user summary = {username/profilename= username of the random\_user\_id assigned, profilepicture = null}
+      6. favorite count = reply count = 0;
+      7. timestamp = creation time
+
+
+
+1. A special Community (collection) document with that particular ID is to be created. Then every post documents points to this special document.
+2. Yes,  post.community\_id should be added to POST schema as an ObjectID reference.
+3. Yes, infact, every media object (or field referring to media objects) should allow null value as well
+4. Popularity\_score had its data type changed from integer to Double (NumberDouble) wherever used.
+
+\---
+
+
+
+* For recovery purposes, store the password of each user document in a separate new collection called 'passwords'.
+* The structure is very simple {username: string, string: password}.
+* This collection requires no indices. This collection will never have any handlers retrieve from it (handlers only add documents to this collection).
+
+
+
+Insertion of objects fail (for example user creation) fails document validation (in \[store.ts](B:/Projects/Broadcast/backend/src/store.ts)  at register() method). Check whether all the methods in store.ts match the validations applied in \[initialize-mongodb.ts](B:/Projects/Broadcast/backend/scripts/initialize-mongodb.ts) .  Furthermore, instead of storing all DB access methods in \[store.ts](B:/Projects/Broadcast/backend/src/store.ts) modularize this so that each collection access is stored in its own directory (or provide a reason on why this may not be ideal).
+
+
+
+* Logging messages are inconsistent: Server responds with "Conflict" error to client, however server also logs "success" for insertion (Fortunately, the error is only with the logging, DB is consistent).
+* Update POST entity's create post methods.
+* Logging messages for database modifications is present. However, bad requests are not logged server-side. (Currently a failed User Delete request leaves no trace in the server logs).
+* remove the current community\_id of the special community document. Instead, declare an environment variable that contains the ID of this special document. Any reference to its ID is now accessed via the environment variable.
+
+\---
+
+
+
+* Ensure that admin can delete posts (and comments) associated with their community. This is to be done via checking whether requesting user's id is community's admin\_id.
+
+
+
+#### Major Schema Changes:
+
+1. Include a new "comment\_favorite\_store"  document, this document contains all comment\_favorites by users. 
+2. No longer is the favorite\_count of the either post/comment incremented immediately, both operation occur as the result of a scheduled task by a background worker.
+3. For posts/comments, likes create new entries in a server side set that tracks all events where each event represents that actions like <post liked by user> or <comment unliked by user>, and so on. This is done through (comment-user) , (post-user) pairs as key, and event result as value. (LIke, Dislike) etc..
+4. Important behaviour of the set is that addition of a existing (key-value) pairs results in overwrite. 
+5. A background worker periodically processes each entry in the set and performs the following:
+
+   1. (comment:user) pair results in a (comment, user0 entry added to 'comment\_favorite\_store' in mongoDB. Vice versa for deletion
+   2. (post:user) pair results in a <post, user> edge added to Neo4j. Vice versa for deletion. (This is to considered for now, and implemented in future when asked).
+6. Another background worker also periodically processes the same set and performs the following:
+
+   1. for each distinct <comment> in the queue, collect all its pairs (representing likes/dislikes), find the resultant of all operations, and add this sum to the comment entity.
+   2. for each distinct <post> in the queue, collect all its pairs (representing likes/dislikes), find the resultant of all operations, and add this sum to the comment entity.
+
+
+
+
+
+Result:
+
+1. comment\_favorite\_store collection added
+2. Background works for creating relations and aggregation of counts are added
+3. Population\_score calculating background worker is integrated under favorite\_aggregator for posts.
+4. Server-maintained event set is implemented (Snapshots are given to workers, and set is cleared when all works succeed).
+5. Asynchrounous background workers respond with their status every <30s> and this is logged by the server program.
+
+
+
+##### Inserting sample relations into Neo4j.
+
+1. Create another initializer script, similar to seed-mongodb.ts, which will insert the sample data into neo4j graph DB.
+2. Note that will be executed after seed-mongodb.ts is executed, as entities need to be present before they are added to graph.
+3. Each entity should have its corresponding node label, with ObjectID of the entity also as an attribute of the node.
+4. All relation handlers should now modify underlying neo4j DB.
+5. Consider the cached write-back (background services) implemented when implementing these relations.
+6. Comments are not added as nodes within neo4j graph database.
+
+
+
+* Restructure the \[index.html](broadcast/index.html) to now allow testing of all handlers (both entity and relations). Add moderate amount of styling for ease of use. Implement a simple login / registration mechanism for liking posts, joining communities and follow users as one of the users.
+* Frontend should not have an input for "user summary JSON", instead it should be handled based on current user in the session. Modify as required. Ask for clarification
+
+
+
+*Note: Environment variable configuration. (Know what environment variable is)'*
+
+
+
+
+
+##### **TESTING:**
+
+* Post deletion does not delete the node in Neo4j.
+* Wrong error message when user tries to follow non-existent follower\_id, or following self, or when unfollowing\_self, or when unfollowing an account that was never followed.
+* Comment Creation creates no request from the frontend
+* 
+
+
+
+Efficient use of CPU (aggregation worker to flush/execute immediately when backend is idle beyond a threshold)
+
+
+
+
+
+
 

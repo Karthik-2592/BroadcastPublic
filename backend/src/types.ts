@@ -15,15 +15,16 @@ export interface User {
 export interface Post {
   id: Id;
   user_id: Id | null;
+  community_id?: Id | null;
+  title: string;
   content: string;
   user_summary: unknown;
   tags: string[];
   media: unknown[];
-  visibility: string | null;
   popularity_score: number;
   favorite_count: number;
   comment_count: number;
-  created_at: string;
+  time_created: string;
 }
 export interface Comment {
   id: Id;
@@ -77,11 +78,12 @@ export interface LoginRequest {
 }
 export interface PostCreateRequest {
   user_id: Id;
+  community_id?: Id | null;
+  title: string;
   content: string;
   user_summary: unknown;
   tags?: string[];
   media?: unknown[];
-  visibility?: string | null;
 }
 export interface CommentCreateRequest {
   user_id: Id;

@@ -1,10 +1,12 @@
 import { createHash, randomBytes } from "node:crypto";
 import {
   MongoClient,
+  Double,
   ObjectId,
   type Collection,
   type Db,
   type Document,
+  type Filter,
   type UpdateFilter,
 } from "mongodb";
 import type {
@@ -15,32 +17,59 @@ import type {
   Post,
   User,
 } from "./types.ts";
+import { env } from "./config/env.ts";
 
-type UserDocument = Omit<User, "id" | "password"> & {
+type UserDocument = Omit<User, "id" | "pinned_posts"> & {
   _id: ObjectId;
+  pinned_posts: ObjectId[];
   password: { password_hash: string; salt: string };
 };
-type PostDocument = Omit<Post, "id" | "created_at"> & {
+type PostDocument = Omit<
+  Post,
+  "id" | "user_id" | "community_id" | "time_created" | "popularity_score"
+> & {
   _id: ObjectId;
-  created_at: Date;
+  user_id: ObjectId | null;
+  community_id?: ObjectId | null;
+  time_created: Date;
+  popularity_score: Double | number;
 };
-type CommentDocument = Omit<Comment, "id" | "timestamp"> & {
+type CommentDocument = Omit<
+  Comment,
+  "id" | "post_id" | "user_id" | "root" | "timestamp"
+> & {
   _id: ObjectId;
+  post_id: ObjectId;
+  user_id: ObjectId | null;
+  root: ObjectId | null;
   timestamp: Date;
 };
-type CommunityDocument = Omit<Community, "id" | "timestamp"> & {
+type CommunityDocument = Omit<Community, "id" | "admin_id" | "timestamp"> & {
   _id: ObjectId;
+  admin_id: ObjectId | null;
   timestamp: Date;
 };
-type NotificationDocument = Omit<Notification, "id" | "timestamp"> & {
+type NotificationDocument = Omit<
+  Notification,
+  "id" | "user_id" | "event_id" | "timestamp"
+> & {
   _id: ObjectId;
+  user_id: ObjectId;
+  event_id: ObjectId;
   timestamp: Date;
+};
+type CommentFavoriteDocument = {
+  comment_id: ObjectId;
+  user_id: ObjectId;
 };
 
-const uri = process.env.MONGODB_URI ?? "mongodb://127.0.0.1:27017";
-const databaseName = process.env.MONGODB_DATABASE ?? "broadcast";
+const uri = env.mongoUri;
+const databaseName = env.mongoDatabase;
 const oid = (value: string) =>
   ObjectId.isValid(value) ? new ObjectId(value) : null;
+const publicCommunityObjectId = oid(env.publicCommunityId);
+if (!publicCommunityObjectId)
+  throw new Error("PUBLIC_COMMUNITY_ID must be a valid MongoDB ObjectId");
 const apiId = (value: ObjectId) => value.toHexString();
 const hash = (password: string, salt: string) =>
   createHash("sha256").update(`${salt}:${password}`).digest("hex");
@@ -52,7 +81,7 @@ const safeUser = (user: UserDocument): User => ({
   profile_name: user.profile_name,
   profile_picture: user.profile_picture,
   profile_description: user.profile_description,
-  pinned_posts: user.pinned_posts,
+  pinned_posts: user.pinned_posts.map(apiId),
   follower_count: user.follower_count,
   following_count: user.following_count,
 });
@@ -61,7 +90,10 @@ const safePost = (post: PostDocument): Post => {
   return {
     ...value,
     id: apiId(_id),
-    created_at: post.created_at.toISOString(),
+    user_id: post.user_id ? apiId(post.user_id) : null,
+    community_id: post.community_id ? apiId(post.community_id) : null,
+    popularity_score: Number(post.popularity_score.valueOf()),
+    time_created: post.time_created.toISOString(),
   };
 };
 const safeComment = (comment: CommentDocument): Comment => {
@@ -69,6 +101,9 @@ const safeComment = (comment: CommentDocument): Comment => {
   return {
     ...value,
     id: apiId(_id),
+    post_id: apiId(comment.post_id),
+    user_id: comment.user_id ? apiId(comment.user_id) : null,
+    root: comment.root ? apiId(comment.root) : null,
     timestamp: comment.timestamp.toISOString(),
   };
 };
@@ -77,6 +112,7 @@ const safeCommunity = (community: CommunityDocument): Community => {
   return {
     ...value,
     id: apiId(_id),
+    admin_id: community.admin_id ? apiId(community.admin_id) : null,
     timestamp: community.timestamp.toISOString(),
   };
 };
@@ -85,6 +121,8 @@ const safeNotification = (notification: NotificationDocument): Notification => {
   return {
     ...value,
     id: apiId(_id),
+    user_id: apiId(notification.user_id),
+    event_id: apiId(notification.event_id),
     timestamp: notification.timestamp.toISOString(),
   };
 };
@@ -92,8 +130,9 @@ const safeNotification = (notification: NotificationDocument): Notification => {
 export class MongoStore {
   private readonly client = new MongoClient(uri, {
     serverSelectionTimeoutMS: Number(
-      process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS ?? 5000,
+      env.mongoServerSelectionTimeoutMs,
     ),
+    ignoreUndefined: true,
   });
   private database?: Db;
   private async db(): Promise<Db> {
@@ -115,7 +154,9 @@ export class MongoStore {
   ): Promise<T> {
     try {
       const result = await action();
-      console.log(`[mongo] ${operation}: success`);
+      const outcome =
+        result === null || result === false || result === 0 ? "no-op" : "success";
+      console.log(`[mongo] ${operation}: ${outcome}`);
       return result;
     } catch (error) {
       console.log(`[mongo] ${operation}: failed`, error);
@@ -154,6 +195,14 @@ export class MongoStore {
         following_count: 0,
       };
       await users.insertOne(user);
+      await this.log("passwords.insertOne", () =>
+        this.collection("passwords").then((passwords) =>
+          passwords.insertOne({
+            username: input.username,
+            password: input.password,
+          }),
+        ),
+      );
       return safeUser(user);
     });
   }
@@ -190,6 +239,11 @@ export class MongoStore {
           ),
       ),
     );
+    if (Array.isArray(changes.pinned_posts)) {
+      const pinnedPosts = changes.pinned_posts.map((postId) => oid(postId));
+      if (pinnedPosts.some((postId) => !postId)) return null;
+      update.pinned_posts = pinnedPosts;
+    }
     return this.log("users.updateOne", async () => {
       const users = await this.collection<UserDocument>("users");
       await users.updateOne({ _id: objectId }, { $set: update });
@@ -207,12 +261,12 @@ export class MongoStore {
       if (!result.deletedCount) return false;
       await (
         await this.collection<PostDocument>("posts")
-      ).updateMany({ user_id: id }, {
+      ).updateMany({ user_id: objectId }, {
         $set: { user_id: null },
       } as UpdateFilter<PostDocument>);
       await (
         await this.collection<CommentDocument>("comments")
-      ).updateMany({ user_id: id }, {
+      ).updateMany({ user_id: objectId }, {
         $set: { user_id: null },
       } as UpdateFilter<CommentDocument>);
       return true;
@@ -248,14 +302,30 @@ export class MongoStore {
     );
   }
   async createPost(
-    input: Omit<Post, "id" | "created_at" | "favorite_count" | "comment_count">,
+    input: Omit<
+      Post,
+      "id" | "time_created" | "favorite_count" | "comment_count"
+    >,
   ) {
+    const userId = oid(input.user_id ?? "");
+    if (!userId) throw new Error("Invalid post user_id");
+  const communityId = input.community_id
+    ? oid(input.community_id)
+    : publicCommunityObjectId;
+  if (!communityId) throw new Error("Invalid post community_id");
     const post: PostDocument = {
       _id: new ObjectId(),
-      ...input,
+      user_id: userId,
+      community_id: communityId,
+      title: input.title,
+      content: input.content,
+      user_summary: input.user_summary,
+      tags: input.tags,
+      media: input.media,
+      popularity_score: new Double(input.popularity_score),
       favorite_count: 0,
       comment_count: 0,
-      created_at: new Date(),
+      time_created: new Date(),
     };
     return this.log("posts.insertOne", async () => {
       await (await this.collection<PostDocument>("posts")).insertOne(post);
@@ -282,9 +352,10 @@ export class MongoStore {
           ![
             "id",
             "user_id",
-            "created_at",
+            "time_created",
             "favorite_count",
             "comment_count",
+            "popularity_score",
           ].includes(key),
       ),
     );
@@ -305,18 +376,18 @@ export class MongoStore {
       if (result.deletedCount)
         await (
           await this.collection<CommentDocument>("comments")
-        ).deleteMany({ post_id: id });
+        ).deleteMany({ post_id: objectId });
       return Boolean(result.deletedCount);
     });
   }
   async feed() {
     return this.log("posts.find", () =>
       this.collection<PostDocument>("posts")
-        .then((c) => c.find().sort({ created_at: -1 }).toArray())
+        .then((c) => c.find().sort({ time_created: -1 }).toArray())
         .then((posts) => posts.map(safePost)),
     );
   }
-  async incrementPostFavoriteCount(postId: string, delta: 1 | -1) {
+  async incrementPostFavoriteCount(postId: string, delta: number) {
     const objectId = oid(postId);
     if (!objectId) return false;
     const result = await this.log("posts.favorite_count.update", () =>
@@ -326,7 +397,7 @@ export class MongoStore {
     );
     return result.matchedCount > 0;
   }
-  async incrementCommentFavoriteCount(commentId: string, delta: 1 | -1) {
+  async incrementCommentFavoriteCount(commentId: string, delta: number) {
     const objectId = oid(commentId);
     if (!objectId) return false;
     const result = await this.log("comments.favorite_count.update", () =>
@@ -335,6 +406,33 @@ export class MongoStore {
       ),
     );
     return result.matchedCount > 0;
+  }
+  async setCommentFavorite(
+    commentId: string,
+    userId: string,
+    favorited: boolean,
+  ): Promise<1 | 0 | -1> {
+    const commentObjectId = oid(commentId);
+    const userObjectId = oid(userId);
+    if (!commentObjectId || !userObjectId) return 0;
+    return this.log("comment_favorite_store.update", async () => {
+      const favorites = await this.collection<CommentFavoriteDocument>(
+        "comment_favorite_store",
+      );
+      if (favorited) {
+        const result = await favorites.updateOne(
+          { comment_id: commentObjectId, user_id: userObjectId },
+          { $setOnInsert: { comment_id: commentObjectId, user_id: userObjectId } },
+          { upsert: true },
+        );
+        return result.upsertedCount ? 1 : 0;
+      }
+      const result = await favorites.deleteOne({
+        comment_id: commentObjectId,
+        user_id: userObjectId,
+      });
+      return result.deletedCount ? -1 : 0;
+    });
   }
   async updateFollowCounts(
     followerId: string,
@@ -381,7 +479,8 @@ export class MongoStore {
     if (!post) return false;
     const ageInMonths = Math.max(
       0,
-      (now.getTime() - post.created_at.getTime()) / (1000 * 60 * 60 * 24 * 30),
+      (now.getTime() - post.time_created.getTime()) /
+        (1000 * 60 * 60 * 24 * 30),
     );
     const popularityScore =
       ((post.favorite_count ?? 0) + (post.comment_count ?? 0)) *
@@ -390,7 +489,7 @@ export class MongoStore {
       this.collection<PostDocument>("posts").then((c) =>
         c.updateOne(
           { _id: objectId },
-          { $set: { popularity_score: popularityScore } },
+          { $set: { popularity_score: new Double(popularityScore) } },
         ),
       ),
     );
@@ -403,7 +502,10 @@ export class MongoStore {
     return this.log("comments.find", () =>
       this.collection<CommentDocument>("comments")
         .then((c) =>
-          c.find({ post_id: postId }).sort({ timestamp: 1 }).toArray(),
+          c
+            .find({ post_id: oid(postId)! })
+            .sort({ timestamp: 1 })
+            .toArray(),
         )
         .then((items) => items.map(safeComment)),
     );
@@ -413,7 +515,11 @@ export class MongoStore {
   ) {
     const comment: CommentDocument = {
       _id: new ObjectId(),
-      ...input,
+      post_id: oid(input.post_id)!,
+      user_id: input.user_id ? oid(input.user_id) : null,
+      root: input.root ? oid(input.root) : null,
+      content: input.content,
+      user_summary: input.user_summary,
       favorite_count: 0,
       reply_count: 0,
       timestamp: new Date(),
@@ -466,7 +572,7 @@ export class MongoStore {
             await (
               await this.collection<CommentDocument>("comments")
             )
-              .find({ root: id })
+              .find({ root: oid(id)! })
               .project({ _id: 1 })
               .toArray()
           ).map((item) => apiId(item._id))
@@ -490,9 +596,12 @@ export class MongoStore {
   async createCommunity(
     input: Omit<Community, "id" | "timestamp" | "population" | "post_count">,
   ) {
+    const adminId = input.admin_id ? oid(input.admin_id) : null;
+    if (!adminId) throw new Error("Invalid community admin_id");
     const community: CommunityDocument = {
       _id: new ObjectId(),
       ...input,
+      admin_id: adminId,
       population: 1,
       post_count: 0,
       timestamp: new Date(),
@@ -541,13 +650,6 @@ export class MongoStore {
         c.deleteOne({ _id: objectId }),
       ),
     );
-    if (result.deletedCount) {
-      await (
-        await this.collection<PostDocument>("posts")
-      ).updateMany({ visibility: id }, {
-        $set: { visibility: null },
-      } as UpdateFilter<PostDocument>);
-    }
     return Boolean(result.deletedCount);
   }
   async communityRecommendations() {
@@ -558,7 +660,10 @@ export class MongoStore {
     );
   }
   async notifications(userId?: string) {
-    const filter = userId ? { user_id: userId } : {};
+    const userObjectId = userId ? oid(userId) : null;
+    const filter: Filter<NotificationDocument> = userObjectId
+      ? { user_id: userObjectId }
+      : {};
     return this.log("notifications.find", () =>
       this.collection<NotificationDocument>("notifications")
         .then((c) => c.find(filter).sort({ timestamp: -1 }).toArray())

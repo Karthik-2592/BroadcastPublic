@@ -75,11 +75,11 @@ Since the system employs a hybrid MongoDB–Neo4j architecture, MongoDB serves a
 **Neo4j**
 
 * Create Community node.
-* Create `MEMBER\\\\\\\\\\\\\\\_OF` relationship between creator and community with:
+* Create `MEMBER\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\_OF` relationship between creator and community with:
 
 &#x20; - `role = ADMIN`
 
-&#x20; - `joined\\\\\\\\\\\\\\\_at`
+&#x20; - `joined\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\_at`
 
 
 
@@ -119,7 +119,7 @@ Since the system employs a hybrid MongoDB–Neo4j architecture, MongoDB serves a
 * Create corresponding Post node.
 * If associated with a community, create:
 
-&#x20; - `(Post)-\\\\\\\\\\\\\\\[:BELONGS\\\\\\\\\\\\\\\_TO]->(Community)`
+&#x20; - `(Post)-\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[:BELONGS\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\_TO]->(Community)`
 
 
 
@@ -162,7 +162,7 @@ Since the system employs a hybrid MongoDB–Neo4j architecture, MongoDB serves a
 
 * Create
 
-&#x20; `(:User)-\\\\\\\\\\\\\\\[:FOLLOWS]->(:User)`
+&#x20; `(:User)-\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[:FOLLOWS]->(:User)`
 
 &#x20; using `MERGE`.
 
@@ -202,7 +202,7 @@ Since the system employs a hybrid MongoDB–Neo4j architecture, MongoDB serves a
 
 * Create
 
-&#x20; `(:User)-\\\\\\\\\\\\\\\[:MEMBER\\\\\\\\\\\\\\\_OF]->(:Community)`
+&#x20; `(:User)-\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[:MEMBER\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\_OF]->(:Community)`
 
 &#x20; with relationship properties:
 
@@ -228,7 +228,7 @@ Since the system employs a hybrid MongoDB–Neo4j architecture, MongoDB serves a
 
 **Neo4j**
 
-* Delete corresponding `MEMBER\\\\\\\\\\\\\\\_OF` relationship.
+* Delete corresponding `MEMBER\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\_OF` relationship.
 
 
 
@@ -256,7 +256,7 @@ Since the system employs a hybrid MongoDB–Neo4j architecture, MongoDB serves a
 
 * Create
 
-&#x20; `(:User)-\\\\\\\\\\\\\\\[:LIKED]->(:Post)`
+&#x20; `(:User)-\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[:LIKED]->(:Post)`
 
 &#x20; using `MERGE`.
 
@@ -298,7 +298,7 @@ Since the system employs a hybrid MongoDB–Neo4j architecture, MongoDB serves a
 
 * Create
 
-&#x20; `(:User)-\\\\\\\\\\\\\\\[:SAVED]->(:Post)`
+&#x20; `(:User)-\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[:SAVED]->(:Post)`
 
 &#x20; using `MERGE`.
 
@@ -344,7 +344,7 @@ Since the system employs a hybrid MongoDB–Neo4j architecture, MongoDB serves a
 
 * Create
 
-&#x20; `(:Post)-\\\\\\\\\\\\\\\[:MENTIONS]->(:User)`.
+&#x20; `(:Post)-\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[:MENTIONS]->(:User)`.
 
 
 
@@ -761,588 +761,6 @@ All endpoints return JSON responses using the following general structure:
 Errors are returned as:
 
 ```json
-{Validators for entities:
-
-1. ###### USER
-
-{
-
-\\\&#x20; $jsonSchema: {
-
-\\\&#x20;   bsonType: 'object',
-
-\\\&#x20;   required: \\\\\\\[
-
-\\\&#x20;     'username',
-
-\\\&#x20;     'email',
-
-\\\&#x20;     'password'
-
-\\\&#x20;   ],
-
-\\\&#x20;   properties: {
-
-\\\&#x20;     username: {
-
-\\\&#x20;       bsonType: 'string',
-
-\\\&#x20;       maxLength: 24,
-
-\\\&#x20;       minLength: 4,
-
-\\\&#x20;       description: 'username must be a string'
-
-\\\&#x20;     },
-
-\\\&#x20;     password: {
-
-\\\&#x20;       bsonType: 'object',
-
-\\\&#x20;       properties: {
-
-\\\&#x20;         password\\\\\\\_hash: {
-
-\\\&#x20;           bsonType: 'string'
-
-\\\&#x20;         },
-
-\\\&#x20;         salt: {
-
-\\\&#x20;           bsonType: 'string'
-
-\\\&#x20;         }
-
-\\\&#x20;       }
-
-\\\&#x20;     },
-
-\\\&#x20;     email: {
-
-\\\&#x20;       bsonType: 'string',
-
-\\\&#x20;       description: 'email must be valid'
-
-\\\&#x20;     },
-
-\\\&#x20;     interests: {
-
-\\\&#x20;       bsonType: 'array',
-
-\\\&#x20;       items: {
-
-\\\&#x20;         bsonType: 'string'
-
-\\\&#x20;       }
-
-\\\&#x20;     },
-
-\\\&#x20;     profile\\\\\\\_name: {
-
-\\\&#x20;       bsonType: 'string',
-
-\\\&#x20;       maxLength: 64
-
-\\\&#x20;     },
-
-\\\&#x20;     profile\\\\\\\_picture: {
-
-\\\&#x20;       bsonType: 'object',
-
-\\\&#x20;       required: \\\\\\\[
-
-\\\&#x20;         'media\\\\\\\_id',
-
-\\\&#x20;         'media\\\\\\\_url',
-
-\\\&#x20;         'mime\\\\\\\_type'
-
-\\\&#x20;       ],
-
-\\\&#x20;       properties: {
-
-\\\&#x20;         media\\\\\\\_id: {
-
-\\\&#x20;           bsonType: 'int'
-
-\\\&#x20;         },
-
-\\\&#x20;         mime\\\\\\\_type: {
-
-\\\&#x20;           bsonType: 'string'
-
-\\\&#x20;         },
-
-\\\&#x20;         media\\\\\\\_url: {
-
-\\\&#x20;           bsonType: 'string'
-
-\\\&#x20;         }
-
-\\\&#x20;       }
-
-\\\&#x20;     },
-
-\\\&#x20;     profile\\\\\\\_description: {
-
-\\\&#x20;       bsonType: 'string',
-
-\\\&#x20;       maxLength: 200
-
-\\\&#x20;     },
-
-\\\&#x20;     follower\\\\\\\_count: {
-
-\\\&#x20;       bsonType: 'int'
-
-\\\&#x20;     },
-
-\\\&#x20;     following\\\\\\\_count: {
-
-\\\&#x20;       bsonType: 'int'
-
-\\\&#x20;     },
-
-\\\&#x20;     pinned\\\\\\\_posts: {
-
-\\\&#x20;       bsonType: 'array',
-
-\\\&#x20;       items: {
-
-\\\&#x20;         bsonType: 'objectId'
-
-\\\&#x20;       }
-
-\\\&#x20;     }
-
-\\\&#x20;   }
-
-\\\&#x20; }
-
-}
-
-
-
-###### 2\\\\. POST
-
-{
-
-\\\&#x20; $jsonSchema: {
-
-\\\&#x20;   bsonType: 'object',
-
-\\\&#x20;   required: \\\\\\\[
-
-\\\&#x20;     'user\\\\\\\_id',
-
-\\\&#x20;     'visibility'
-
-\\\&#x20;   ],
-
-\\\&#x20;   properties: {
-
-\\\&#x20;     visibility: {
-
-\\\&#x20;       bsonType: 'bool'
-
-\\\&#x20;     },
-
-\\\&#x20;     tags: {
-
-\\\&#x20;       bsonType: 'array',
-
-\\\&#x20;       items: {
-
-\\\&#x20;         bsonType: 'string'
-
-\\\&#x20;       }
-
-\\\&#x20;     },
-
-\\\&#x20;     user\\\\\\\_id: {
-
-\\\&#x20;       bsonType: 'objectId'
-
-\\\&#x20;     },
-
-\\\&#x20;     favorite\\\\\\\_count: {
-
-\\\&#x20;       bsonType: 'int'
-
-\\\&#x20;     },
-
-\\\&#x20;     comment\\\\\\\_count: {
-
-\\\&#x20;       bsonType: 'int'
-
-\\\&#x20;     },
-
-\\\&#x20;     popularity\\\\\\\_score: {
-
-\\\&#x09;bsonType: 'NumberDoubl'
-
-\\\&#x20;     },
-
-\\\&#x20;     time\\\\\\\_created: {
-
-\\\&#x20;       bsonType: 'date'
-
-\\\&#x20;     },
-
-\\\&#x20;     content: {
-
-\\\&#x20;       bsonType: 'string',
-
-\\\&#x20;       maxLength: 200
-
-\\\&#x20;     },
-
-\\\&#x20;     media: {
-
-\\\&#x20;       bsonType: 'array',
-
-\\\&#x20;       items: {
-
-\\\&#x20;         bsonType: 'object',
-
-\\\&#x20;         required: \\\\\\\[
-
-\\\&#x20;           'media\\\\\\\_id',
-
-\\\&#x20;           'media\\\\\\\_url',
-
-\\\&#x20;           'mime\\\\\\\_type'
-
-\\\&#x20;         ],
-
-\\\&#x20;         properties: {
-
-\\\&#x20;           media\\\\\\\_id: {
-
-\\\&#x20;             bsonType: 'int'
-
-\\\&#x20;           },
-
-\\\&#x20;           mime\\\\\\\_type: {
-
-\\\&#x20;             bsonType: 'string'
-
-\\\&#x20;           },
-
-\\\&#x20;           media\\\\\\\_url: {
-
-\\\&#x20;             bsonType: 'string'
-
-\\\&#x20;           }
-
-\\\&#x20;         }
-
-\\\&#x20;       }
-
-\\\&#x20;     },
-
-\\\&#x20;     user\\\\\\\_summary: {
-
-\\\&#x20;       bsonType: 'object',
-
-\\\&#x20;       required: \\\\\\\[
-
-\\\&#x20;         'username',
-
-\\\&#x20;         'profile\\\\\\\_picture'
-
-\\\&#x20;       ],
-
-\\\&#x20;       properties: {
-
-\\\&#x20;         username: {
-
-\\\&#x20;           bsonType: 'string'
-
-\\\&#x20;         },
-
-\\\&#x20;         profile\\\\\\\_picture: {
-
-\\\&#x20;           bsonType: 'string'
-
-\\\&#x20;         }
-
-\\\&#x20;       }
-
-\\\&#x20;     }
-
-\\\&#x20;   }
-
-\\\&#x20; }
-
-}
-
-
-
-###### 3\\\\. NOTIFICATION
-
-{
-
-\\\&#x20; $jsonSchema: {
-
-\\\&#x20;   bsonType: 'object',
-
-\\\&#x20;   required: \\\\\\\[
-
-\\\&#x20;     'user\\\\\\\_id',
-
-\\\&#x20;     'event\\\\\\\_type',
-
-\\\&#x20;     'event\\\\\\\_id'
-
-\\\&#x20;   ],
-
-\\\&#x20;   properties: {
-
-\\\&#x20;     user\\\\\\\_id: {
-
-\\\&#x20;       bsonType: 'objectId'
-
-\\\&#x20;     },
-
-\\\&#x20;     event\\\\\\\_type: {
-
-\\\&#x20;       bsonType: 'string'
-
-\\\&#x20;     },
-
-\\\&#x20;     timestamp: {
-
-\\\&#x20;       bsonType: 'date'
-
-\\\&#x20;     },
-
-\\\&#x20;     event\\\\\\\_id: {
-
-\\\&#x20;       bsonType: 'objectId'
-
-\\\&#x20;     }
-
-\\\&#x20;   }
-
-\\\&#x20; }
-
-}
-
-
-
-###### 4\\\\. COMMUNITY
-
-{
-
-\\\&#x20; $jsonSchema: {
-
-\\\&#x20;   bsonType: 'object',
-
-\\\&#x20;   required: \\\\\\\[
-
-\\\&#x20;     'community\\\\\\\_name',
-
-\\\&#x20;     'admin\\\\\\\_id'
-
-\\\&#x20;   ],
-
-\\\&#x20;   properties: {
-
-\\\&#x20;     population: {
-
-\\\&#x20;       bsonType: 'int'
-
-\\\&#x20;     },
-
-\\\&#x20;     community\\\\\\\_banner: {
-
-\\\&#x20;       bsonType: 'object',
-
-\\\&#x20;       required: \\\\\\\[
-
-\\\&#x20;         'media\\\\\\\_id',
-
-\\\&#x20;         'media\\\\\\\_url',
-
-\\\&#x20;         'mime\\\\\\\_type'
-
-\\\&#x20;       ],
-
-\\\&#x20;       properties: {
-
-\\\&#x20;         media\\\\\\\_id: {
-
-\\\&#x20;           bsonType: 'objectId'
-
-\\\&#x20;         },
-
-\\\&#x20;         mime\\\\\\\_type: {
-
-\\\&#x20;           bsonType: 'string'
-
-\\\&#x20;         },
-
-\\\&#x20;         media\\\\\\\_url: {
-
-\\\&#x20;           bsonType: 'string'
-
-\\\&#x20;         }
-
-\\\&#x20;       }
-
-\\\&#x20;     },
-
-\\\&#x20;     timestamp: {
-
-\\\&#x20;       bsonType: 'date'
-
-\\\&#x20;     },
-
-\\\&#x20;     post\\\\\\\_count: {
-
-\\\&#x20;       bsonType: 'int'
-
-\\\&#x20;     },
-
-\\\&#x20;     tags: {
-
-\\\&#x20;       bsonType: 'array',
-
-\\\&#x20;       items: {
-
-\\\&#x20;         bsonType: 'string'
-
-\\\&#x20;       }
-
-\\\&#x20;     },
-
-\\\&#x20;     community\\\\\\\_name: {
-
-\\\&#x20;       bsonType: 'string'
-
-\\\&#x20;     },
-
-\\\&#x20;     admin\\\\\\\_id: {
-
-\\\&#x20;       bsonType: 'objectId'
-
-\\\&#x20;     },
-
-\\\&#x20;     community\\\\\\\_desc: {
-
-\\\&#x20;       bsonType: 'string'
-
-\\\&#x20;     }
-
-\\\&#x20;   }
-
-\\\&#x20; }
-
-}
-
-
-
-###### 5\\\\. COMMENT
-
-{
-
-\\\&#x20; $jsonSchema: {
-
-\\\&#x20;   bsonType: 'object',
-
-\\\&#x20;   required: \\\\\\\[
-
-\\\&#x20;     'type',
-
-\\\&#x20;     'post\\\\\\\_id',
-
-\\\&#x20;     'user\\\\\\\_id'
-
-\\\&#x20;   ],
-
-\\\&#x20;   properties: {
-
-\\\&#x20;     post\\\\\\\_id: {
-
-\\\&#x20;       bsonType: 'objectId'
-
-\\\&#x20;     },
-
-\\\&#x20;     user\\\\\\\_id: {
-
-\\\&#x20;       bsonType: 'objectId'
-
-\\\&#x20;     },
-
-\\\&#x20;     root: {
-
-\\\&#x20;       bsonType: 'objectId'
-
-\\\&#x20;     },
-
-\\\&#x20;     content: {
-
-\\\&#x20;       bsonType: 'string',
-
-\\\&#x20;       maxLength: 500
-
-\\\&#x20;     },
-
-\\\&#x20;     reply\\\\\\\_count: {
-
-\\\&#x20;       bsonType: 'int'
-
-\\\&#x20;     },
-
-\\\&#x20;     favorite\\\\\\\_count: {
-
-\\\&#x20;       bsonType: 'int'
-
-\\\&#x20;     },
-
-\\\&#x20;     timestamp: {
-
-\\\&#x20;       bsonType: 'date'
-
-\\\&#x20;     },
-
-\\\&#x20;     user\\\\\\\_summary: {
-
-\\\&#x20;       bsonType: 'object',
-
-\\\&#x20;       required: \\\\\\\[
-
-\\\&#x20;         'user\\\\\\\_id',
-
-\\\&#x20;         'username',
-
-\\\&#x20;         'profile\\\\\\\_picture'
-
-\\\&#x20;       ],
-
-\\\&#x20;       properties: {
-
-\\\&#x20;         username: {
-
-\\\&#x20;           bsonType: 'string'
-
-\\\&#x20;         },
-
-\\\&#x20;         profile\\\\\\\_picture: {
-
-\\\&#x20;           bsonType: 'string'
-
-\\\&#x20;         }
-
-\\\&#x20;       }
-
-\\\&#x20;     }
-
-\\\&#x20;   }
-
-\\\&#x20; }
-
 }
 
 
@@ -1384,10 +802,10 @@ The User collection stores authentication credentials, profile information, inte
 
 **Not Indexed**
 
-* `password.password\\\_hash`, `password.salt` – retrieved only after locating the user by username/email.
-* `profile\\\_name`, `profile\\\_picture`, `profile\\\_description` – always retrieved as part of the document.
-* `follower\\\_count`, `following\\\_count` – displayed but rarely queried directly.
-* `pinned\\\_posts` – fixed-size array (≤3), making indexing unnecessary.
+* `password.password\\\\\\\\\\\\\\\_hash`, `password.salt` – retrieved only after locating the user by username/email.
+* `profile\\\\\\\\\\\\\\\_name`, `profile\\\\\\\\\\\\\\\_picture`, `profile\\\\\\\\\\\\\\\_description` – always retrieved as part of the document.
+* `follower\\\\\\\\\\\\\\\_count`, `following\\\\\\\\\\\\\\\_count` – displayed but rarely queried directly.
+* `pinned\\\\\\\\\\\\\\\_posts` – fixed-size array (≤3), making indexing unnecessary.
 
 \---
 
@@ -1397,37 +815,37 @@ Posts constitute the most frequently accessed entity, supporting profile pages, 
 
 |Indexed Field(s)|Type|Justification|
 |-|-|-|
-|`{ user\\\_id, time\\\_created }`|Compound|Retrieves posts from a specific user in reverse chronological order.|
-|`{ community\\\_id, popularity\\\_score }`|Compound|Supports community feeds ordered by popularity.|
-|`{ tags, popularity\\\_score }`|Compound Multikey|Supports interest/tag-based feed generation.|
-|`popularity\\\_score`|Descending|Supports global "Trending" page and popularity-based ranking.|
+|`{ user\\\\\\\\\\\\\\\_id, time\\\\\\\\\\\\\\\_created }`|Compound|Retrieves posts from a specific user in reverse chronological order.|
+|`{ community\\\\\\\\\\\\\\\_id, popularity\\\\\\\\\\\\\\\_score }`|Compound|Supports community feeds ordered by popularity.|
+|`{ tags, popularity\\\\\\\\\\\\\\\_score }`|Compound Multikey|Supports interest/tag-based feed generation.|
+|`popularity\\\\\\\\\\\\\\\_score`|Descending|Supports global "Trending" page and popularity-based ranking.|
 
 **Not Indexed**
 
-* `favorite\\\_count` – highly volatile; used only to derive `popularity\\\_score`.
-* `comment\\\_count` – updated frequently; not queried directly.
+* `favorite\\\\\\\\\\\\\\\_count` – highly volatile; used only to derive `popularity\\\\\\\\\\\\\\\_score`.
+* `comment\\\\\\\\\\\\\\\_count` – updated frequently; not queried directly.
 * `content` – unless full-text search is introduced.
-* Embedded `media` and `user\\\_summary` – always accessed together with the post.
+* Embedded `media` and `user\\\\\\\\\\\\\\\_summary` – always accessed together with the post.
 
 \---
 
 ##### 3\. COMMENT Collection
 
-Comments are stored independently for scalability and are classified as either top-level comments or replies through the `root` attribute. Replies retain the same `post\\\_id` as their parent because Comment is a weak entity dependent on Post.
+Comments are stored independently for scalability and are classified as either top-level comments or replies through the `root` attribute. Replies retain the same `post\\\\\\\\\\\\\\\_id` as their parent because Comment is a weak entity dependent on Post.
 
 |Indexed Field(s)|Type|Justification|
 |-|-|-|
-|`{ post\\\_id, root }`|Compound|Efficiently retrieves top-level comments (`root = null`) and replies (`root = comment\\\_id`).|
-|`{ post\\\_id, root, popularity\\\_score }` *(optional)*|Compound|Used if server-side popularity ranking of comments is retained.|
-|`{ user\\\_id, timestamp }` *(optional)*|Compound|Retrieves a user's comment history.|
+|`{ post\\\\\\\\\\\\\\\_id, root }`|Compound|Efficiently retrieves top-level comments (`root = null`) and replies (`root = comment\\\\\\\\\\\\\\\_id`).|
+|`{ post\\\\\\\\\\\\\\\_id, root, popularity\\\\\\\\\\\\\\\_score }` *(optional)*|Compound|Used if server-side popularity ranking of comments is retained.|
+|`{ user\\\\\\\\\\\\\\\_id, timestamp }` *(optional)*|Compound|Retrieves a user's comment history.|
 
 **Not Indexed**
 
-* `favorite\\\_count` – volatile counter.
-* `reply\\\_count` – maintained for display only.
+* `favorite\\\\\\\\\\\\\\\_count` – volatile counter.
+* `reply\\\\\\\\\\\\\\\_count` – maintained for display only.
 * `content` – unless comment search is introduced.
 
-If client-side sorting of comments is adopted, the `popularity\\\_score` index becomes unnecessary.
+If client-side sorting of comments is adopted, the `popularity\\\\\\\\\\\\\\\_score` index becomes unnecessary.
 
 \---
 
@@ -1437,15 +855,15 @@ Communities support browsing, recommendation, and ranking by member population. 
 
 |Indexed Field(s)|Type|Justification|
 |-|-|-|
-|`community\\\_name`|Unique|Community lookup and duplicate prevention.|
+|`community\\\\\\\\\\\\\\\_name`|Unique|Community lookup and duplicate prevention.|
 |`tags`|Multikey|Community recommendation based on user interests.|
 |`population`|Descending|Implements the "Top Communities" feature through global ranking.|
 
 **Not Indexed**
 
-* `post\\\_count` – informational only.
-* `community\\\_desc` – not used for filtering.
-* `admin\\\_id` – rarely queried independently.
+* `post\\\\\\\\\\\\\\\_count` – informational only.
+* `community\\\\\\\\\\\\\\\_desc` – not used for filtering.
+* `admin\\\\\\\\\\\\\\\_id` – rarely queried independently.
 
 Unlike post likes, community membership changes relatively infrequently, making an index on `population` acceptable despite update costs.
 
@@ -1457,12 +875,12 @@ Notifications are short-lived, with frequent insertions and deletions. The prima
 
 |Indexed Field(s)|Type|Justification|
 |-|-|-|
-|`{ user\\\_id, timestamp }`|Compound|Retrieves recent notifications efficiently.|
+|`{ user\\\\\\\\\\\\\\\_id, timestamp }`|Compound|Retrieves recent notifications efficiently.|
 
 **Not Indexed**
 
-* `event\\\_type`
-* `event\\\_id`
+* `event\\\\\\\\\\\\\\\_type`
+* `event\\\\\\\\\\\\\\\_id`
 
 These fields are used only after notifications have already been retrieved and would impose unnecessary maintenance overhead on a highly volatile collection.
 
@@ -1473,18 +891,14 @@ These fields are used only after notifications have already been retrieved and w
 |Collection|Recommended Indexes|
 |-|-|
 |**User**|`username (unique)`, `email (unique)`, `interests`|
-|**Post**|`{user\\\_id, time\\\_created}`, `{community\\\_id, popularity\\\_score}`, `{tags, popularity\\\_score}`, `popularity\\\_score`|
-|**Comment**|`{post\\\_id, root}`, `{post\\\_id, root, popularity\\\_score}` *(optional)*, `{user\\\_id, timestamp}` *(optional)*|
-|**Community**|`community\\\_name (unique)`, `tags`, `population`|
-|**Notification**|`{user\\\_id, timestamp}`|
+|**Post**|`{user\\\\\\\\\\\\\\\_id, time\\\\\\\\\\\\\\\_created}`, `{community\\\\\\\\\\\\\\\_id, popularity\\\\\\\\\\\\\\\_score}`, `{tags, popularity\\\\\\\\\\\\\\\_score}`, `popularity\\\\\\\\\\\\\\\_score`|
+|**Comment**|`{post\\\\\\\\\\\\\\\_id, root}`, `{post\\\\\\\\\\\\\\\_id, root, popularity\\\\\\\\\\\\\\\_score}` *(optional)*, `{user\\\\\\\\\\\\\\\_id, timestamp}` *(optional)*|
+|**Community**|`community\\\\\\\\\\\\\\\_name (unique)`, `tags`, `population`|
+|**Notification**|`{user\\\\\\\\\\\\\\\_id, timestamp}`|
 
 Overall, the indexing strategy follows three principles:
 
 1. **Index fields used for filtering and sorting**, rather than every frequently accessed attribute.
-2. **Avoid indexing highly volatile counters** such as `favorite\\\_count` and `comment\\\_count`; instead, index periodically updated derived fields like `popularity\\\_score`.
+2. **Avoid indexing highly volatile counters** such as `favorite\\\\\\\\\\\\\\\_count` and `comment\\\\\\\\\\\\\\\_count`; instead, index periodically updated derived fields like `popularity\\\\\\\\\\\\\\\_score`.
 3. **Use compound indexes that mirror common query patterns**, minimizing collection scans while keeping index maintenance costs manageable.
-
-
-
-
 

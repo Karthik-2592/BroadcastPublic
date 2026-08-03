@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { fail, ok, required } from "../../http.ts";
 import { store } from "../../store.ts";
+import { neo4jRelations } from "../../relations/neo4j.ts";
 import type { LoginRequest, RegisterRequest } from "../../types.ts";
 export async function register(req: Request, res: Response): Promise<Response> {
   const body = req.body as Partial<RegisterRequest>;
@@ -9,6 +10,7 @@ export async function register(req: Request, res: Response): Promise<Response> {
     return fail(res, 400, `Missing required fields: ${missing.join(", ")}`);
   const user = await store.register(body as RegisterRequest);
   if (!user) return fail(res, 409, "Username or email is already in use.");
+  await neo4jRelations.createUserNode(user.id);
   return ok(res, user, "User registered successfully.", 201);
 }
 export async function login(req: Request, res: Response): Promise<Response> {

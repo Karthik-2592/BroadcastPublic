@@ -1,9 +1,10 @@
 import neo4j, { type Driver, type Integer, type Session } from "neo4j-driver";
+import { env } from "../config/env.ts";
 
-const uri = process.env.NEO4J_URI ?? "bolt://127.0.0.1:7687";
-const username = process.env.NEO4J_USERNAME ?? "neo4j";
-const password = process.env.NEO4J_PASSWORD ?? "change-me";
-const database = process.env.NEO4J_DATABASE ?? "neo4j";
+const uri = env.neo4jUri;
+const username = env.neo4jUsername;
+const password = env.neo4jPassword;
+const database = env.neo4jDatabase;
 
 export const numberValue = (
   value: Integer | number | boolean | null | undefined,
@@ -39,6 +40,27 @@ export class Neo4jRelations {
       await session.close();
     }
   }
+  async createUserNode(userId: string) {
+    return this.write<number>(
+      "USER.create",
+      "MERGE (:USER {user_id: $userId}) RETURN 1 AS value",
+      { userId },
+    );
+  }
+  async createPostNode(postId: string) {
+    return this.write<number>(
+      "POST.create",
+      "MERGE (:POST {post_id: $postId}) RETURN 1 AS value",
+      { postId },
+    );
+  }
+  async createCommunityNode(communityId: string) {
+    return this.write<number>(
+      "COMMUNITY.create",
+      "MERGE (:COMMUNITY {community_id: $communityId}) RETURN 1 AS value",
+      { communityId },
+    );
+  }
   async follow(followerId: string, followedId: string, enabled: boolean) {
     return this.write<number>(
       enabled ? "FOLLOWS.merge" : "FOLLOWS.delete",
@@ -51,16 +73,13 @@ export class Neo4jRelations {
   async likePost(userId: string, postId: string, enabled: boolean) {
     return this.like("POST", userId, postId, enabled);
   }
-  async likeComment(userId: string, commentId: string, enabled: boolean) {
-    return this.like("COMMENT", userId, commentId, enabled);
-  }
   private async like(
-    label: "POST" | "COMMENT",
+    label: "POST",
     userId: string,
     entityId: string,
     enabled: boolean,
   ) {
-    const property = label === "POST" ? "post_id" : "comment_id";
+    const property = "post_id";
     return this.write<number>(
       `LIKES.${label}.${enabled ? "merge" : "delete"}`,
       enabled

@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { fail, id, ok, required } from "../../http.ts";
 import { store } from "../../store.ts";
+import { neo4jRelations } from "../../relations/neo4j.ts";
 import type { Community } from "../../types.ts";
 export async function create(req: Request, res: Response) {
   const missing = required(req.body, [
@@ -19,6 +20,7 @@ export async function create(req: Request, res: Response) {
     tags: Array.isArray(req.body.tags) ? req.body.tags : [],
     community_banner: req.body.community_banner,
   });
+  await neo4jRelations.createCommunityNode(community.id);
   return ok(res, community, "Community created successfully.", 201);
 }
 export async function get(req: Request, res: Response) {

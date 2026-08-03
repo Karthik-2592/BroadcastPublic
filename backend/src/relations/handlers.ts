@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { fail, ok, required } from "../http.ts";
-import { recordFavoriteChange } from "../services/popularity.ts";
+import { queueFavoriteEvent } from "../services/favorites.ts";
 import { store } from "../store.ts";
 import { neo4jRelations, numberValue } from "./neo4j.ts";
 import type {
@@ -44,11 +44,13 @@ export async function postLike(req: Request, res: Response): Promise<Response> {
   if (!(await store.user(body.user_id!)) || !(await store.post(body.post_id!)))
     return fail(res, 404, "User or post not found.");
   const enabled = req.method === "POST";
-  const changed = numberValue(
-    await neo4jRelations.likePost(body.user_id!, body.post_id!, enabled),
-  );
-  if (changed) await recordFavoriteChange(body.post_id!, enabled ? 1 : -1);
-  return ok(res, { favorited: enabled, changed: Boolean(changed) });
+  queueFavoriteEvent({
+    target: "post",
+    targetId: body.post_id!,
+    userId: body.user_id!,
+    favorited: enabled,
+  });
+  return ok(res, { favorited: enabled, queued: true });
 }
 export async function commentLike(
   req: Request,
@@ -67,15 +69,13 @@ export async function commentLike(
   )
     return fail(res, 404, "User, post, or comment not found.");
   const enabled = req.method === "POST";
-  const changed = numberValue(
-    await neo4jRelations.likeComment(body.user_id!, body.comment_id!, enabled),
-  );
-  if (changed)
-    await store.incrementCommentFavoriteCount(
-      body.comment_id!,
-      enabled ? 1 : -1,
-    );
-  return ok(res, { favorited: enabled, changed: Boolean(changed) });
+  queueFavoriteEvent({
+    target: "comment",
+    targetId: body.comment_id!,
+    userId: body.user_id!,
+    favorited: enabled,
+  });
+  return ok(res, { favorited: enabled, queued: true });
 }
 export async function save(req: Request, res: Response): Promise<Response> {
   const body = req.body as Partial<SaveRelationRequest>;

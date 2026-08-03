@@ -1,13 +1,17 @@
 {
   "dependencies": {
     "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "mongodb": "^7.5.0",
-    "neo4j-driver": "^6.2.0"
+    "neo4j-driver": "^6.2.0",
+    "path": "^0.12.7"
   },
   "scripts": {
     "db:init": "node --experimental-strip-types scripts/initialize-mongodb.ts",
-    "start": "node --experimental-strip-types src/index.ts",
+    "db:seed": "node --experimental-strip-types scripts/seed-mongodb.ts",
+    "neo4j:seed": "node --experimental-strip-types scripts/seed-neo4j.ts",
+    "start": "node --experimental-strip-types index.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
