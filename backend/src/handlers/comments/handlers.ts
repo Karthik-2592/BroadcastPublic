@@ -6,6 +6,7 @@ export async function list(req: Request, res: Response) {
   return ok(res, await store.commentsForPost(id(req)));
 }
 export async function create(req: Request, res: Response) {
+  console.log(`[http] POST /v1/posts/${id(req)}/comments received`);
   const missing = required(req.body, ["user_id", "content"]);
   if (missing.length)
     return fail(res, 400, `Missing required fields: ${missing.join(", ")}`);

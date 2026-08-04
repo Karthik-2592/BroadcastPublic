@@ -18,12 +18,11 @@ export async function follow(req: Request, res: Response): Promise<Response> {
   if (missing.length)
     return fail(res, 400, `Missing required fields: ${missing.join(", ")}`);
   if (body.follower_id === body.followed_id)
-    return fail(res, 400, "Users cannot follow themselves.");
-  if (
-    !(await store.user(body.follower_id!)) ||
-    !(await store.user(body.followed_id!))
-  )
-    return fail(res, 404, "User not found.");
+    return fail(res, 400, "A user cannot follow or unfollow themselves.");
+  if (!(await store.user(body.follower_id!)))
+    return fail(res, 404, "Follower user not found.");
+  if (!(await store.user(body.followed_id!)))
+    return fail(res, 404, "Followed user not found.");
   const enabled = req.method === "POST";
   const changed = numberValue(
     await neo4jRelations.follow(body.follower_id!, body.followed_id!, enabled),
@@ -34,6 +33,8 @@ export async function follow(req: Request, res: Response): Promise<Response> {
       body.followed_id!,
       enabled ? 1 : -1,
     );
+  if (!enabled && !changed)
+    return fail(res, 409, "The follower was not following this user.");
   return ok(res, { active: enabled, changed: Boolean(changed) });
 }
 export async function postLike(req: Request, res: Response): Promise<Response> {

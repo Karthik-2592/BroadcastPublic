@@ -7,16 +7,101 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Broadcast API verification</title>
   <style>
-    :root { font: 15px system-ui, sans-serif; color: #203047; background: #f3f6fa; }
-    body { max-width: 1180px; margin: 0 auto; padding: 24px; }
-    h1 { margin-bottom: 4px; } h2 { color: #173b67; margin-top: 24px; }
-    section, .toolbar { background: white; border: 1px solid #d7e0eb; border-radius: 10px; padding: 16px; margin: 16px 0; box-shadow: 0 2px 8px #18324a0d; }
-    .toolbar, form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    .relation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
-    input, textarea, select, button { border: 1px solid #b9c8d8; border-radius: 6px; padding: 8px; font: inherit; }
-    input, textarea, select { flex: 1 1 145px; min-width: 0; } button { cursor: pointer; background: #e9f1fb; color: #173b67; font-weight: 600; }
-    button:hover { background: #d5e6fa; } .danger { color: #9b2226; } .hint { color: #5e7187; font-size: .9rem; }
-    #session { color: #1d6b43; font-weight: 700; } #response { min-height: 120px; overflow: auto; background: #17212b; color: #d8f3dc; padding: 14px; border-radius: 8px; }
+    :root {
+      font: 15px system-ui, sans-serif;
+      color: #203047;
+      background: #f3f6fa;
+    }
+
+    body {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    h1 {
+      margin-bottom: 4px;
+    }
+
+    h2 {
+      color: #173b67;
+      margin-top: 24px;
+    }
+
+    section,
+    .toolbar {
+      background: white;
+      border: 1px solid #d7e0eb;
+      border-radius: 10px;
+      padding: 16px;
+      margin: 16px 0;
+      box-shadow: 0 2px 8px #18324a0d;
+    }
+
+    .toolbar,
+    form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .relation-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+    }
+
+    input,
+    textarea,
+    select,
+    button {
+      border: 1px solid #b9c8d8;
+      border-radius: 6px;
+      padding: 8px;
+      font: inherit;
+    }
+
+    input,
+    textarea,
+    select {
+      flex: 1 1 145px;
+      min-width: 0;
+    }
+
+    button {
+      cursor: pointer;
+      background: #e9f1fb;
+      color: #173b67;
+      font-weight: 600;
+    }
+
+    button:hover {
+      background: #d5e6fa;
+    }
+
+    .danger {
+      color: #9b2226;
+    }
+
+    .hint {
+      color: #5e7187;
+      font-size: .9rem;
+    }
+
+    #session {
+      color: #1d6b43;
+      font-weight: 700;
+    }
+
+    #response {
+      min-height: 120px;
+      overflow: auto;
+      background: #17212b;
+      color: #d8f3dc;
+      padding: 14px;
+      border-radius: 8px;
+    }
   </style>
 </head>
 
@@ -76,7 +161,7 @@
   </form>
 
   <h2>Comments</h2>
-  <form onsubmit="createComment(event)">
+  <form id="create-comment-form" method="post">
     <input name="post_id" placeholder="post id" required />
     <input name="content" placeholder="comment content" required />
     <input name="root" placeholder="root comment id (optional)" />
@@ -127,34 +212,116 @@
     <button>Delete notification</button>
   </form>
 
-    <section>
-      <h2>Relations</h2>
-      <p class="hint">Login first. The active user is automatically sent for these operations. Post likes are processed by the background worker.</p>
-      <div class="relation-grid">
-        <div><h3>Follow user</h3><form onsubmit="relation(event, '/relations/follows', 'followed_id')"><input name="followed_id" placeholder="followed user id" required /><button>Follow</button><button type="button" onclick="relation(event, '/relations/follows', 'followed_id', 'DELETE')">Unfollow</button></form></div>
-        <div><h3>Like post</h3><form onsubmit="relation(event, '/relations/posts/likes', 'post_id')"><input name="post_id" placeholder="post id" required /><button>Like</button><button type="button" onclick="relation(event, '/relations/posts/likes', 'post_id', 'DELETE')">Unlike</button></form></div>
-        <div><h3>Like comment</h3><form onsubmit="relation(event, '/relations/comments/likes', 'comment_id', 'POST', 'post_id')"><input name="post_id" placeholder="post id" required /><input name="comment_id" placeholder="comment id" required /><button>Like</button><button type="button" onclick="relation(event, '/relations/comments/likes', 'comment_id', 'DELETE', 'post_id')">Unlike</button></form></div>
-        <div><h3>Save post</h3><form onsubmit="relation(event, '/relations/saves', 'post_id')"><input name="post_id" placeholder="post id" required /><button>Save</button><button type="button" onclick="relation(event, '/relations/saves', 'post_id', 'DELETE')">Unsave</button></form></div>
-        <div><h3>Join community</h3><form onsubmit="relation(event, '/relations/memberships', 'community_id')"><input name="community_id" placeholder="community id" required /><button>Join</button><button type="button" onclick="relation(event, '/relations/memberships', 'community_id', 'DELETE')">Leave</button></form></div>
-        <div><h3>Moderate user</h3><form onsubmit="moderate(event, 'POST')"><input name="community_id" placeholder="community id" required /><input name="user_id" placeholder="user to moderate" required /><select name="authorization"><option>MODERATOR</option><option>ADMIN</option></select><button>Grant</button><button type="button" onclick="moderate(event, 'DELETE')">Revoke</button></form></div>
+  <section>
+    <h2>Relations</h2>
+    <p class="hint">Login first. The active user is automatically sent for these operations. Post likes are processed by
+      the background worker.</p>
+    <div class="relation-grid">
+      <div>
+        <h3>Follow user</h3>
+        <form onsubmit="relation(event, '/relations/follows', 'followed_id')"><input name="followed_id"
+            placeholder="followed user id" required /><button>Follow</button><button type="button"
+            onclick="relation(event, '/relations/follows', 'followed_id', 'DELETE')">Unfollow</button></form>
       </div>
-    </section>
-
-    <section>
-      <h2>Additional entity operations</h2>
-      <div class="relation-grid">
-        <div><h3>Read / search users</h3><form onsubmit="submitForm(event, '/users/' + fieldValue(this, 'id'), 'GET')"><input name="id" placeholder="user id" required /><button>Get user</button></form><form onsubmit="submitForm(event, '/users/search?q=' + encodeURIComponent(fieldValue(this, 'q')), 'GET')"><input name="q" placeholder="username" required /><button>Search</button></form><form onsubmit="submitForm(event, '/users/' + fieldValue(this, 'id') + '/recommendations', 'GET')"><input name="id" placeholder="user id" required /><button>Recommendations</button></form></div>
-        <div><h3>Read posts</h3><form onsubmit="submitForm(event, '/posts/' + fieldValue(this, 'id'), 'GET')"><input name="id" placeholder="post id" required /><button>Get post</button></form><form onsubmit="submitForm(event, '/posts/feed', 'GET')"><button>Feed</button></form></div>
-        <div><h3>Read communities</h3><form onsubmit="submitForm(event, '/communities/' + fieldValue(this, 'id'), 'GET')"><input name="id" placeholder="community id" required /><button>Get community</button></form><form onsubmit="submitForm(event, '/communities/recommendations', 'GET')"><button>Recommendations</button></form></div>
-        <div><h3>Comments for post</h3><form onsubmit="submitForm(event, '/posts/' + fieldValue(this, 'post_id') + '/comments', 'GET')"><input name="post_id" placeholder="post id" required /><button>List comments</button></form></div>
-        <div><h3>Update user</h3><form onsubmit="submitForm(event, '/users/' + fieldValue(this, 'id'), 'PUT', jsonBody)"><input name="id" placeholder="user id" required /><textarea name="json" placeholder='{"profile_name":"Updated"}' required></textarea><button>Update</button></form></div>
-        <div><h3>Update post</h3><form onsubmit="submitForm(event, '/posts/' + fieldValue(this, 'id'), 'PUT', postUpdate)"><input name="id" placeholder="post id" required /><input name="user_id" placeholder="owner user id" required /><textarea name="json" placeholder='{"content":"Updated"}' required></textarea><button>Update</button></form></div>
-        <div><h3>Update community</h3><form onsubmit="submitForm(event, '/communities/' + fieldValue(this, 'id'), 'PUT', communityUpdate)"><input name="id" placeholder="community id" required /><input name="admin_id" placeholder="admin user id" required /><textarea name="json" placeholder='{"community_desc":"Updated"}' required></textarea><button>Update</button></form></div>
-        <div><h3>Update notification</h3><form onsubmit="submitForm(event, '/notifications/' + fieldValue(this, 'id'), 'PATCH', readNotification)"><input name="id" placeholder="notification id" required /><select name="read"><option value="true">Read</option><option value="false">Unread</option></select><button>Mark read</button></form></div>
+      <div>
+        <h3>Like post</h3>
+        <form onsubmit="relation(event, '/relations/posts/likes', 'post_id')"><input name="post_id"
+            placeholder="post id" required /><button>Like</button><button type="button"
+            onclick="relation(event, '/relations/posts/likes', 'post_id', 'DELETE')">Unlike</button></form>
       </div>
-    </section>
+      <div>
+        <h3>Like comment</h3>
+        <form onsubmit="relation(event, '/relations/comments/likes', 'comment_id', 'POST', 'post_id')"><input
+            name="post_id" placeholder="post id" required /><input name="comment_id" placeholder="comment id"
+            required /><button>Like</button><button type="button"
+            onclick="relation(event, '/relations/comments/likes', 'comment_id', 'DELETE', 'post_id')">Unlike</button>
+        </form>
+      </div>
+      <div>
+        <h3>Save post</h3>
+        <form onsubmit="relation(event, '/relations/saves', 'post_id')"><input name="post_id" placeholder="post id"
+            required /><button>Save</button><button type="button"
+            onclick="relation(event, '/relations/saves', 'post_id', 'DELETE')">Unsave</button></form>
+      </div>
+      <div>
+        <h3>Join community</h3>
+        <form onsubmit="relation(event, '/relations/memberships', 'community_id')"><input name="community_id"
+            placeholder="community id" required /><button>Join</button><button type="button"
+            onclick="relation(event, '/relations/memberships', 'community_id', 'DELETE')">Leave</button></form>
+      </div>
+      <div>
+        <h3>Moderate user</h3>
+        <form onsubmit="moderate(event, 'POST')"><input name="community_id" placeholder="community id" required /><input
+            name="user_id" placeholder="user to moderate" required /><select name="authorization">
+            <option>MODERATOR</option>
+            <option>ADMIN</option>
+          </select><button>Grant</button><button type="button" onclick="moderate(event, 'DELETE')">Revoke</button>
+        </form>
+      </div>
+    </div>
+  </section>
 
-    <h2>Response</h2>
+  <section>
+    <h2>Additional entity operations</h2>
+    <div class="relation-grid">
+      <div>
+        <h3>Read / search users</h3>
+        <form onsubmit="submitForm(event, '/users/' + fieldValue(this, 'id'), 'GET')"><input name="id"
+            placeholder="user id" required /><button>Get user</button></form>
+        <form onsubmit="submitForm(event, '/users/search?q=' + encodeURIComponent(fieldValue(this, 'q')), 'GET')"><input
+            name="q" placeholder="username" required /><button>Search</button></form>
+        <form onsubmit="submitForm(event, '/users/' + fieldValue(this, 'id') + '/recommendations', 'GET')"><input
+            name="id" placeholder="user id" required /><button>Recommendations</button></form>
+      </div>
+      <div>
+        <h3>Read posts</h3>
+        <form onsubmit="submitForm(event, '/posts/' + fieldValue(this, 'id'), 'GET')"><input name="id"
+            placeholder="post id" required /><button>Get post</button></form>
+        <form onsubmit="submitForm(event, '/posts/feed', 'GET')"><button>Feed</button></form>
+      </div>
+      <div>
+        <h3>Read communities</h3>
+        <form onsubmit="submitForm(event, '/communities/' + fieldValue(this, 'id'), 'GET')"><input name="id"
+            placeholder="community id" required /><button>Get community</button></form>
+        <form onsubmit="submitForm(event, '/communities/recommendations', 'GET')"><button>Recommendations</button>
+        </form>
+      </div>
+      <div>
+        <h3>Comments for post</h3>
+        <form onsubmit="submitForm(event, '/posts/' + fieldValue(this, 'post_id') + '/comments', 'GET')"><input
+            name="post_id" placeholder="post id" required /><button>List comments</button></form>
+      </div>
+      <div>
+        <h3>Update user</h3>
+        <form onsubmit="submitForm(event, '/users/' + fieldValue(this, 'id'), 'PUT', jsonBody)"><input name="id"
+            placeholder="user id" required /><textarea name="json" placeholder='{"username":"Updated"}'
+            required></textarea><button>Update</button></form>
+      </div>
+      <div>
+        <h3>Update post</h3>
+        <form onsubmit="submitForm(event, '/posts/' + fieldValue(this, 'id'), 'PUT', postUpdate)"><input name="id"
+            placeholder="post id" required /><input name="user_id" placeholder="owner user id" required /><textarea
+            name="json" placeholder='{"content":"Updated"}' required></textarea><button>Update</button></form>
+      </div>
+      <div>
+        <h3>Update community</h3>
+        <form onsubmit="submitForm(event, '/communities/' + fieldValue(this, 'id'), 'PUT', communityUpdate)"><input
+            name="id" placeholder="community id" required /><input name="admin_id" placeholder="admin user id"
+            required /><textarea name="json" placeholder='{"community_desc":"Updated"}'
+            required></textarea><button>Update</button></form>
+      </div>
+      <div>
+        <h3>Update notification</h3>
+        <form onsubmit="submitForm(event, '/notifications/' + fieldValue(this, 'id'), 'PATCH', readNotification)"><input
+            name="id" placeholder="notification id" required /><select name="read">
+            <option value="true">Read</option>
+            <option value="false">Unread</option>
+          </select><button>Mark read</button></form>
+      </div>
+    </div>
+  </section>
+
+  <h2>Response</h2>
   <pre id="response">No request made.</pre>
   <script>
     function fieldValue(form, name) {
@@ -219,12 +386,18 @@
     }
     async function createComment(event) {
       event.preventDefault();
+      console.log("SUBMITTING")
       try {
-        const postId = fieldValue(event.target, "post_id");
-        const data = normalizeComment(fields(event.target));
-        data.user_id = activeUserId;
-        data.user_summary = await currentUserSummary();
-        await callApi(`/posts/${postId}/comments`, "POST", data);
+        const form = event.currentTarget;
+        const postId = fieldValue(form, "post_id");
+        if (!activeUserId) throw new Error("Register or login first.");
+        const data = normalizeComment({
+          content: fieldValue(form, "content"),
+          root: fieldValue(form, "root"),
+          user_id: activeUserId,
+          user_summary: await currentUserSummary(),
+        });
+        await callApi(`/posts/${encodeURIComponent(postId)}/comments`, "POST", data);
       } catch (error) {
         show({ success: false, message: error.message });
       }
@@ -336,6 +509,9 @@
         2,
       );
     }
+    document
+      .getElementById("create-comment-form")
+      .addEventListener("submit", createComment);
     updateSession();
   </script>
 </body>

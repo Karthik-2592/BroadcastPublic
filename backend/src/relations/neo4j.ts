@@ -54,6 +54,13 @@ export class Neo4jRelations {
       { postId },
     );
   }
+  async deletePostNode(postId: string) {
+    return this.write<number>(
+      "POST.delete",
+      "MATCH (post:POST {post_id: $postId}) DETACH DELETE post RETURN 1 AS value",
+      { postId },
+    );
+  }
   async createCommunityNode(communityId: string) {
     return this.write<number>(
       "COMMUNITY.create",

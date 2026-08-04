@@ -20,7 +20,9 @@ export async function deleteUser(req: Request, res: Response) {
   return ok(res, null, "User deleted successfully.");
 }
 export async function searchUsers(req: Request, res: Response) {
-  return ok(res, await store.searchUsers(String(req.query.q ?? "")));
+  const users = await store.searchUsers(String(req.query.q ?? ""));
+  console.log(`[http] user search: ${users.length ? `found ${users.length}` : "not found"}`);
+  return ok(res, users);
 }
 export async function recommendations(req: Request, res: Response) {
   const users = await store.recommendations(id(req));

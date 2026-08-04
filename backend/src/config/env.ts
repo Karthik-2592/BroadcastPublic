@@ -16,7 +16,7 @@ export const env = {
   neo4jPassword: process.env.NEO4J_PASSWORD ?? "change-me",
   neo4jDatabase: process.env.NEO4J_DATABASE ?? "neo4j",
   favoriteEventProcessIntervalMs: Number(
-    process.env.FAVORITE_EVENT_PROCESS_INTERVAL_MS ?? 15 * 60 * 1000,
+    process.env.FAVORITE_EVENT_PROCESS_INTERVAL_MS ?? 3 * 60 * 1000,
   ),
   favoriteEventQueueThreshold: Number(
     process.env.FAVORITE_EVENT_QUEUE_THRESHOLD ?? 100,

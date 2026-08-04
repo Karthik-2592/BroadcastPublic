@@ -70,6 +70,8 @@ const oid = (value: string) =>
 const publicCommunityObjectId = oid(env.publicCommunityId);
 if (!publicCommunityObjectId)
   throw new Error("PUBLIC_COMMUNITY_ID must be a valid MongoDB ObjectId");
+const FEED_LIMIT = 50;
+const COMMUNITY_LIMIT = 50;
 const apiId = (value: ObjectId) => value.toHexString();
 const hash = (password: string, salt: string) =>
   createHash("sha256").update(`${salt}:${password}`).digest("hex");
@@ -221,10 +223,10 @@ export class MongoStore {
     const objectId = oid(id);
     return objectId
       ? this.log("users.findOne", () =>
-          this.collection<UserDocument>("users")
-            .then((c) => c.findOne({ _id: objectId }))
-            .then((user) => (user ? safeUser(user) : null)),
-        )
+        this.collection<UserDocument>("users")
+          .then((c) => c.findOne({ _id: objectId }))
+          .then((user) => (user ? safeUser(user) : null)),
+      )
       : null;
   }
   async updateUser(id: string, changes: Partial<User>) {
@@ -273,16 +275,16 @@ export class MongoStore {
     });
   }
   async searchUsers(query: string) {
-    return this.log("users.search", () =>
-      this.collection<UserDocument>("users")
-        .then((c) =>
-          c
-            .find({ username: { $regex: query, $options: "i" } })
-            .project({ password: 0 })
-            .toArray(),
-        )
-        .then((users) => users.map((user) => safeUser(user as UserDocument))),
-    );
+    return this.log("users.search", async () => {
+      const users = await (
+        await this.collection<UserDocument>("users")
+      )
+        .find({ username: { $regex: query, $options: "i" } })
+        .project({ password: 0 })
+        .toArray();
+      console.log(`[mongo] users.search: ${users.length ? `found ${users.length}` : "not found"}`);
+      return users.map((user) => safeUser(user as UserDocument));
+    });
   }
   async recommendations(id: string) {
     const user = await this.user(id);
@@ -309,10 +311,10 @@ export class MongoStore {
   ) {
     const userId = oid(input.user_id ?? "");
     if (!userId) throw new Error("Invalid post user_id");
-  const communityId = input.community_id
-    ? oid(input.community_id)
-    : publicCommunityObjectId;
-  if (!communityId) throw new Error("Invalid post community_id");
+    const communityId = input.community_id
+      ? oid(input.community_id)
+      : publicCommunityObjectId;
+    if (!communityId) throw new Error("Invalid post community_id");
     const post: PostDocument = {
       _id: new ObjectId(),
       user_id: userId,
@@ -336,10 +338,10 @@ export class MongoStore {
     const objectId = oid(id);
     return objectId
       ? this.log("posts.findOne", () =>
-          this.collection<PostDocument>("posts")
-            .then((c) => c.findOne({ _id: objectId }))
-            .then((post) => (post ? safePost(post) : null)),
-        )
+        this.collection<PostDocument>("posts")
+          .then((c) => c.findOne({ _id: objectId }))
+          .then((post) => (post ? safePost(post) : null)),
+      )
       : null;
   }
   async updatePost(id: string, changes: Partial<Post>) {
@@ -383,7 +385,7 @@ export class MongoStore {
   async feed() {
     return this.log("posts.find", () =>
       this.collection<PostDocument>("posts")
-        .then((c) => c.find().sort({ time_created: -1 }).toArray())
+        .then((c) => c.find().sort({ time_created: -1 }).limit(FEED_LIMIT).toArray())
         .then((posts) => posts.map(safePost)),
     );
   }
@@ -480,7 +482,7 @@ export class MongoStore {
     const ageInMonths = Math.max(
       0,
       (now.getTime() - post.time_created.getTime()) /
-        (1000 * 60 * 60 * 24 * 30),
+      (1000 * 60 * 60 * 24 * 30),
     );
     const popularityScore =
       ((post.favorite_count ?? 0) + (post.comment_count ?? 0)) *
@@ -538,10 +540,10 @@ export class MongoStore {
     const objectId = oid(id);
     return objectId
       ? this.log("comments.findOne", () =>
-          this.collection<CommentDocument>("comments")
-            .then((c) => c.findOne({ _id: objectId }))
-            .then((item) => (item ? safeComment(item) : null)),
-        )
+        this.collection<CommentDocument>("comments")
+          .then((c) => c.findOne({ _id: objectId }))
+          .then((item) => (item ? safeComment(item) : null)),
+      )
       : null;
   }
   async updateComment(id: string, content: string, userSummary?: unknown) {
@@ -569,13 +571,13 @@ export class MongoStore {
       id,
       ...(!comment.root
         ? (
-            await (
-              await this.collection<CommentDocument>("comments")
-            )
-              .find({ root: oid(id)! })
-              .project({ _id: 1 })
-              .toArray()
-          ).map((item) => apiId(item._id))
+          await (
+            await this.collection<CommentDocument>("comments")
+          )
+            .find({ root: oid(id)! })
+            .project({ _id: 1 })
+            .toArray()
+        ).map((item) => apiId(item._id))
         : []),
     ];
     await this.log("comments.deleteMany", () =>
@@ -617,10 +619,10 @@ export class MongoStore {
     const objectId = oid(id);
     return objectId
       ? this.log("communities.findOne", () =>
-          this.collection<CommunityDocument>("communities")
-            .then((c) => c.findOne({ _id: objectId }))
-            .then((item) => (item ? safeCommunity(item) : null)),
-        )
+        this.collection<CommunityDocument>("communities")
+          .then((c) => c.findOne({ _id: objectId }))
+          .then((item) => (item ? safeCommunity(item) : null)),
+      )
       : null;
   }
   async updateCommunity(id: string, changes: Partial<Community>) {
@@ -655,7 +657,7 @@ export class MongoStore {
   async communityRecommendations() {
     return this.log("communities.find", () =>
       this.collection<CommunityDocument>("communities")
-        .then((c) => c.find().sort({ population: -1 }).toArray())
+        .then((c) => c.find().sort({ population: -1 }).limit(COMMUNITY_LIMIT).toArray())
         .then((items) => items.map(safeCommunity)),
     );
   }
@@ -684,10 +686,10 @@ export class MongoStore {
     const objectId = oid(id);
     return objectId
       ? this.log("notifications.deleteOne", () =>
-          this.collection<NotificationDocument>("notifications")
-            .then((c) => c.deleteOne({ _id: objectId }))
-            .then((result) => Boolean(result.deletedCount)),
-        )
+        this.collection<NotificationDocument>("notifications")
+          .then((c) => c.deleteOne({ _id: objectId }))
+          .then((result) => Boolean(result.deletedCount)),
+      )
       : false;
   }
   async ping() {

@@ -13,7 +13,7 @@ import { logFailure } from "./http.ts";
 
 export function createApp(): Express {
   const app = express();
-  app.use(cors({ origin: "http://localhost:5173" }));
+  app.use(cors({ origin: true }));
 
   startAggregationWorker();
   app.use(express.json({ limit: "2mb" }));
