@@ -22,7 +22,7 @@ function SidebarSection({ title, children }: { title: string; children: React.Re
     <Box
       sx={{
         bgcolor: 'background.paper',
-        borderRadius: 3,
+        borderRadius: 1,
         border: '1px solid',
         borderColor: 'divider',
         p: 2,
@@ -48,11 +48,11 @@ export default function RightSidebar() {
         width: 320,
         minWidth: 320,
         height: 'calc(100vh - 60px)',
-        position: 'sticky',
+        position: 'fixed',
         top: 60,
-        overflowY: 'auto',
+        right: 0,
         px: 2,
-        py: 2,
+        pt: 1,
       }}
     >
       {/* Popular Communities */}

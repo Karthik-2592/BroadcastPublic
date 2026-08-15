@@ -51,7 +51,7 @@ const theme = createTheme({
     },
   },
   shape: {
-    borderRadius: 12,
+    borderRadius: 6,
   },
   components: {
     MuiCssBaseline: {
@@ -97,7 +97,7 @@ const theme = createTheme({
     MuiListItemButton: {
       styleOverrides: {
         root: {
-          borderRadius: 8,
+          borderRadius: 24,
           marginBottom: 2,
           '&.Mui-selected': {
             backgroundColor: 'rgba(179, 136, 255, 0.12)',
@@ -115,7 +115,7 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           '& .MuiOutlinedInput-root': {
-            borderRadius: 10,
+            borderRadius: 60,
             backgroundColor: 'rgba(255,255,255,0.04)',
             '& fieldset': {
               borderColor: 'rgba(255,255,255,0.08)',

@@ -9,10 +9,11 @@ export default function Feed() {
   return (
     <Box
       sx={{
-        maxWidth: 620,
+        maxWidth: 840,
         mx: 'auto',
         py: 2,
         px: 1,
+
       }}
     >
       {mockPosts.map((post) => (

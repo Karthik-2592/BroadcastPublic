@@ -28,3 +28,16 @@ Result:
 
 
 
+
+
+###### **LANDING PAGE REFINEMENT:**
+
+
+
+1. Align both Search bar and Main feed content (already done)
+2. Sharper corners in all elements
+3. Outstanding search bar, (Gradient bright outline, and larger border radius)
+4. Side bars and Header are to be made 'fixed' instead of current 'relative'.
+5. Remove scrollbar for the 'feed' section, as feed will be navigated via the page-scrollbar.
+6. Glassmorphism for Navbar.
+

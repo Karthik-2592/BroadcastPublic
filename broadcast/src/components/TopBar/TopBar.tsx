@@ -16,14 +16,21 @@ import CellTowerRoundedIcon from '@mui/icons-material/CellTowerRounded';
 
 export default function TopBar() {
   return (
-    <AppBar position="sticky" elevation={0}>
+    <AppBar sx={{
+      position: "sticky",
+      elevation: 0,
+      background: 'none'
+    }}>
       <Toolbar
         sx={{
-          display: 'grid',
+          display: 'flex',
+          justifyContent: 'space-between',
           gridTemplateColumns: '240px 1fr auto',
           gap: 2,
           minHeight: { xs: 60 },
           px: { xs: 2, md: 3 },
+          background: 'rgba(10, 10, 10, 0.5)',
+          backdropFilter: 'blur(10px)',
         }}
       >
         {/* Logo / branding */}
@@ -44,7 +51,17 @@ export default function TopBar() {
         </Box>
 
         {/* Search bar */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', maxWidth: 600, mx: 'auto', width: '100%' }}>
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          maxWidth: 650,
+          mx: 'auto',
+          my: 'auto',
+          width: '100%',
+          position: 'fixed',
+          left: '33%',
+          borderRadius: '50px',
+        }}>
           <TextField
             size="small"
             placeholder="Search posts, communities, people..."

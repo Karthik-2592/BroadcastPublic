@@ -5,10 +5,34 @@
   MUI CssBaseline handles the base styles and colors.
 */
 
-html, body, #root {
+html,
+body,
+#root {
   width: 100%;
   height: 100%;
   margin: 0;
   padding: 0;
 }
 
+/* Chrome, Edge, Safari */
+html::-webkit-scrollbar {
+  width: 6px;
+  /* scrollbar width */
+}
+
+html::-webkit-scrollbar-track {
+  background: #1a1a2e;
+  /* track color */
+}
+
+html::-webkit-scrollbar-thumb {
+  background: #653ecfd8;
+  /* thumb color */
+  border-radius: 6px;
+  /* rounded corners */
+}
+
+html::-webkit-scrollbar-thumb:hover {
+  background: #555;
+  /* hover effect */
+}

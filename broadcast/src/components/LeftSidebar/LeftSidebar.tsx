@@ -33,10 +33,10 @@ export default function LeftSidebar() {
     <Box
       component="aside"
       sx={{
-        width: 240,
+        width: 260,
         minWidth: 240,
         height: 'calc(100vh - 60px)',
-        position: 'sticky',
+        position: 'fixed',
         top: 60,
         overflowY: 'auto',
         borderRight: '1px solid',

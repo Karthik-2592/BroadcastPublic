@@ -11,7 +11,11 @@ import RightSidebar from '../components/RightSidebar/RightSidebar';
 
 export default function MainLayout() {
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <Box sx={{
+      display: 'flex',
+      flexDirection: 'column',
+      minHeight: '100vh',
+    }}>
       <TopBar />
 
       <Box sx={{ display: 'flex', flex: 1 }}>
@@ -23,8 +27,7 @@ export default function MainLayout() {
           sx={{
             flex: 1,
             minWidth: 0,
-            overflowY: 'auto',
-            height: 'calc(100vh - 60px)',
+            height: '100%',
             bgcolor: 'background.default',
           }}
         >
