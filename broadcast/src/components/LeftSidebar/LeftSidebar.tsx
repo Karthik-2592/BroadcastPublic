@@ -11,7 +11,6 @@ import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
 import Divider from '@mui/material/Divider';
 import Avatar from '@mui/material/Avatar';
-import ExploreOutlinedIcon from '@mui/icons-material/ExploreOutlined';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
@@ -20,7 +19,6 @@ import { userCommunities } from '../../data/mockData';
 // Navigation items corresponding to the wireframe's sidebar tabs
 const navItems = [
   { label: 'Home', icon: <HomeOutlinedIcon />, path: '/' },
-  { label: 'Explore', icon: <ExploreOutlinedIcon />, path: '/explore' },
   { label: 'Trending', icon: <TrendingUpIcon />, path: '/trending' },
   { label: 'Communities', icon: <GroupsOutlinedIcon />, path: '/communities' },
 ];

@@ -47,12 +47,10 @@ export default function RightSidebar() {
       sx={{
         width: 320,
         minWidth: 320,
-        height: 'calc(100vh - 60px)',
-        position: 'fixed',
-        top: 60,
-        right: 0,
         px: 2,
-        pt: 1,
+        pt: 2,
+        position: 'sticky',
+        top: 77
       }}
     >
       {/* Popular Communities */}
@@ -75,10 +73,13 @@ export default function RightSidebar() {
                 </Avatar>
               </ListItemIcon>
               <ListItemText
-                primary={community.name}
-                secondary={`${community.memberCount.toLocaleString()} members`}
-                primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }}
-                secondaryTypographyProps={{ fontSize: '0.7rem' }}
+                primary={
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>
+                    {community.name}
+                  </Typography>
+                }
+                secondary={<Typography sx={{ fontSize: '0.7rem' }}>{community.memberCount.toLocaleString()} members</Typography>}
+
               />
             </ListItemButton>
           ))}
@@ -111,10 +112,13 @@ export default function RightSidebar() {
                 </Avatar>
               </ListItemIcon>
               <ListItemText
-                primary={user.name}
-                secondary={user.handle}
-                primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }}
-                secondaryTypographyProps={{ fontSize: '0.7rem' }}
+                primary={
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>
+                    {user.name}
+                  </Typography>
+                }
+                secondary={<Typography sx={{ fontSize: '0.7rem' }}>{user.handle}</Typography>}
+
               />
             </ListItemButton>
           ))}
@@ -135,8 +139,11 @@ export default function RightSidebar() {
               <ContactSupportOutlinedIcon fontSize="small" />
             </ListItemIcon>
             <ListItemText
-              primary="Contact Support"
-              primaryTypographyProps={{ fontSize: '0.82rem' }}
+              primary={
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>
+                  Contact Support
+                </Typography>
+              }
             />
           </ListItemButton>
 
@@ -145,8 +152,11 @@ export default function RightSidebar() {
               <InfoOutlinedIcon fontSize="small" />
             </ListItemIcon>
             <ListItemText
-              primary="About Us"
-              primaryTypographyProps={{ fontSize: '0.82rem' }}
+              primary={
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>
+                  About Us
+                </Typography>
+              }
             />
           </ListItemButton>
 
@@ -155,8 +165,11 @@ export default function RightSidebar() {
               <GavelOutlinedIcon fontSize="small" />
             </ListItemIcon>
             <ListItemText
-              primary="Terms of Service"
-              primaryTypographyProps={{ fontSize: '0.82rem' }}
+              primary={
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>
+                  Terms of Service
+                </Typography>
+              }
             />
           </ListItemButton>
         </List>

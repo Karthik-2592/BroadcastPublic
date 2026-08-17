@@ -1,30 +1,33 @@
-// ProfilePage — Stub route for the "/profile" path.
-// Placeholder content until the profile feature is implemented.
-
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
+import ProfileDescription from '../components/Profile/ProfileDescription';
+import ProfileTabs from '../components/Profile/ProfileTabs';
+import ProfileSidebar from '../components/Profile/ProfileSidebar';
 
 export default function ProfilePage() {
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100%',
-        gap: 2,
-        color: 'text.secondary',
-      }}
-    >
-      <PersonOutlineOutlinedIcon sx={{ fontSize: 64, opacity: 0.3 }} />
-      <Typography variant="h5" sx={{ color: 'text.primary' }}>
-        Profile
-      </Typography>
-      <Typography variant="body2">
-        View and edit your profile — coming soon.
-      </Typography>
-    </Box>
+    <>
+      <div className="flex flex-col relative py-6 w-[65%] mx-auto pl-8">
+        <ProfileDescription />
+      </div>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 0.53fr',
+          justifyContent: 'center',
+          gap: 4,
+          px: 4,
+          py: 2,
+          width: '100%',
+          alignItems: 'start',
+        }}
+      >
+        <Box sx={{ justifySelf: 'end', width: '100%', maxWidth: 720 }}>
+          <ProfileTabs />
+        </Box>
+        <Box sx={{ maxHeight: '100%' }}>
+          <ProfileSidebar />
+        </Box>
+      </Box>
+    </>
   );
 }

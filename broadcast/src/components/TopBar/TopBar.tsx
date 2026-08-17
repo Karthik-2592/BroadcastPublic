@@ -16,25 +16,29 @@ import CellTowerRoundedIcon from '@mui/icons-material/CellTowerRounded';
 
 export default function TopBar() {
   return (
-    <AppBar sx={{
-      position: "sticky",
-      elevation: 0,
-      background: 'none'
-    }}>
+    <AppBar
+      sx={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 1100,
+        elevation: 0,
+        background: 'none',
+      }}
+    >
       <Toolbar
         sx={{
           display: 'flex',
+          alignItems: 'center',
           justifyContent: 'space-between',
-          gridTemplateColumns: '240px 1fr auto',
-          gap: 2,
           minHeight: { xs: 60 },
           px: { xs: 2, md: 3 },
-          background: 'rgba(10, 10, 10, 0.5)',
+          background: 'rgba(10, 10, 10, 0.75)',
           backdropFilter: 'blur(10px)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
         }}
       >
-        {/* Logo / branding */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        {/* Left branding area matching LeftSidebar width (260px) */}
+        <Box sx={{ width: 236, minWidth: 236, display: 'flex', alignItems: 'center', gap: 1 }}>
           <CellTowerRoundedIcon sx={{ color: 'primary.main', fontSize: 28 }} />
           <Typography
             variant="h6"
@@ -50,18 +54,16 @@ export default function TopBar() {
           </Typography>
         </Box>
 
-        {/* Search bar */}
-        <Box sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          maxWidth: 650,
-          mx: 'auto',
-          my: 'auto',
-          width: '100%',
-          position: 'fixed',
-          left: '33%',
-          borderRadius: '50px',
-        }}>
+        {/* Center Search Bar area — aligned with feed (starts after 260px area, max-width 640px) */}
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            justifyContent: 'center',
+            maxWidth: 640,
+            mx: 'auto',
+          }}
+        >
           <TextField
             size="small"
             placeholder="Search posts, communities, people..."
@@ -79,13 +81,11 @@ export default function TopBar() {
         </Box>
 
         {/* Account controls */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
           <IconButton size="small" sx={{ color: 'text.secondary' }}>
             <NotificationsNoneOutlinedIcon fontSize="small" />
           </IconButton>
-          <IconButton size="small" sx={{ color: 'text.secondary' }}>
-            <SettingsOutlinedIcon fontSize="small" />
-          </IconButton>
+
           <Button
             variant="outlined"
             size="small"
@@ -115,3 +115,4 @@ export default function TopBar() {
     </AppBar>
   );
 }
+

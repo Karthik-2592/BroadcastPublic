@@ -1,5 +1,52 @@
 @import "tailwindcss";
 
+@theme {
+  --color-surface-container-lowest: #0d0d18;
+  --color-secondary-fixed: #75fbb8;
+  --color-primary-fixed-dim: #d4bbff;
+  --color-tertiary-fixed-dim: #dbc838;
+  --color-surface-container-high: #292935;
+  --color-on-tertiary-container: #3d3600;
+  --color-inverse-on-surface: #302f3b;
+  --color-background: #12121d;
+  --color-tertiary-container: #b1a000;
+  --color-on-primary-container: #46128d;
+  --color-secondary-container: #00ab70;
+  --color-inverse-primary: #7046b8;
+  --color-header: #12121f;
+  --color-on-error: #690005;
+  --color-text-med: #9e9bab;
+  --color-surface-bright: #383845;
+  --color-secondary: #55de9e;
+  --color-on-secondary: #003822;
+  --color-surface-container-low: #1b1a26;
+  --color-inverse-surface: #e3e0f1;
+  --color-error-container: #93000a;
+  --color-on-surface: #e3e0f1;
+  --color-surface-tint: #d4bbff;
+  --color-surface-variant: #343440;
+  --color-outline-variant: #4a4452;
+  --color-surface-container: #1f1e2a;
+  --color-surface-container-highest: #343440;
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
+  --color-tertiary: #dbc838;
+  --color-accent-glow: rgba(179, 136, 255, 0.08);
+  --color-surface: #1a1a2e;
+  --color-primary-container: #b388ff;
+  --color-text-high: #e8e6ef;
+  --color-on-surface-variant: #ccc3d4;
+  --color-primary-fixed: #ebdcff;
+  --color-on-primary: #400688;
+  --color-on-background: #e3e0f1;
+  --color-primary: #d4bbff;
+  --color-outline: #958e9d;
+  --color-surface-dim: #12121d;
+  --color-error: #ffb4ab;
+
+  --spacing-margin-desktop: 24px;
+  --spacing-container-max: 1280px;
+}
+
 /* 
   Tailwind handles utilities.
   MUI CssBaseline handles the base styles and colors.
