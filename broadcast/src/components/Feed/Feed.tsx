@@ -13,6 +13,9 @@ export default function Feed() {
         maxWidth: 720,
         py: 2,
         justifySelf: 'center',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
       }}
     >
       {mockPosts.map((post) => (

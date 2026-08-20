@@ -1,7 +1,7 @@
 export default function CommunityHero() {
   return (
     <div
-      className="relative w-full h-[320px] rounded-xl overflow-hidden shadow-xl mb-6"
+      className="relative w-full h-[280px] rounded-xl overflow-hidden shadow-xl mb-6"
       style={{
         backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuC_hMgUDtQc33ZyA_b-HI2lBkUw-QvBohNMCh3Wueks2Bdj2NEVk1oKEd9sg4OxFSveTjlu2X0dEpVHkbeBjgj9NY0GccQqXBGaRM3ifFyf6ljxNT3F1PibmtZZyxQWr2uisrAeZdVLR9OlSX7RhfEBZ5xYRpfHQefM4d2UUYrYx2iJK-phDSFAS5GJzgxp5ElH4JXry2T7go9nbURq8uZG9eBfseZOCrvYlc8tQKMCZGj_3oFrtgIpIEAmv4olJEZK3w')`,
         backgroundSize: 'cover',

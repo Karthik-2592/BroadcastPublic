@@ -22,8 +22,6 @@ export default function ProfileTabs() {
           borderRadius: 2,
           p: 0.5,
           boxShadow: 1,
-          position: 'sticky',
-          top: 64,
           zIndex: 30,
         }}
       >

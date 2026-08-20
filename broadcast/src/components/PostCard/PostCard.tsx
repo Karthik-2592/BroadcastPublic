@@ -15,6 +15,7 @@ import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutlined';
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
+import { useNavigate } from 'react-router-dom';
 import type { MockPost } from '../../data/mockData';
 
 interface PostCardProps {
@@ -22,6 +23,7 @@ interface PostCardProps {
 }
 
 export default function PostCard({ post }: PostCardProps) {
+  const navigate = useNavigate();
   return (
     <Card sx={{ mb: 2 }}>
       <CardContent sx={{ pb: 1 }}>
@@ -56,28 +58,34 @@ export default function PostCard({ post }: PostCardProps) {
           </IconButton>
         </Box>
 
-        {/* -- Post Title -- */}
-        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
-          {post.title}
-        </Typography>
+        {/* -- Clickable content area: title, body, media → navigates to post view -- */}
+        <Box
+          onClick={() => navigate(`/post/${post.id}`)}
+          sx={{ cursor: 'pointer' }}
+        >
+          {/* -- Post Title -- */}
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+            {post.title}
+          </Typography>
 
-        {/* -- Post Body Text -- */}
-        <Typography variant="body2" sx={{ mb: 1.5, lineHeight: 1.65 }}>
-          {post.content}
-        </Typography>
+          {/* -- Post Body Text -- */}
+          <Typography variant="body2" sx={{ mb: 1.5, lineHeight: 1.65 }}>
+            {post.content}
+          </Typography>
 
-        {/* -- Optional Media Placeholder -- */}
-        {post.mediaPlaceholder && (
-          <Box
-            sx={{
-              width: '100%',
-              height: 220,
-              borderRadius: 2,
-              background: post.mediaPlaceholder,
-              mb: 1.5,
-            }}
-          />
-        )}
+          {/* -- Optional Media Placeholder -- */}
+          {post.mediaPlaceholder && (
+            <Box
+              sx={{
+                width: '100%',
+                height: 220,
+                borderRadius: 2,
+                background: post.mediaPlaceholder,
+                mb: 1.5,
+              }}
+            />
+          )}
+        </Box>
 
         {/* -- Tags -- */}
         {post.tags.length > 0 && (

@@ -1,7 +1,3 @@
-// LeftSidebar — Navigation panel with page links and user community listings.
-// Fixed 240px width; contains navigation tabs (Explore, Trending, Communities)
-// and a "Your Communities" section listing the user's joined communities.
-
 import { useLocation, useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import List from '@mui/material/List';
@@ -32,7 +28,7 @@ export default function LeftSidebar() {
       component="aside"
       sx={{
         width: 260,
-        minWidth: 240,
+        minWidth: 260,
         height: 'calc(100vh - 60px)',
         position: 'fixed',
         top: 60,
@@ -47,13 +43,13 @@ export default function LeftSidebar() {
       }}
     >
       {/* Primary navigation tabs */}
-      <List disablePadding>
+      <List >
         {navItems.map((item) => (
           <ListItemButton
             key={item.path}
             selected={location.pathname === item.path}
             onClick={() => navigate(item.path)}
-            sx={{ py: 1, px: 1.5 }}
+            sx={{ py: 1, px: 1.5, my: 1 }}
           >
             <ListItemIcon sx={{ minWidth: 36, color: 'text.secondary' }}>
               {item.icon}
@@ -71,13 +67,17 @@ export default function LeftSidebar() {
       {/* User's joined communities */}
       <Typography
         variant="overline"
-        sx={{ px: 1.5, mb: 1, color: 'text.secondary', fontSize: '0.7rem', letterSpacing: '0.08em' }}
+        sx={{ px: 1.5, my: 1, color: 'text.secondary', fontSize: '0.7rem', letterSpacing: '0.08em' }}
       >
         Your Communities
       </Typography>
       <List disablePadding>
         {userCommunities.map((community) => (
-          <ListItemButton key={community.id} sx={{ py: 0.75, px: 1.5 }}>
+          <ListItemButton
+            key={community.id}
+            sx={{ py: 0.75, px: 1.5, my: 1 }}
+            onClick={() => navigate('/community/' + community.id)}
+          >
             <ListItemIcon sx={{ minWidth: 36 }}>
               <Avatar
                 sx={{

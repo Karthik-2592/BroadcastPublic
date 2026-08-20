@@ -19,7 +19,7 @@ const theme = createTheme({
     },
     background: {
       default: '#0f0f1a',   // Deep dark background
-      paper: '#1a1a2e',     // Slightly lighter card/sidebar surfaces
+      paper: '#16161dff',     // Slightly lighter card/sidebar surfaces
     },
     text: {
       primary: '#e8e6ef',

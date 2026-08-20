@@ -10,15 +10,17 @@ import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import SearchIcon from '@mui/icons-material/Search';
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import NotificationsNoneOutlinedIcon from '@mui/icons-material/NotificationsNoneOutlined';
 import CellTowerRoundedIcon from '@mui/icons-material/CellTowerRounded';
+import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import { useNavigate } from 'react-router-dom';
 
 export default function TopBar() {
+  const navigate = useNavigate();
   return (
     <AppBar
       sx={{
-        position: 'sticky',
+        position: 'fixed',
         top: 0,
         zIndex: 1100,
         elevation: 0,
@@ -38,7 +40,7 @@ export default function TopBar() {
         }}
       >
         {/* Left branding area matching LeftSidebar width (260px) */}
-        <Box sx={{ width: 236, minWidth: 236, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ width: 236, minWidth: 236, display: 'flex', alignItems: 'center', gap: 1, mr: 6 }}>
           <CellTowerRoundedIcon sx={{ color: 'primary.main', fontSize: 28 }} />
           <Typography
             variant="h6"
@@ -80,36 +82,72 @@ export default function TopBar() {
           />
         </Box>
 
-        {/* Account controls */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
-          <IconButton size="small" sx={{ color: 'text.secondary' }}>
-            <NotificationsNoneOutlinedIcon fontSize="small" />
-          </IconButton>
-
-          <Button
-            variant="outlined"
-            size="small"
-            sx={{
-              ml: 1,
-              borderColor: 'rgba(179,136,255,0.4)',
-              color: 'primary.light',
-              '&:hover': { borderColor: 'primary.main', bgcolor: 'rgba(179,136,255,0.08)' },
-            }}
-          >
-            Log In
-          </Button>
+        {/* Post Creation CTA & Account controls */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, ml: 2 }}>
+          {/* Post Creation CTA Button */}
           <Button
             variant="contained"
             size="small"
+            startIcon={<AddRoundedIcon />}
+            onClick={() => navigate('/create')}
             sx={{
-              bgcolor: 'primary.main',
-              color: '#0f0f1a',
+              background: 'linear-gradient(135deg, #b388ff 0%, #7c4dff 100%)',
+              color: '#ffffff',
               fontWeight: 600,
-              '&:hover': { bgcolor: 'primary.light' },
+              fontSize: '0.85rem',
+              borderRadius: 6,
+              px: 2,
+              py: 0.6,
+              textTransform: 'none',
+              boxShadow: '0 2px 10px rgba(179, 136, 255, 0.25)',
+              transition: 'all 0.2s ease-in-out',
+              whiteSpace: 'nowrap',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #a98bdaff 0%, #7452d1ff 100%)',
+                boxShadow: '0 4px 16px rgba(179, 136, 255, 0.45)',
+                transform: 'translateY(-1px)',
+              },
+              '&:active': {
+                transform: 'translateY(0)',
+              },
             }}
           >
-            Sign Up
+            Create
           </Button>
+
+          {/* Account controls */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <IconButton size="small" sx={{ color: 'text.secondary' }}>
+              <NotificationsNoneOutlinedIcon fontSize="small" />
+            </IconButton>
+
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => navigate('/login')}
+              sx={{
+                ml: 0.5,
+                borderColor: 'rgba(179,136,255,0.4)',
+                color: 'primary.light',
+                '&:hover': { borderColor: 'primary.main', bgcolor: 'rgba(179,136,255,0.08)' },
+              }}
+            >
+              Log In
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => navigate('/register')}
+              sx={{
+                bgcolor: 'primary.main',
+                color: '#0f0f1a',
+                fontWeight: 600,
+                '&:hover': { bgcolor: 'primary.light' },
+              }}
+            >
+              Sign Up
+            </Button>
+          </Box>
         </Box>
       </Toolbar>
     </AppBar>

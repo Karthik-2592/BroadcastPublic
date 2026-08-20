@@ -14,6 +14,7 @@ import Button from '@mui/material/Button';
 import ContactSupportOutlinedIcon from '@mui/icons-material/ContactSupportOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import GavelOutlinedIcon from '@mui/icons-material/GavelOutlined';
+import { useNavigate } from 'react-router-dom';
 import { popularCommunities, followedUsers } from '../../data/mockData';
 
 // Reusable section wrapper with a subtle card-like surface
@@ -41,6 +42,8 @@ function SidebarSection({ title, children }: { title: string; children: React.Re
 }
 
 export default function RightSidebar() {
+  const navigate = useNavigate();
+
   return (
     <Box
       component="aside"
@@ -57,7 +60,7 @@ export default function RightSidebar() {
       <SidebarSection title="Popular Communities">
         <List disablePadding>
           {popularCommunities.map((community) => (
-            <ListItemButton key={community.id} sx={{ py: 0.75, px: 1, borderRadius: 2 }}>
+            <ListItemButton key={community.id} sx={{ py: 0.75, px: 1, borderRadius: 2 }} onClick={() => navigate('/community/' + community.id)}>
               <ListItemIcon sx={{ minWidth: 38 }}>
                 <Avatar
                   sx={{
@@ -96,7 +99,7 @@ export default function RightSidebar() {
       <SidebarSection title="Your Follows">
         <List disablePadding>
           {followedUsers.map((user) => (
-            <ListItemButton key={user.id} sx={{ py: 0.75, px: 1, borderRadius: 2 }}>
+            <ListItemButton key={user.id} sx={{ py: 0.75, px: 1, borderRadius: 2 }} onClick={() => navigate('/profile')}>
               <ListItemIcon sx={{ minWidth: 38 }}>
                 <Avatar
                   sx={{
@@ -134,7 +137,7 @@ export default function RightSidebar() {
       {/* Support links */}
       <SidebarSection title="Support">
         <List disablePadding>
-          <ListItemButton sx={{ py: 0.5, px: 1, borderRadius: 2 }}>
+          <ListItemButton sx={{ py: 0.5, px: 1, borderRadius: 2 }} onClick={() => navigate('/placeholder')}>
             <ListItemIcon sx={{ minWidth: 32, color: 'text.secondary' }}>
               <ContactSupportOutlinedIcon fontSize="small" />
             </ListItemIcon>
@@ -147,7 +150,7 @@ export default function RightSidebar() {
             />
           </ListItemButton>
 
-          <ListItemButton sx={{ py: 0.5, px: 1, borderRadius: 2 }}>
+          <ListItemButton sx={{ py: 0.5, px: 1, borderRadius: 2 }} onClick={() => navigate('/placeholder')}>
             <ListItemIcon sx={{ minWidth: 32, color: 'text.secondary' }}>
               <InfoOutlinedIcon fontSize="small" />
             </ListItemIcon>
@@ -160,7 +163,7 @@ export default function RightSidebar() {
             />
           </ListItemButton>
 
-          <ListItemButton sx={{ py: 0.5, px: 1, borderRadius: 2 }}>
+          <ListItemButton sx={{ py: 0.5, px: 1, borderRadius: 2 }} onClick={() => navigate('/placeholder')}>
             <ListItemIcon sx={{ minWidth: 32, color: 'text.secondary' }}>
               <GavelOutlinedIcon fontSize="small" />
             </ListItemIcon>

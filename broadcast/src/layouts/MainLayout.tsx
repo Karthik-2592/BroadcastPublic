@@ -19,10 +19,9 @@ export default function MainLayout() {
     >
       <TopBar />
 
-      <Box sx={{ display: 'flex', flex: 1 }}>
+      <Box sx={{ display: 'flex', flex: 1, mt: '60px' }}>
         <LeftSidebar />
 
-        {/* Main content area — starts after the 260px fixed LeftSidebar */}
         <Box
           component="main"
           sx={{
