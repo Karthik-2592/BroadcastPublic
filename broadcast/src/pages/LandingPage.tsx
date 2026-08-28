@@ -11,7 +11,7 @@ export default function LandingPage() {
         justifyContent: 'center',
         gap: 4,
         px: 4,
-        py: 2,
+        pt: 2,
         width: '100%',
         height: '100%',
       }}

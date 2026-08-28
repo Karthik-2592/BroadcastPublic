@@ -1,3 +1,5 @@
+import { useState, useCallback } from 'react';
+import debounce from 'lodash.debounce';
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
@@ -17,6 +19,20 @@ interface CommentsSectionProps {
 }
 
 export default function CommentsSection({ comments = mockComments }: CommentsSectionProps) {
+  const [commentText, setCommentText] = useState('');
+
+  const debouncedSubmitCommentApi = useCallback(
+    debounce((text: string) => {
+      console.log(`[API MOCK] Submitted comment:`, text);
+    }, 500),
+    []
+  );
+
+  const handleSubmitComment = () => {
+    if (!commentText.trim()) return;
+    debouncedSubmitCommentApi(commentText);
+    setCommentText('');
+  };
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
       {/* ── Comment Submit Section ── */}
@@ -54,6 +70,8 @@ export default function CommentsSection({ comments = mockComments }: CommentsSec
             component="textarea"
             placeholder="Add to the discussion..."
             rows={2}
+            value={commentText}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCommentText(e.target.value)}
             sx={{
               width: '100%',
               bgcolor: 'rgba(255,255,255,0.04)',
@@ -101,6 +119,7 @@ export default function CommentsSection({ comments = mockComments }: CommentsSec
             <Button
               size="small"
               variant="contained"
+              onClick={handleSubmitComment}
               sx={{
                 background: 'linear-gradient(135deg, #b388ff 0%, #7c4dff 100%)',
                 color: '#fff',
@@ -117,7 +136,7 @@ export default function CommentsSection({ comments = mockComments }: CommentsSec
                 },
               }}
             >
-              Reply
+              Comment
             </Button>
           </Box>
         </Box>

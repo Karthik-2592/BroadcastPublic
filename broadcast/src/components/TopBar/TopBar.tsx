@@ -1,6 +1,5 @@
-// TopBar — Application header with logo, search bar, and account controls.
-// Spans the full viewport width; uses MUI AppBar with a 3-section toolbar layout.
-
+import { useState, useCallback } from 'react';
+import debounce from 'lodash.debounce';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
@@ -17,6 +16,33 @@ import { useNavigate } from 'react-router-dom';
 
 export default function TopBar() {
   const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const submitSearch = (query: string) => {
+    if (!query.trim()) return;
+    console.log(`[API MOCK] Submitting search query:`, query);
+  };
+
+  const debouncedSearchApi = useCallback(
+    debounce((query: string) => {
+      submitSearch(query);
+    }, 500),
+    []
+  );
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+    debouncedSearchApi(val);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      debouncedSearchApi.cancel();
+      submitSearch(searchQuery);
+    }
+  };
+
   return (
     <AppBar
       sx={{
@@ -70,6 +96,9 @@ export default function TopBar() {
             size="small"
             placeholder="Search posts, communities, people..."
             fullWidth
+            value={searchQuery}
+            onChange={handleSearchChange}
+            onKeyDown={handleKeyDown}
             slotProps={{
               input: {
                 startAdornment: (

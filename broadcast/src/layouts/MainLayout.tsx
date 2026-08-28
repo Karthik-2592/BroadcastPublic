@@ -7,8 +7,17 @@ import { Outlet } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import TopBar from '../components/TopBar/TopBar';
 import LeftSidebar from '../components/LeftSidebar/LeftSidebar';
+import { Fade } from '@mui/material';
+import { useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 
 export default function MainLayout() {
+  const location = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
   return (
     <Box
       sx={{
@@ -32,7 +41,12 @@ export default function MainLayout() {
             bgcolor: 'background.default',
           }}
         >
-          <Outlet />
+
+          <Fade in={true} timeout={350} key={location.key}>
+            <Box sx={{ width: '100%', height: '100%' }}>
+              <Outlet />
+            </Box>
+          </Fade>
         </Box>
       </Box>
     </Box>

@@ -3,6 +3,8 @@ import { fail, ok, required } from "../../http.ts";
 import { store } from "../../store.ts";
 import { neo4jRelations } from "../../relations/neo4j.ts";
 import type { LoginRequest, RegisterRequest } from "../../types.ts";
+
+
 export async function register(req: Request, res: Response): Promise<Response> {
   const body = req.body as Partial<RegisterRequest>;
   const missing = required(body, ["username", "password", "email"]);
@@ -14,6 +16,8 @@ export async function register(req: Request, res: Response): Promise<Response> {
   return ok(res, user, "User registered successfully.", 201);
 }
 export async function login(req: Request, res: Response): Promise<Response> {
+
+
   const body = req.body as LoginRequest;
   const identity = body.username ?? body.email ?? "";
   const user = await store.authenticate(identity, body.password);

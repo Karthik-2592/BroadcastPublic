@@ -9,10 +9,14 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
 import Link from '@mui/material/Link';
-import Chip from '@mui/material/Chip';
 import Textarea from '@mui/material/TextareaAutosize';
 import InputAdornment from '@mui/material/InputAdornment';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import Radio from '@mui/material/Radio';
+import Fade from '@mui/material/Fade';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
 import PersonOutlineOutlined from '@mui/icons-material/PersonOutlineOutlined';
 import MailOutlineIcon from '@mui/icons-material/MailOutlineOutlined';
@@ -21,8 +25,24 @@ import LockClockOutlinedIcon from '@mui/icons-material/LockClockOutlined';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import UploadIcon from '@mui/icons-material/Upload';
 import CellTowerRoundedIcon from '@mui/icons-material/CellTowerRounded';
+import CloseIcon from '@mui/icons-material/Close';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 
-const INTERESTS = ['Web Dev', 'Open Source', 'UI/UX', 'Cloud Computing', 'AI/ML', 'DevOps'];
+const INTERESTS = [
+  'Web Dev',
+  'Open Source',
+  'UI/UX',
+  'Cloud Computing',
+  'AI/ML',
+  'DevOps',
+  'Cybersecurity',
+  'Mobile App Dev',
+  'Blockchain',
+  'Data Science',
+  'Game Dev',
+  'Systems Programming',
+];
 
 const inputSx = {
   '& .MuiOutlinedInput-root': {
@@ -43,15 +63,206 @@ const inputSx = {
   },
 };
 
+// ─── Interests Dialog Component ───────────────────────────────────────────────
+function InterestsDialog({
+  selectedInterests,
+  onToggleInterest,
+}: {
+  selectedInterests: Set<string>;
+  onToggleInterest: (interest: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasSelection = selectedInterests.size > 0;
+
+  const getButtonText = () => {
+    if (!hasSelection) return 'Select interests';
+    const items = Array.from(selectedInterests);
+    if (items.length <= 2) return items.join(', ');
+    return `${items.slice(0, 2).join(', ')} +${items.length - 2} more`;
+  };
+
+  return (
+    <>
+      {/* Full-width, fixed-height button with left-aligned text */}
+      <Button
+        type="button"
+        fullWidth
+        onClick={() => setOpen(true)}
+        sx={{
+          height: 48,
+          borderRadius: 9999,
+          bgcolor: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          color: hasSelection ? 'primary.light' : 'text.secondary',
+          fontWeight: hasSelection ? 600 : 400,
+          fontSize: '0.88rem',
+          textTransform: 'none',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          px: 2.5,
+          textAlign: 'left',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            bgcolor: 'rgba(255,255,255,0.1)',
+            borderColor: 'rgba(179,136,255,0.3)',
+          },
+        }}
+      >
+        <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {getButtonText()}
+        </Box>
+        <KeyboardArrowDownIcon
+          sx={{
+            color: hasSelection ? 'primary.light' : 'text.secondary',
+            fontSize: 20,
+            transform: open ? 'rotate(180deg)' : 'none',
+            transition: 'transform 0.2s ease',
+          }}
+        />
+      </Button>
+
+      {/* Dialog box containing radio options */}
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        slotProps={{
+          backdrop: {
+            sx: {
+              backgroundColor: 'rgba(0, 0, 0, 0.75)',
+              backdropFilter: 'brightness(0.5) blur(4px)',
+            },
+          },
+          paper: {
+            sx: {
+              width: '100%',
+              maxWidth: 420,
+              height: 380,
+              bgcolor: '#1a1a2e',
+              color: 'text.primary',
+              borderRadius: 3,
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
+              p: 0,
+              m: 2,
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative',
+              overflow: 'hidden',
+            },
+          },
+        }}
+      >
+        {/* Top gradient line */}
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 2,
+            background: 'linear-gradient(90deg, transparent, #b388ff, transparent)',
+            opacity: 0.6,
+          }}
+        />
+
+        {/* Dialog Header */}
+        <Box
+          sx={{
+            px: 3,
+            py: 2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+          }}
+        >
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, color: 'text.primary' }}>
+            Select Interests {hasSelection && `(${selectedInterests.size})`}
+          </Typography>
+          <IconButton
+            size="small"
+            onClick={() => setOpen(false)}
+            sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Box>
+
+        {/* Dialog Content — fixed height, scrollable without visible scrollbars */}
+        <DialogContent
+          sx={{
+            p: 2.5,
+            overflowY: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            '&::-webkit-scrollbar': { display: 'none' },
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1,
+          }}
+        >
+          {INTERESTS.map((interest) => {
+            const isSelected = selectedInterests.has(interest);
+            return (
+              <Box
+                key={interest}
+                onClick={() => onToggleInterest(interest)}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  p: '10px 16px',
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  bgcolor: isSelected ? 'rgba(179,136,255,0.14)' : 'rgba(255,255,255,0.04)',
+                  border: '1px solid',
+                  borderColor: isSelected ? 'rgba(179,136,255,0.4)' : 'rgba(255,255,255,0.05)',
+                  '&:hover': {
+                    bgcolor: isSelected ? 'rgba(179,136,255,0.2)' : 'rgba(255,255,255,0.08)',
+                    borderColor: isSelected ? 'rgba(179,136,255,0.5)' : 'rgba(255,255,255,0.15)',
+                  },
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: isSelected ? 600 : 400,
+                    color: isSelected ? 'primary.light' : 'text.secondary',
+                  }}
+                >
+                  {interest}
+                </Typography>
+                <Radio
+                  checked={isSelected}
+                  size="small"
+                  sx={{
+                    p: 0,
+                    color: 'rgba(255,255,255,0.3)',
+                    '&.Mui-checked': { color: 'primary.light' },
+                  }}
+                />
+              </Box>
+            );
+          })}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 // ─── Step 1 ───────────────────────────────────────────────────────────────────
-function StepOne({ onContinue }: { onContinue: () => void }) {
+function StepOne({ onContinue, handleBack }: { onContinue: () => void; handleBack: () => void }) {
+  const navigate = useNavigate();
+
   return (
     <Box
       sx={{
         position: 'relative',
         width: '100%',
-        maxWidth: 460,
-        bgcolor: '#1f1e2a',
+        maxWidth: 480,
+        bgcolor: '#1a1a2e',
         borderRadius: 3,
         border: '1px solid rgba(255,255,255,0.06)',
         overflow: 'hidden',
@@ -63,6 +274,74 @@ function StepOne({ onContinue }: { onContinue: () => void }) {
         },
       }}
     >
+      <IconButton
+        onClick={handleBack}
+        aria-label="Navigate back"
+        sx={{
+          position: 'absolute',
+          top: { xs: 32, md: 52 },
+          left: { xs: 32, md: 52 },
+          zIndex: 10,
+          color: 'text.secondary',
+          bgcolor: 'rgba(255, 255, 255, 0.04)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(8px)',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            color: 'primary.light',
+            bgcolor: 'rgba(179, 136, 255, 0.12)',
+            borderColor: 'rgba(179, 136, 255, 0.3)',
+            transform: 'translateX(-2px)',
+          },
+          width: 12,
+          height: 12,
+        }}
+      >
+        <ArrowBackRoundedIcon fontSize="medium" />
+      </IconButton>
+      {/* Top gradient line */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 2,
+          background: 'linear-gradient(90deg, transparent, #b388ff, transparent)',
+          opacity: 0.6,
+        }}
+      />
+
+      {/* Decorative blobs inside card (consistent with step 2) */}
+      <Box
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          top: -16,
+          right: -16,
+          width: 80,
+          height: 80,
+          bgcolor: 'rgba(105, 240, 174, 0.08)',
+          borderRadius: '50%',
+          filter: 'blur(24px)',
+          pointerEvents: 'none',
+        }}
+      />
+      <Box
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          bottom: -24,
+          left: -24,
+          width: 128,
+          height: 128,
+          bgcolor: 'rgba(179,136,255,0.08)',
+          borderRadius: '50%',
+          filter: 'blur(32px)',
+          pointerEvents: 'none',
+        }}
+      />
+
       {/* Inner glow overlay on hover */}
       <Box
         aria-hidden
@@ -76,7 +355,7 @@ function StepOne({ onContinue }: { onContinue: () => void }) {
         }}
       />
 
-      <Box sx={{ p: { xs: 4, md: 5 }, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <Box sx={{ position: 'relative', zIndex: 1, p: { xs: 4, md: 5 }, display: 'flex', flexDirection: 'column', gap: 4 }}>
         {/* Header */}
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
           <HowToRegIcon sx={{ color: 'primary.light', fontSize: 40, mb: 0.5 }} />
@@ -206,6 +485,7 @@ function StepOne({ onContinue }: { onContinue: () => void }) {
               component="button"
               type="button"
               underline="hover"
+              onClick={() => navigate('/login')}
               sx={{
                 color: 'primary.light',
                 fontWeight: 600,
@@ -225,79 +505,131 @@ function StepOne({ onContinue }: { onContinue: () => void }) {
 }
 
 // ─── Step 2 ───────────────────────────────────────────────────────────────────
-function StepTwo() {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+function StepTwo({ handleBack }: { handleBack: () => void }) {
+  const [selectedInterests, setSelectedInterests] = useState<Set<string>>(new Set());
 
-  const toggle = (interest: string) => {
-    setSelected((prev) => {
+  const toggleInterest = (interest: string) => {
+    setSelectedInterests((prev) => {
       const next = new Set(prev);
-      next.has(interest) ? next.delete(interest) : next.add(interest);
+      if (next.has(interest)) {
+        next.delete(interest);
+      } else {
+        next.add(interest);
+      }
       return next;
     });
   };
 
   return (
-    <Box sx={{ position: 'relative', width: '100%', maxWidth: 520 }}>
-      {/* Gradient glow backdrop */}
+    <Box
+      sx={{
+        position: 'relative',
+        width: '100%',
+        maxWidth: 480,
+        bgcolor: '#1a1a2e',
+        borderRadius: 3,
+        border: '1px solid rgba(255,255,255,0.06)',
+        overflow: 'hidden',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
+        transition: 'box-shadow 0.3s ease, border-color 0.3s ease',
+        '&:hover': {
+          boxShadow: '0 12px 48px rgba(179,136,255,0.15)',
+          borderColor: 'rgba(179,136,255,0.25)',
+        },
+      }}
+    >
+      <IconButton
+        onClick={handleBack}
+        aria-label="Navigate back"
+        sx={{
+          position: 'absolute',
+          top: { xs: 32, md: 52 },
+          left: { xs: 32, md: 52 },
+          zIndex: 10,
+          color: 'text.secondary',
+          bgcolor: 'rgba(255, 255, 255, 0.04)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(8px)',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            color: 'primary.light',
+            bgcolor: 'rgba(179, 136, 255, 0.12)',
+            borderColor: 'rgba(179, 136, 255, 0.3)',
+            transform: 'translateX(-2px)',
+          },
+          width: 12,
+          height: 12,
+        }}
+      >
+        <ArrowBackRoundedIcon fontSize="medium" />
+      </IconButton>
+      {/* Top gradient line */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 2,
+          background: 'linear-gradient(90deg, transparent, #b388ff, transparent)',
+          opacity: 0.6,
+        }}
+      />
+
+      {/* Decorative blobs inside card (consistent with step 1) */}
       <Box
         aria-hidden
         sx={{
           position: 'absolute',
-          inset: -4,
-          background: 'linear-gradient(135deg, #b388ff, #69f0ae)',
-          borderRadius: 4,
-          filter: 'blur(16px)',
-          opacity: 0.18,
-          zIndex: 0,
+          top: -16,
+          right: -16,
+          width: 80,
+          height: 80,
+          bgcolor: 'rgba(105, 240, 174, 0.08)',
+          borderRadius: '50%',
+          filter: 'blur(24px)',
+          pointerEvents: 'none',
+        }}
+      />
+      <Box
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          bottom: -24,
+          left: -24,
+          width: 128,
+          height: 128,
+          bgcolor: 'rgba(179,136,255,0.08)',
+          borderRadius: '50%',
+          filter: 'blur(32px)',
           pointerEvents: 'none',
         }}
       />
 
-      {/* Card */}
+      {/* Inner glow overlay on hover */}
+      <Box
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: 3,
+          pointerEvents: 'none',
+          transition: 'box-shadow 0.3s ease',
+          '&:hover': { boxShadow: 'inset 0 4px 20px rgba(179,136,255,0.08)' },
+        }}
+      />
+
+      {/* Card Content */}
       <Box
         sx={{
           position: 'relative',
           zIndex: 1,
-          bgcolor: '#1a1a2e',
-          borderRadius: 3,
-          border: '1px solid rgba(255,255,255,0.06)',
-          boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
           p: { xs: 4, md: 5 },
           display: 'flex',
           flexDirection: 'column',
           gap: 4,
         }}
       >
-        {/* Decorative blobs */}
-        <Box
-          aria-hidden
-          sx={{
-            position: 'absolute',
-            top: -16,
-            right: -16,
-            width: 80,
-            height: 80,
-            bgcolor: 'rgba(105, 240, 174, 0.08)',
-            borderRadius: '50%',
-            filter: 'blur(24px)',
-            pointerEvents: 'none',
-          }}
-        />
-        <Box
-          aria-hidden
-          sx={{
-            position: 'absolute',
-            bottom: -24,
-            left: -24,
-            width: 128,
-            height: 128,
-            bgcolor: 'rgba(179,136,255,0.08)',
-            borderRadius: '50%',
-            filter: 'blur(32px)',
-            pointerEvents: 'none',
-          }}
-        />
-
         {/* Header */}
         <Box sx={{ textAlign: 'center' }}>
           <Typography
@@ -425,37 +757,15 @@ function StepTwo() {
             />
           </Box>
 
-          {/* Interests */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+          {/* Interests Dialog Component */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
             <Typography variant="caption" sx={{ color: 'text.primary', fontWeight: 500, ml: 0.5, fontSize: '0.8rem' }}>
               Interests
             </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {INTERESTS.map((interest) => {
-                const isSelected = selected.has(interest);
-                return (
-                  <Chip
-                    key={interest}
-                    label={interest}
-                    onClick={() => toggle(interest)}
-                    size="small"
-                    sx={{
-                      fontSize: '0.78rem',
-                      height: 28,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      bgcolor: isSelected ? 'rgba(179,136,255,0.18)' : 'rgba(255,255,255,0.06)',
-                      color: isSelected ? 'primary.light' : 'text.secondary',
-                      border: '1px solid',
-                      borderColor: isSelected ? 'rgba(179,136,255,0.45)' : 'transparent',
-                      '&:hover': {
-                        bgcolor: isSelected ? 'rgba(179,136,255,0.24)' : 'rgba(255,255,255,0.1)',
-                      },
-                    }}
-                  />
-                );
-              })}
-            </Box>
+            <InterestsDialog
+              selectedInterests={selectedInterests}
+              onToggleInterest={toggleInterest}
+            />
           </Box>
 
           {/* Complete registration button */}
@@ -497,6 +807,14 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<1 | 2>(1);
 
+  const handleBack = () => {
+    if (step === 2) {
+      setStep(1);
+    } else {
+      navigate('/login');
+    }
+  };
+
   return (
     <Box
       sx={{
@@ -512,23 +830,66 @@ export default function RegisterPage() {
         overflow: 'hidden',
       }}
     >
-      {/* Ambient background glow */}
+
+
+      {/* Soft static faint decorative blobs in background (increased to 3 blobs with increased dimensions) */}
       <Box
         aria-hidden
         sx={{
           position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 600,
-          height: 600,
-          background: 'radial-gradient(ellipse at center, rgba(179,136,255,0.08) 0%, transparent 70%)',
+          top: '12%',
+          left: '10%',
+          width: 450,
+          height: 450,
+          bgcolor: 'rgba(179,136,255,0.07)',
+          borderRadius: '50%',
+          filter: 'blur(80px)',
+          pointerEvents: 'none',
+        }}
+      />
+      <Box
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          bottom: '10%',
+          right: '10%',
+          width: 420,
+          height: 420,
+          bgcolor: 'rgba(105, 240, 174, 0.05)',
+          borderRadius: '50%',
+          filter: 'blur(70px)',
+          pointerEvents: 'none',
+        }}
+      />
+      <Box
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          top: '15%',
+          right: '12%',
+          width: 380,
+          height: 380,
+          bgcolor: 'rgba(179,136,255,0.06)',
+          borderRadius: '50%',
+          filter: 'blur(75px)',
           pointerEvents: 'none',
         }}
       />
 
       {/* Branding */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 4 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          mb: 4,
+          position: 'fixed',
+          zIndex: 2,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          top: '5%',
+        }}
+      >
         <CellTowerRoundedIcon sx={{ color: 'primary.light', fontSize: 28 }} />
         <Typography
           variant="h6"
@@ -544,53 +905,22 @@ export default function RegisterPage() {
         </Typography>
       </Box>
 
-      {/* Step indicator */}
-      <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
-        {[1, 2].map((s) => (
-          <Box
-            key={s}
-            sx={{
-              width: s === step ? 24 : 8,
-              height: 8,
-              borderRadius: 4,
-              bgcolor: s === step ? 'primary.light' : 'rgba(255,255,255,0.15)',
-              transition: 'all 0.3s ease',
-            }}
-          />
-        ))}
+      {/* Step containers with smooth transition switching */}
+      <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', position: 'relative', zIndex: 2 }}>
+        {step === 1 ? (
+          <Fade in={step === 1} timeout={350} key="step-1">
+            <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+              <StepOne onContinue={() => setStep(2)} handleBack={handleBack} />
+            </Box>
+          </Fade>
+        ) : (
+          <Fade in={step === 2} timeout={350} key="step-2">
+            <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+              <StepTwo handleBack={handleBack} />
+            </Box>
+          </Fade>
+        )}
       </Box>
-
-      {step === 1 ? (
-        <StepOne onContinue={() => setStep(2)} />
-      ) : (
-        <StepTwo />
-      )}
-
-      {/* Back link on step 2 */}
-      {step === 2 && (
-        <Button
-          size="small"
-          onClick={() => setStep(1)}
-          sx={{
-            mt: 2,
-            color: 'text.secondary',
-            textTransform: 'none',
-            fontSize: '0.82rem',
-            '&:hover': { color: 'primary.light' },
-          }}
-        >
-          ← Back
-        </Button>
-      )}
-
-      {/* Sign in link on step 1 hidden – handled inside StepOne, but navigate fallback */}
-      {step === 1 && (
-        <Button
-          size="small"
-          onClick={() => navigate('/login')}
-          sx={{ mt: 2, color: 'text.secondary', textTransform: 'none', fontSize: '0.82rem', display: 'none' }}
-        />
-      )}
     </Box>
   );
 }

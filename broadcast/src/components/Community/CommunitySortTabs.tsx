@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 
 interface CommunitySortTabsProps {
   activeTab?: 'new' | 'top';
@@ -17,32 +19,63 @@ export default function CommunitySortTabs({
   };
 
   return (
-    <div className="flex items-center justify-between p-4 rounded-xl bg-surface-container shadow-md">
-      <div className="flex items-center gap-2">
-        <button
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        p: 1.5,
+        borderRadius: 3,
+        bgcolor: 'background.paper',
+        border: '1px solid rgba(255, 255, 255, 0.06)',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Button
           onClick={() => handleSelect('new')}
-          className={`px-4 py-2 rounded-full font-label-sm transition-all cursor-pointer ${
-            selected === 'new'
-              ? 'bg-primary-container/20 text-primary font-bold shadow-[0_4px_20px_rgba(179,136,255,0.08)]'
-              : 'text-text-med hover:text-on-surface hover:bg-surface-variant/50'
-          }`}
+          size="small"
+          sx={{
+            borderRadius: 9999,
+            px: 2.5,
+            py: 0.75,
+            fontSize: '0.8rem',
+            fontWeight: selected === 'new' ? 700 : 500,
+            textTransform: 'none',
+            bgcolor: selected === 'new' ? 'rgba(179, 136, 255, 0.16)' : 'transparent',
+            color: selected === 'new' ? 'primary.light' : 'text.secondary',
+            boxShadow: selected === 'new' ? '0 2px 12px rgba(179, 136, 255, 0.15)' : 'none',
+            '&:hover': {
+              bgcolor: selected === 'new' ? 'rgba(179, 136, 255, 0.24)' : 'rgba(255, 255, 255, 0.05)',
+              color: 'text.primary',
+            },
+          }}
         >
           New
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => handleSelect('top')}
-          className={`px-4 py-2 rounded-full font-label-sm transition-all cursor-pointer ${
-            selected === 'top'
-              ? 'bg-primary-container/20 text-primary font-bold shadow-[0_4px_20px_rgba(179,136,255,0.08)]'
-              : 'text-text-med hover:text-on-surface hover:bg-surface-variant/50'
-          }`}
+          size="small"
+          sx={{
+            borderRadius: 9999,
+            px: 2.5,
+            py: 0.75,
+            fontSize: '0.8rem',
+            fontWeight: selected === 'top' ? 700 : 500,
+            textTransform: 'none',
+            bgcolor: selected === 'top' ? 'rgba(179, 136, 255, 0.16)' : 'transparent',
+            color: selected === 'top' ? 'primary.light' : 'text.secondary',
+            boxShadow: selected === 'top' ? '0 2px 12px rgba(179, 136, 255, 0.15)' : 'none',
+            '&:hover': {
+              bgcolor: selected === 'top' ? 'rgba(179, 136, 255, 0.24)' : 'rgba(255, 255, 255, 0.05)',
+              color: 'text.primary',
+            },
+          }}
         >
           Top
-        </button>
-      </div>
-      <button className="p-2 rounded-full text-text-med hover:text-on-surface transition-all cursor-pointer">
-        <span className="material-symbols-outlined">filter_list</span>
-      </button>
-    </div>
+        </Button>
+      </Box>
+    </Box>
   );
 }
+

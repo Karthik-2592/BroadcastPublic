@@ -2,13 +2,16 @@
 // Layout: avatar column (with vertical thread-line) | content column.
 // Includes an embedded Reply toggle that shows/hides the Reply component.
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import debounce from 'lodash.debounce';
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
 import ReplyIcon from '@mui/icons-material/Reply';
 import Reply from '../Reply/Reply';
@@ -20,11 +23,39 @@ interface CommentProps {
   depth?: number;
 }
 
+
 export default function Comment({ comment, depth = 0 }: CommentProps) {
+  const navigate = useNavigate();
   const [replyOpen, setReplyOpen] = useState(false);
+
+  const [isLiked, setIsLiked] = useState(comment.isLiked ?? false);
+  const [likeCount, setLikeCount] = useState(comment.likes);
 
   const avatarSize = depth === 0 ? 40 : 32;
   const isNested = depth > 0;
+
+  const handleNavigateProfile = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate('/profile');
+  };
+
+  const debouncedLikeApi = useCallback(
+    debounce((commentId: string, newLikedState: boolean) => {
+      console.log(`[API MOCK] Comment ${commentId} liked: ${newLikedState}`);
+    }, 500),
+    []
+  );
+
+  const handleToggleLike = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsLiked((prev) => {
+      const next = !prev;
+      console.log("hello")
+      setLikeCount((c) => (next ? c + 1 : c - 1));
+      debouncedLikeApi(comment.id, next);
+      return next;
+    });
+  };
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
@@ -33,6 +64,7 @@ export default function Comment({ comment, depth = 0 }: CommentProps) {
         {/* Avatar column with vertical thread-line */}
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
           <Avatar
+            onClick={handleNavigateProfile}
             sx={{
               width: avatarSize,
               height: avatarSize,
@@ -41,6 +73,7 @@ export default function Comment({ comment, depth = 0 }: CommentProps) {
               fontWeight: 600,
               border: isNested ? '2px solid rgba(179, 136, 255, 0.3)' : 'none',
               flexShrink: 0,
+              cursor: 'pointer'
             }}
           >
             {comment.author.name.charAt(0)}
@@ -111,50 +144,57 @@ export default function Comment({ comment, depth = 0 }: CommentProps) {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Button
               size="small"
-              startIcon={<ThumbUpOutlinedIcon sx={{ fontSize: 15 }} />}
+              onClick={handleToggleLike}
+              startIcon={isLiked ? <ThumbUpIcon sx={{ fontSize: 15 }} /> : <ThumbUpOutlinedIcon sx={{ fontSize: 15 }} />}
               sx={{
-                color: 'text.secondary',
+                color: isLiked ? 'secondary.main' : 'text.secondary',
+                bgcolor: isLiked ? 'rgba(105, 240, 174, 0.08)' : 'transparent',
                 textTransform: 'none',
                 fontSize: '0.78rem',
                 fontWeight: 500,
                 px: 1,
                 py: 0.25,
                 minWidth: 0,
-                '&:hover': { color: 'secondary.main', bgcolor: 'rgba(105, 240, 174, 0.08)' },
+                '&:hover': { color: 'secondary.main', bgcolor: 'rgba(105, 240, 174, 0.12)' },
               }}
             >
-              {comment.likes}
+              {likeCount}
             </Button>
-            <Button
-              size="small"
-              startIcon={<ReplyIcon sx={{ fontSize: 15 }} />}
-              onClick={() => setReplyOpen((prev) => !prev)}
-              sx={{
-                color: replyOpen ? 'primary.light' : 'text.secondary',
-                textTransform: 'none',
-                fontSize: '0.78rem',
-                fontWeight: 500,
-                px: 1,
-                py: 0.25,
-                minWidth: 0,
-                '&:hover': { color: 'primary.main', bgcolor: 'rgba(179, 136, 255, 0.08)' },
-              }}
-            >
-              Reply
-            </Button>
+            {!isNested && (
+              <Button
+                size="small"
+                startIcon={<ReplyIcon sx={{ fontSize: 15 }} />}
+                onClick={() => setReplyOpen((prev) => !prev)}
+                sx={{
+                  color: replyOpen ? 'primary.light' : 'text.secondary',
+                  textTransform: 'none',
+                  fontSize: '0.78rem',
+                  fontWeight: 500,
+                  px: 1,
+                  py: 0.25,
+                  minWidth: 0,
+                  '&:hover': { color: 'primary.main', bgcolor: 'rgba(179, 136, 255, 0.08)' },
+                }}
+              >
+                Reply
+              </Button>
+            )}
           </Box>
         </Box>
       </Box>
 
-      {/* Inline reply composer — toggled by Reply button */}
-      <Box sx={{ ml: depth === 0 ? 7 : 11 }}>
-        <Reply open={replyOpen} onClose={() => setReplyOpen(false)} />
-      </Box>
+      {/* Inline reply composer — toggled by Reply button (only for top-level comments) */}
+      {!isNested && (
+        <Box sx={{ ml: 7 }}>
+          <Reply open={replyOpen} onClose={() => setReplyOpen(false)} />
+        </Box>
+      )}
 
-      {/* Nested replies */}
-      {comment.replies?.map((reply) => (
-        <Comment key={reply.id} comment={reply} depth={depth + 1} />
-      ))}
+      {/* Nested replies — restricted to depth 1 (only top-level comments can render replies) */}
+      {depth === 0 &&
+        comment.replies?.map((reply) => (
+          <Comment key={reply.id} comment={reply} depth={1} />
+        ))}
     </Box>
   );
 }

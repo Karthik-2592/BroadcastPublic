@@ -2,29 +2,26 @@
 // Placeholder content until the trending feature is implemented.
 
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import Feed from '../components/Feed/Feed';
 
 export default function TrendingPage() {
   return (
     <Box
       sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
+        display: 'grid',
+        gridTemplateColumns: '1fr 0.53fr',
         justifyContent: 'center',
+        gap: 4,
+        px: 4,
+        pt: 2,
+        width: '100%',
         height: '100%',
-        gap: 2,
-        color: 'text.secondary',
       }}
     >
-      <TrendingUpIcon sx={{ fontSize: 64, opacity: 0.3 }} />
-      <Typography variant="h5" sx={{ color: 'text.primary' }}>
-        Trending
-      </Typography>
-      <Typography variant="body2">
-        See what's popular right now — coming soon.
-      </Typography>
+      <Box sx={{ justifySelf: 'end', width: '100%', maxWidth: 720 }}>
+        <Feed />
+      </Box>
+
     </Box>
   );
 }

@@ -1,25 +1,66 @@
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import BarChartIcon from '@mui/icons-material/BarChart';
+
 export default function CommunityStatsWidget() {
   return (
-    <div className="rounded-xl bg-surface-container p-6 shadow-md relative overflow-hidden">
-      <div className="absolute -right-8 -top-8 w-32 h-32 bg-primary/10 rounded-full blur-2xl"></div>
-      <h4 className="text-subtitle-1 font-subtitle-1 text-high mb-4 flex items-center gap-2 font-semibold">
-        <span className="material-symbols-outlined text-primary">bar_chart</span>
-        Community Stats
-      </h4>
-      <div className="grid grid-cols-3 gap-3">
-        <div className="flex flex-col bg-surface-variant/30 p-3 rounded-lg">
-          <span className="text-headline-md font-headline-md text-primary font-bold text-lg">12.4k</span>
-          <span className="text-label-sm font-label-sm text-text-med text-xs">Members</span>
-        </div>
-        <div className="flex flex-col bg-surface-variant/30 p-3 rounded-lg">
-          <span className="text-headline-md font-headline-md text-on-surface font-bold text-lg">1.2k</span>
-          <span className="text-label-sm font-label-sm text-text-med text-xs">Total Community Posts</span>
-        </div>
-        <div className="flex flex-col bg-surface-variant/30 p-3 rounded-lg">
-          <span className="text-headline-md font-headline-md text-tertiary font-bold text-lg">Top 5%</span>
-          <span className="text-label-sm font-label-sm text-text-med text-xs">Rank</span>
-        </div>
-      </div>
-    </div>
+    <Box
+      sx={{
+        borderRadius: 3,
+        bgcolor: '#1a1a2e',
+        border: '1px solid rgba(255, 255, 255, 0.06)',
+        p: 3,
+        position: 'relative',
+        overflow: 'hidden',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
+      }}
+    >
+      {/* Subtle ambient glow in top corner */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: -24,
+          right: -24,
+          width: 96,
+          height: 96,
+          bgcolor: 'rgba(179, 136, 255, 0.08)',
+          borderRadius: '50%',
+          filter: 'blur(24px)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+        <BarChartIcon sx={{ color: 'primary.light', fontSize: 20 }} />
+        <Typography variant="subtitle1" sx={{ color: 'text.primary', fontWeight: 600, fontSize: '0.92rem' }}>
+          Community Stats
+        </Typography>
+      </Box>
+
+      <Box sx={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: 1.5,
+      }}>
+        <Box sx={{ bgcolor: 'rgba(255, 255, 255, 0.04)', p: 1.5, borderRadius: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <Typography variant="h6" sx={{ color: 'primary.light', fontWeight: 700, lineHeight: 1.2, fontSize: '1.1rem' }}>
+            12.4k
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.72rem' }}>
+            Members
+          </Typography>
+        </Box>
+
+        <Box sx={{ bgcolor: 'rgba(255, 255, 255, 0.04)', p: 1.5, borderRadius: 2, display: 'flex', flexDirection: 'column', alignItems: 'center ' }}>
+          <Typography variant="h6" sx={{ color: 'text.primary', fontWeight: 700, lineHeight: 1.2, fontSize: '1.1rem' }}>
+            1.2k
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.72rem' }}>
+            Posts
+          </Typography>
+        </Box>
+      </Box>
+    </Box>
   );
 }
+

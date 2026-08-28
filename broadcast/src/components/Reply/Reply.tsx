@@ -1,3 +1,5 @@
+import { useState, useCallback } from 'react';
+import debounce from 'lodash.debounce';
 import Collapse from '@mui/material/Collapse';
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
@@ -14,6 +16,21 @@ interface ReplyProps {
 }
 
 export default function Reply({ open, onClose }: ReplyProps) {
+  const [replyText, setReplyText] = useState('');
+
+  const debouncedSubmitReplyApi = useCallback(
+    debounce((text: string) => {
+      console.log(`[API MOCK] Submitted reply:`, text);
+    }, 500),
+    []
+  );
+
+  const handleSubmitReply = () => {
+    if (!replyText.trim()) return;
+    debouncedSubmitReplyApi(replyText);
+    setReplyText('');
+    onClose?.();
+  };
   return (
     <Collapse in={open} unmountOnExit>
       <Box
@@ -56,6 +73,8 @@ export default function Reply({ open, onClose }: ReplyProps) {
               component="textarea"
               placeholder="Write your reply..."
               rows={3}
+              value={replyText}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReplyText(e.target.value)}
               sx={{
                 width: '100%',
                 background: 'transparent',
@@ -119,6 +138,7 @@ export default function Reply({ open, onClose }: ReplyProps) {
                 <Button
                   size="small"
                   variant="contained"
+                  onClick={handleSubmitReply}
                   sx={{
                     background: 'linear-gradient(135deg, #b388ff 0%, #7c4dff 100%)',
                     color: '#fff',

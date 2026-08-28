@@ -14,7 +14,6 @@ export interface MockPost {
   timestamp: string;
   likes: number;
   comments: number;
-  shares: number;
   tags: string[];
 }
 
@@ -44,7 +43,6 @@ export const mockPosts: MockPost[] = [
     timestamp: '2h ago',
     likes: 42,
     comments: 8,
-    shares: 3,
     tags: ['webdev', 'react', 'launch'],
   },
   {
@@ -56,7 +54,6 @@ export const mockPosts: MockPost[] = [
     timestamp: '5h ago',
     likes: 127,
     comments: 23,
-    shares: 15,
     tags: ['databases', 'neo4j', 'backend'],
   },
   {
@@ -69,7 +66,6 @@ export const mockPosts: MockPost[] = [
     timestamp: '8h ago',
     likes: 89,
     comments: 14,
-    shares: 7,
     tags: ['design', 'community', 'spotlight'],
   },
   {
@@ -81,7 +77,6 @@ export const mockPosts: MockPost[] = [
     timestamp: '12h ago',
     likes: 215,
     comments: 41,
-    shares: 28,
     tags: ['typescript', 'javascript', 'programming'],
   },
 ];
@@ -110,6 +105,7 @@ export interface MockComment {
   content: string;
   timestamp: string;
   likes: number;
+  isLiked?: boolean;
   replies?: MockComment[];
 }
 

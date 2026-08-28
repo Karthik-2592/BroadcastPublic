@@ -15,5 +15,5 @@ const aggregationStatusTimer = setInterval(() => {
   console.log(
     `[server] aggregation ${status.processing ? "processing" : "idle"}; pending=${status.pendingEvents}; progress=${status.currentBatchProgress}/${status.currentBatchSize}`,
   );
-}, 30_000);
+}, 60_000);
 aggregationStatusTimer.unref?.();

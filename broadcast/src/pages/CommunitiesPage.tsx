@@ -15,10 +15,19 @@ export default function CommunitiesPage() {
 
   return (
     <>
-      <div className="flex flex-col relative py-6 w-[65%] mx-auto pl-8">
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+        py: 3,
+        width: '100%',
+        mx: 'auto',
+        pl: 4,
+        maxWidth: '1080px'
+      }}>
         {/* Community Banner Hero */}
         <CommunityHero />
-      </div>
+      </Box>
 
       <Box
         sx={{
@@ -36,11 +45,11 @@ export default function CommunitiesPage() {
           <CommunitySortTabs activeTab={sortTab} onTabChange={setSortTab} />
 
           {/* Reused Post Cards */}
-          <div className="flex flex-col gap-4 mt-6">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 3 }}>
             {displayedPosts.map((post) => (
               <PostCard key={post.id} post={post} />
             ))}
-          </div>
+          </Box>
         </Box>
 
         <Box sx={{ maxHeight: '100%' }}>

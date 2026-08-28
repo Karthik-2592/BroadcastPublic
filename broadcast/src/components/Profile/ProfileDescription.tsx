@@ -19,7 +19,7 @@ export default function ProfileDescription() {
         >
             {/* Content */}
             <Box sx={{ px: 4, py: 2, position: 'relative' }}>
-                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'flex-end' }, gap: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'center' }, gap: 3, mb: 3 }}>
                     <Box
                         sx={{
                             width: 128,
@@ -60,7 +60,7 @@ export default function ProfileDescription() {
                     </Box>
 
                     {/* Name & Handle */}
-                    <Box sx={{ flex: 1, mb: 1 }}>
+                    <Box sx={{ flex: 1, mb: 1, mt: 1 }}>
                         <Typography variant="h4" sx={{ fontWeight: 600, color: '#e8e6ef', letterSpacing: '-0.02em' }}>
                             Alex Rivera
                         </Typography>
@@ -89,29 +89,11 @@ export default function ProfileDescription() {
                         >
                             Edit Profile
                         </Button>
-                        <Button
-                            variant="contained"
-                            sx={{
-                                textTransform: 'none',
-                                bgcolor: '#d4bbff', // primary
-                                color: '#400688', // on-primary
-                                borderRadius: 2,
-                                px: 3,
-                                py: 1,
-                                fontWeight: 500,
-                                '&:hover': {
-                                    bgcolor: '#ebdcff' // primary-fixed
-                                },
-                                boxShadow: '0 0 15px rgba(212,187,255,0.3)'
-                            }}
-                        >
-                            Share
-                        </Button>
                     </Box>
                 </Box>
 
                 {/* Bio & Tags */}
-                <Box sx={{ maxWidth: 768 }}>
+                <Box sx={{ maxWidth: '100%' }}>
                     <Typography
                         variant="body1"
                         sx={{

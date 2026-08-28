@@ -1,37 +1,139 @@
+import { useNavigate } from 'react-router-dom';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import IconButton from '@mui/material/IconButton';
+import CodeIcon from '@mui/icons-material/Code';
+import DnsIcon from '@mui/icons-material/Dns';
+import BrushIcon from '@mui/icons-material/Brush';
+import AddIcon from '@mui/icons-material/Add';
+
 export default function RelatedCommunitiesWidget() {
+  const navigate = useNavigate();
+
   const related = [
-    { id: '1', name: 'ReactDevs', members: '89k members', icon: 'code', colorClass: 'text-primary group-hover:bg-primary group-hover:text-on-primary' },
-    { id: '2', name: 'Backend Architecture', members: '112k members', icon: 'dns', colorClass: 'text-secondary group-hover:bg-secondary group-hover:text-on-secondary' },
-    { id: '3', name: 'CSS Wizards', members: '45k members', icon: 'brush', colorClass: 'text-tertiary group-hover:bg-tertiary group-hover:text-on-tertiary' },
+    {
+      id: 'react-devs',
+      name: 'ReactDevs',
+      members: '89k members',
+      icon: <CodeIcon fontSize="small" />,
+      color: '#b388ff',
+      bgColor: 'rgba(179, 136, 255, 0.12)',
+    },
+    {
+      id: 'backend-arch',
+      name: 'Backend Architecture',
+      members: '112k members',
+      icon: <DnsIcon fontSize="small" />,
+      color: '#69f0ae',
+      bgColor: 'rgba(105, 240, 174, 0.12)',
+    },
+    {
+      id: 'css-wizards',
+      name: 'CSS Wizards',
+      members: '45k members',
+      icon: <BrushIcon fontSize="small" />,
+      color: '#ffd54f',
+      bgColor: 'rgba(255, 213, 79, 0.12)',
+    },
   ];
 
   return (
-    <div className="rounded-xl bg-surface-container p-6 shadow-md">
-      <h4 className="text-subtitle-1 font-subtitle-1 text-high mb-4 uppercase tracking-wider text-label-sm text-xs font-semibold text-gray-400">
+    <Box
+      sx={{
+        borderRadius: 3,
+        bgcolor: '#1a1a2e',
+        border: '1px solid rgba(255, 255, 255, 0.06)',
+        p: 3,
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
+      }}
+    >
+      <Typography
+        variant="caption"
+        sx={{
+          color: 'text.secondary',
+          fontWeight: 700,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          fontSize: '0.72rem',
+          display: 'block',
+          mb: 2,
+        }}
+      >
         Related Communities
-      </h4>
-      <div className="flex flex-col gap-4">
+      </Typography>
+
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {related.map((item) => (
-          <a key={item.id} className="flex items-center justify-between group cursor-pointer" href="#">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-lg bg-surface-variant flex items-center justify-center transition-colors ${item.colorClass}`}>
-                <span className="material-symbols-outlined">{item.icon}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-body-md font-body-md text-on-surface group-hover:text-primary transition-colors text-sm font-medium">
+          <Box
+            key={item.id}
+            onClick={() => navigate('/community/' + item.id)}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              p: 1,
+              mx: -1,
+              borderRadius: 2,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              '&:hover': {
+                bgcolor: 'rgba(255, 255, 255, 0.04)',
+                '& .community-name': { color: 'primary.light' },
+              },
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box
+                sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 2,
+                  bgcolor: item.bgColor,
+                  color: item.color,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {item.icon}
+              </Box>
+
+              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                <Typography
+                  className="community-name"
+                  variant="body2"
+                  sx={{
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    color: 'text.primary',
+                    transition: 'color 0.15s ease',
+                  }}
+                >
                   {item.name}
-                </span>
-                <span className="text-label-sm font-label-sm text-text-med text-xs text-gray-400">
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.72rem' }}>
                   {item.members}
-                </span>
-              </div>
-            </div>
-            <button className="text-primary hover:bg-primary/10 p-2 rounded-full transition-colors cursor-pointer">
-              <span className="material-symbols-outlined text-[20px]">add</span>
-            </button>
-          </a>
+                </Typography>
+              </Box>
+            </Box>
+
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+              sx={{
+                color: 'primary.light',
+                p: 0.75,
+                '&:hover': { bgcolor: 'rgba(179, 136, 255, 0.12)' },
+              }}
+            >
+              <AddIcon fontSize="small" />
+            </IconButton>
+          </Box>
         ))}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }
+

@@ -7,9 +7,11 @@ import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
 import Divider from '@mui/material/Divider';
 import Avatar from '@mui/material/Avatar';
+import Button from '@mui/material/Button';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
+import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import { userCommunities } from '../../data/mockData';
 
 // Navigation items corresponding to the wireframe's sidebar tabs
@@ -56,11 +58,41 @@ export default function LeftSidebar() {
             </ListItemIcon>
             <ListItemText
               primary={item.label}
-              primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }}
+              slotProps={{
+                primary: {
+                  sx: {
+                    fontSize: '0.9rem',
+                    fontWeight: 500
+                  }
+                }
+              }}
+
             />
           </ListItemButton>
         ))}
       </List>
+
+      {/* Create Community Action Button */}
+      <Box sx={{ px: 0.5, my: 1 }}>
+        <Button
+          fullWidth
+          variant="contained"
+          startIcon={<AddRoundedIcon />}
+          aria-label="Create your community"
+          onClick={() => navigate('/create-community')}
+          sx={{
+            py: 1,
+            borderRadius: 8,
+            textTransform: 'none',
+            fontWeight: 600,
+            fontSize: '0.85rem',
+            bgcolor: 'rgba(124, 77, 255, 0.1)',
+            color: '#7c4dff'
+          }}
+        >
+          Create your community
+        </Button>
+      </Box>
 
       <Divider sx={{ my: 2 }} />
 
@@ -94,7 +126,13 @@ export default function LeftSidebar() {
             </ListItemIcon>
             <ListItemText
               primary={community.name}
-              primaryTypographyProps={{ fontSize: '0.85rem' }}
+              slotProps={{
+                primary: {
+                  sx: {
+                    fontSize: '0.85rem',
+                  }
+                }
+              }}
             />
           </ListItemButton>
         ))}

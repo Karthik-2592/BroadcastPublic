@@ -8,14 +8,11 @@ import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
-import Avatar from '@mui/material/Avatar';
 import Divider from '@mui/material/Divider';
-import Button from '@mui/material/Button';
 import ContactSupportOutlinedIcon from '@mui/icons-material/ContactSupportOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import GavelOutlinedIcon from '@mui/icons-material/GavelOutlined';
 import { useNavigate } from 'react-router-dom';
-import { popularCommunities, followedUsers } from '../../data/mockData';
 
 // Reusable section wrapper with a subtle card-like surface
 function SidebarSection({ title, children }: { title: string; children: React.ReactNode }) {
@@ -53,123 +50,52 @@ export default function RightSidebar() {
         px: 2,
         pt: 2,
         position: 'sticky',
-        top: 77
+        top: '76px',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 'calc(100vh - 76px)',
+        justifyContent: 'flex-end',
+        ml: 8
       }}
     >
-      {/* Popular Communities */}
-      <SidebarSection title="Popular Communities">
-        <List disablePadding>
-          {popularCommunities.map((community) => (
-            <ListItemButton key={community.id} sx={{ py: 0.75, px: 1, borderRadius: 2 }} onClick={() => navigate('/community/' + community.id)}>
-              <ListItemIcon sx={{ minWidth: 38 }}>
-                <Avatar
-                  sx={{
-                    width: 30,
-                    height: 30,
-                    bgcolor: community.avatarColor,
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    border: 'none',
-                  }}
-                >
-                  {community.name.charAt(0)}
-                </Avatar>
-              </ListItemIcon>
-              <ListItemText
-                primary={
-                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>
-                    {community.name}
-                  </Typography>
-                }
-                secondary={<Typography sx={{ fontSize: '0.7rem' }}>{community.memberCount.toLocaleString()} members</Typography>}
 
-              />
-            </ListItemButton>
-          ))}
-        </List>
-        <Button
-          size="small"
-          sx={{ mt: 1, fontSize: '0.75rem', color: 'primary.light' }}
-        >
-          See all communities
-        </Button>
-      </SidebarSection>
-
-      {/* Your Follows */}
-      <SidebarSection title="Your Follows">
-        <List disablePadding>
-          {followedUsers.map((user) => (
-            <ListItemButton key={user.id} sx={{ py: 0.75, px: 1, borderRadius: 2 }} onClick={() => navigate('/profile')}>
-              <ListItemIcon sx={{ minWidth: 38 }}>
-                <Avatar
-                  sx={{
-                    width: 30,
-                    height: 30,
-                    bgcolor: user.avatarColor,
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    border: 'none',
-                  }}
-                >
-                  {user.name.charAt(0)}
-                </Avatar>
-              </ListItemIcon>
-              <ListItemText
-                primary={
-                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>
-                    {user.name}
-                  </Typography>
-                }
-                secondary={<Typography sx={{ fontSize: '0.7rem' }}>{user.handle}</Typography>}
-
-              />
-            </ListItemButton>
-          ))}
-        </List>
-        <Button
-          size="small"
-          sx={{ mt: 1, fontSize: '0.75rem', color: 'primary.light' }}
-        >
-          See all follows
-        </Button>
-      </SidebarSection>
 
       {/* Support links */}
       <SidebarSection title="Support">
         <List disablePadding>
-          <ListItemButton sx={{ py: 0.5, px: 1, borderRadius: 2 }} onClick={() => navigate('/placeholder')}>
+          <ListItemButton sx={{ py: 0.25, px: 1, borderRadius: 2 }} onClick={() => navigate('/placeholder')}>
             <ListItemIcon sx={{ minWidth: 32, color: 'text.secondary' }}>
               <ContactSupportOutlinedIcon fontSize="small" />
             </ListItemIcon>
             <ListItemText
               primary={
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>
+                <Typography sx={{ fontSize: '0.65rem', fontWeight: 500 }}>
                   Contact Support
                 </Typography>
               }
             />
           </ListItemButton>
 
-          <ListItemButton sx={{ py: 0.5, px: 1, borderRadius: 2 }} onClick={() => navigate('/placeholder')}>
+          <ListItemButton sx={{ py: 0.25, px: 1, borderRadius: 2 }} onClick={() => navigate('/placeholder')}>
             <ListItemIcon sx={{ minWidth: 32, color: 'text.secondary' }}>
               <InfoOutlinedIcon fontSize="small" />
             </ListItemIcon>
             <ListItemText
               primary={
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>
+                <Typography sx={{ fontSize: '0.65rem', fontWeight: 500 }}>
                   About Us
                 </Typography>
               }
             />
           </ListItemButton>
 
-          <ListItemButton sx={{ py: 0.5, px: 1, borderRadius: 2 }} onClick={() => navigate('/placeholder')}>
+          <ListItemButton sx={{ py: 0.25, px: 1, borderRadius: 2 }} onClick={() => navigate('/placeholder')}>
             <ListItemIcon sx={{ minWidth: 32, color: 'text.secondary' }}>
               <GavelOutlinedIcon fontSize="small" />
             </ListItemIcon>
             <ListItemText
               primary={
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>
+                <Typography sx={{ fontSize: '0.65rem', fontWeight: 500 }}>
                   Terms of Service
                 </Typography>
               }
@@ -178,10 +104,10 @@ export default function RightSidebar() {
         </List>
       </SidebarSection>
 
-      <Divider sx={{ my: 1 }} />
+      <Divider sx={{ mb: 1 }} />
       <Typography
         variant="caption"
-        sx={{ color: 'text.secondary', display: 'block', textAlign: 'center', mt: 1 }}
+        sx={{ color: 'text.secondary', display: 'block', textAlign: 'center', pb: 2 }}
       >
         © 2026 Broadcast · Non-commercial project
       </Typography>

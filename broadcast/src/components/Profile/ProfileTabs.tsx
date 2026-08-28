@@ -4,13 +4,25 @@ import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import PostCard from '../PostCard/PostCard';
 import { mockPosts } from '../../data/mockData';
+import { useAuth } from '../../context/AuthContext';
 
-export default function ProfileTabs() {
+interface ProfileTabsProps {
+  userId?: string;
+  sessionUserId?: string;
+}
+
+export default function ProfileTabs({ userId = 'user_1', sessionUserId = 'user_1' }: ProfileTabsProps) {
+  const { isAuthenticated } = useAuth();
+  const isOwner = userId === sessionUserId;
+  const canViewPrivateTabs = isAuthenticated && isOwner;
+
   const [activeTab, setActiveTab] = useState(0);
 
   const handleChange = (event: SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
+
+  const currentTab = canViewPrivateTabs ? activeTab : 0;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -26,7 +38,7 @@ export default function ProfileTabs() {
         }}
       >
         <Tabs
-          value={activeTab}
+          value={currentTab}
           onChange={handleChange}
           variant="fullWidth"
           sx={{
@@ -56,46 +68,50 @@ export default function ProfileTabs() {
               }
             }}
           />
-          <Tab
-            label="Comments"
-            sx={{
-              textTransform: 'none',
-              borderRadius: 1.5,
-              fontWeight: 500,
-              minHeight: 48,
-              mx: '2px',
-              color: '#ccc3d4',
-              '&.Mui-selected': {
-                color: '#d4bbff',
-                backgroundColor: '#343440',
-                boxShadow: 1
-              },
-              '&:hover:not(.Mui-selected)': {
-                backgroundColor: '#343440',
-                color: '#e3e0f1'
-              }
-            }}
-          />
-          <Tab
-            label="Saved"
-            sx={{
-              textTransform: 'none',
-              borderRadius: 1.5,
-              fontWeight: 500,
-              minHeight: 48,
-              mx: '2px',
-              color: '#ccc3d4',
-              '&.Mui-selected': {
-                color: '#d4bbff',
-                backgroundColor: '#343440',
-                boxShadow: 1
-              },
-              '&:hover:not(.Mui-selected)': {
-                backgroundColor: '#343440',
-                color: '#e3e0f1'
-              }
-            }}
-          />
+          {canViewPrivateTabs && (
+            <Tab
+              label="Comments"
+              sx={{
+                textTransform: 'none',
+                borderRadius: 1.5,
+                fontWeight: 500,
+                minHeight: 48,
+                mx: '2px',
+                color: '#ccc3d4',
+                '&.Mui-selected': {
+                  color: '#d4bbff',
+                  backgroundColor: '#343440',
+                  boxShadow: 1
+                },
+                '&:hover:not(.Mui-selected)': {
+                  backgroundColor: '#343440',
+                  color: '#e3e0f1'
+                }
+              }}
+            />
+          )}
+          {canViewPrivateTabs && (
+            <Tab
+              label="Saved"
+              sx={{
+                textTransform: 'none',
+                borderRadius: 1.5,
+                fontWeight: 500,
+                minHeight: 48,
+                mx: '2px',
+                color: '#ccc3d4',
+                '&.Mui-selected': {
+                  color: '#d4bbff',
+                  backgroundColor: '#343440',
+                  boxShadow: 1
+                },
+                '&:hover:not(.Mui-selected)': {
+                  backgroundColor: '#343440',
+                  color: '#e3e0f1'
+                }
+              }}
+            />
+          )}
         </Tabs>
       </Box>
 

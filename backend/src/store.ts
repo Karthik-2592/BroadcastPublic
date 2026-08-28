@@ -479,14 +479,14 @@ export class MongoStore {
       c.findOne({ _id: objectId }),
     );
     if (!post) return false;
-    const ageInMonths = Math.max(
+    const ageInWeeks = Math.max(
       0,
       (now.getTime() - post.time_created.getTime()) /
-      (1000 * 60 * 60 * 24 * 30),
+      (1000 * 60 * 60 * 24 * 7),
     );
     const popularityScore =
       ((post.favorite_count ?? 0) + (post.comment_count ?? 0)) *
-      Math.exp(-ageInMonths);
+      Math.exp(-ageInWeeks);
     await this.log("posts.popularity_score.update", () =>
       this.collection<PostDocument>("posts").then((c) =>
         c.updateOne(
@@ -496,7 +496,7 @@ export class MongoStore {
       ),
     );
     console.log(
-      `[popularity] post ${postId}: score=${popularityScore.toFixed(4)} ageMonths=${ageInMonths.toFixed(4)}`,
+      `[popularity] post ${postId}: score=${popularityScore.toFixed(4)} ageWeeks=${ageInWeeks.toFixed(4)}`,
     );
     return true;
   }

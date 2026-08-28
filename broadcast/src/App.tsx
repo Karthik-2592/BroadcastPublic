@@ -10,6 +10,7 @@ import PostViewPage from "./pages/PostViewPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
+import CommunityCreationPage from "./pages/CommunityCreationPage";
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Route path="communities" element={<CommunityExplorePage />} />
         <Route path="community/:communityId" element={<CommunitiesPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="create-community" element={<CommunityCreationPage />} />
         <Route path="create" element={<PostSubmissionPage />} />
         <Route path="post/:postId" element={<PostViewPage />} />
       </Route>

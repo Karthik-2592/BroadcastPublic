@@ -1,15 +1,48 @@
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+
 export default function CommunityGuidelinesWidget() {
   return (
-    <div className="rounded-xl bg-gradient-to-br from-surface-container to-surface-variant p-6 shadow-md border-t border-primary/20">
-      <h4 className="text-subtitle-1 font-subtitle-1 text-high mb-2 font-semibold text-white">
+    <Box
+      sx={{
+        borderRadius: 3,
+        bgcolor: '#1a1a2e',
+        border: '1px solid rgba(255, 255, 255, 0.06)',
+        borderTop: '2px solid rgba(179, 136, 255, 0.4)',
+        p: 3,
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
+      }}
+    >
+      <Typography
+        variant="subtitle1"
+        sx={{
+          color: '#fff',
+          fontWeight: 600,
+          mb: 1.5,
+          fontSize: '0.92rem',
+        }}
+      >
         Community Guidelines
-      </h4>
-      <ul className="text-body-md font-body-md text-on-surface-variant space-y-2 text-sm text-gray-300 list-disc list-inside">
+      </Typography>
+
+      <Box
+        component="ul"
+        sx={{
+          m: 0,
+          pl: 2.5,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1.25,
+          color: 'text.secondary',
+          fontSize: '0.82rem',
+          lineHeight: 1.6,
+        }}
+      >
         <li>Be respectful and inclusive to all community members.</li>
         <li>Keep discussions relevant to web development and engineering.</li>
         <li>Format code snippets clearly and provide context for technical questions.</li>
         <li>No self-promotion, spam, or off-topic advertising.</li>
-      </ul>
-    </div>
+      </Box>
+    </Box>
   );
 }
