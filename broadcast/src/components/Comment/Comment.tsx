@@ -2,7 +2,7 @@
 // Layout: avatar column (with vertical thread-line) | content column.
 // Includes an embedded Reply toggle that shows/hides the Reply component.
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import debounce from 'lodash.debounce';
 import Box from '@mui/material/Box';
@@ -10,26 +10,112 @@ import Avatar from '@mui/material/Avatar';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import Divider from '@mui/material/Divider';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
 import ReplyIcon from '@mui/icons-material/Reply';
+import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import Reply from '../Reply/Reply';
-import type { MockComment } from '../../data/mockData';
+import type { Comment as ApiComment } from '../../types/api';
 
 interface CommentProps {
-  comment: MockComment;
+  comment: ApiComment;
   /** Indent level — 0 for top-level, 1 for nested replies */
   depth?: number;
+  canEdit?: boolean;
 }
 
+function CommentEditDialog({ comment, open, onClose }: { comment: ApiComment; open: boolean; onClose: () => void }) {
+  const [commentText, setCommentText] = useState(comment.content);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const COMMENT_MAX = 200;
 
-export default function Comment({ comment, depth = 0 }: CommentProps) {
+  useEffect(() => {
+    if (open) setCommentText(comment.content);
+  }, [open, comment]);
+
+  const handleEdit = async () => {
+    if (!commentText.trim() || commentText.length > COMMENT_MAX) return;
+    await fetch(`/v1/comments/${comment.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: commentText }),
+    }).catch(() => undefined);
+    onClose();
+  };
+
+  const handleDelete = async () => {
+    await fetch(`/v1/comments/${comment.id}`, { method: 'DELETE' }).catch(() => undefined);
+    setIsDeleteOpen(false);
+    onClose();
+  };
+
+  return (
+    <>
+      <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth disableScrollLock={true}>
+        <DialogContent sx={{ p: 0, bgcolor: '#1a1a2e', color: 'text.primary' }}>
+          <Box sx={{ height: 2, background: 'linear-gradient(90deg, transparent, #b388ff, transparent)' }} />
+          <Box sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>Edit comment</Typography>
+            <IconButton aria-label="Close edit comment" onClick={onClose} sx={{ color: 'text.secondary' }}><CloseRoundedIcon /></IconButton>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, p: 3 }}>
+            <Avatar sx={{ width: 40, height: 40, bgcolor: 'primary.main', color: '#0f0f1a', fontWeight: 700 }}>Y</Avatar>
+            <Box sx={{ flex: 1 }}>
+              <Box sx={{ position: 'relative' }}>
+                <Box
+                  component="textarea"
+                  rows={4}
+                  value={commentText}
+                  onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setCommentText(event.target.value)}
+                  sx={{ width: '100%', bgcolor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 1.5, p: 1.5, pb: '28px', color: 'text.primary', fontFamily: 'inherit', fontSize: '0.88rem', lineHeight: 1.65, resize: 'none', outline: 'none', '&:focus': { borderColor: 'rgba(179,136,255,0.5)' } }}
+                />
+                <Typography component="span" sx={{ position: 'absolute', bottom: 5, right: 6, fontSize: '0.68rem', color: commentText.length > COMMENT_MAX ? 'error.main' : 'text.disabled', bgcolor: 'rgba(0,0,0,0.35)', borderRadius: 9999, px: 0.75, py: 0.15, pointerEvents: 'none' }}>
+                  {commentText.length}/{COMMENT_MAX}
+                </Typography>
+              </Box>
+              <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', my: 1.5 }} />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Button color="error" variant="outlined" size="small" onClick={() => setIsDeleteOpen(true)}>Delete</Button>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button size="small" onClick={onClose} sx={{ color: 'text.secondary' }}>Cancel</Button>
+                  <Button size="small" variant="contained" onClick={handleEdit}>Edit</Button>
+                </Box>
+              </Box>
+            </Box>
+          </Box>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} maxWidth="xs" fullWidth disableScrollLock={true}>
+        <DialogContent sx={{ p: 4, bgcolor: '#1a1a2e' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Delete comment?</Typography>
+          <Typography variant="body2" sx={{ mb: 3 }}>This action cannot be undone. Are you sure you want to delete this comment?</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+            <Button variant="outlined" onClick={() => setIsDeleteOpen(false)}>Cancel</Button>
+            <Button color="error" variant="contained" onClick={handleDelete}>Confirm delete</Button>
+          </Box>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+export default function Comment({ comment, depth = 0, canEdit = false }: CommentProps) {
   const navigate = useNavigate();
   const [replyOpen, setReplyOpen] = useState(false);
+  const [optionsAnchor, setOptionsAnchor] = useState<null | HTMLElement>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   const [isLiked, setIsLiked] = useState(comment.isLiked ?? false);
-  const [likeCount, setLikeCount] = useState(comment.likes);
+  const [likeCount, setLikeCount] = useState(comment.favorite_count);
+  const author = comment.user_summary;
 
   const avatarSize = depth === 0 ? 40 : 32;
   const isNested = depth > 0;
@@ -37,6 +123,11 @@ export default function Comment({ comment, depth = 0 }: CommentProps) {
   const handleNavigateProfile = (e: React.MouseEvent) => {
     e.stopPropagation();
     navigate('/profile');
+  };
+  const handleReport = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOptionsAnchor(null);
+    navigate('/placeholder');
   };
 
   const debouncedLikeApi = useCallback(
@@ -68,7 +159,7 @@ export default function Comment({ comment, depth = 0 }: CommentProps) {
             sx={{
               width: avatarSize,
               height: avatarSize,
-              bgcolor: comment.author.avatarColor,
+              bgcolor: author?.avatarColor ?? '#7c4dff',
               fontSize: isNested ? '0.75rem' : '0.9rem',
               fontWeight: 600,
               border: isNested ? '2px solid rgba(179, 136, 255, 0.3)' : 'none',
@@ -76,7 +167,7 @@ export default function Comment({ comment, depth = 0 }: CommentProps) {
               cursor: 'pointer'
             }}
           >
-            {comment.author.name.charAt(0)}
+            {(author?.profile_name ?? author?.username ?? '?').charAt(0)}
           </Avatar>
           {/* Vertical thread line — shown only when there are replies or reply form is open */}
           {!isNested && (comment.replies?.length || replyOpen) ? (
@@ -106,26 +197,64 @@ export default function Comment({ comment, depth = 0 }: CommentProps) {
                   fontSize: isNested ? '0.82rem' : '0.9rem',
                 }}
               >
-                {comment.author.name}
+                {author?.profile_name ?? author?.username ?? 'Unknown'}
               </Typography>
               {!isNested && (
                 <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
-                  {comment.author.handle}
+                  @{author?.username ?? 'unknown'}
                 </Typography>
               )}
               <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.72rem' }}>
                 • {comment.timestamp}
               </Typography>
             </Box>
-            {!isNested && (
-              <IconButton
-                size="small"
-                sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
-              >
-                <MoreVertIcon sx={{ fontSize: 18 }} />
-              </IconButton>
-            )}
+            <IconButton
+              size="small"
+              aria-label="Comment options"
+              onClick={(event) => { event.stopPropagation(); setOptionsAnchor(event.currentTarget); }}
+              sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+            >
+              <MoreVertIcon sx={{ fontSize: 18 }} />
+            </IconButton>
           </Box>
+
+          <Menu anchorEl={optionsAnchor}
+            open={Boolean(optionsAnchor)}
+            onClose={() => setOptionsAnchor(null)}
+            disableScrollLock={true}
+          >
+            <MenuItem onClick={handleReport}
+              sx={{
+                fontSize: '0.84rem',
+                color: 'error.light',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                px: 2,
+                py: 0.8,
+                '&:hover': { bgcolor: 'rgba(244, 67, 54, 0.1)' },
+              }}>
+              <FlagOutlinedIcon fontSize="small" /> Report
+            </MenuItem>
+            {canEdit && (
+              <MenuItem onClick={() => { setOptionsAnchor(null); setIsEditOpen(true); }} sx={{
+                fontSize: '0.84rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                px: 2,
+                py: 0.8,
+              }}>
+                <EditOutlinedIcon fontSize="small"
+                  sx={{
+                    '&:hover': { color: 'primary.light' },
+                  }}
+                />
+                Edit
+              </MenuItem>
+            )}
+          </Menu>
+          <CommentEditDialog comment={comment} open={isEditOpen} onClose={() => setIsEditOpen(false)} />
 
           {/* Comment body */}
           <Typography

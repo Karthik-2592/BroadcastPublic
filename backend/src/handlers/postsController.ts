@@ -1,8 +1,13 @@
 import type { Request, Response } from "express";
-import { fail, id, ok, required } from "../../http.ts";
-import { store } from "../../store.ts";
-import { neo4jRelations } from "../../relations/neo4j.ts";
-import type { Post } from "../../types.ts";
+import { fail, id, ok, required } from "../http.ts";
+import { store } from "../mongodb.ts";
+import { neo4jRelations, numberValue } from "../neo4j.ts";
+import { queueFavoriteEvent } from "../services/favorites.ts";
+import type { Post, PostLikeRelationRequest, SaveRelationRequest } from "../types.ts";
+import { Router } from "express";
+import commentRouter from "./commentsController.ts";
+import { requireSession, sessionUserId } from "../session.ts";
+
 interface PostBody {
   user_id: string;
   community_id?: string | null;
@@ -14,7 +19,8 @@ interface PostBody {
 }
 export async function createPost(req: Request, res: Response) {
   const body = req.body as Partial<PostBody>;
-  const missing = required(body, ["user_id", "title", "content"]);
+  const userId = sessionUserId(req);
+  const missing = required(body, ["title", "content"]);
   if (missing.length)
     return fail(res, 400, `Missing required fields: ${missing.join(", ")}`);
   if (typeof body.title !== "string" || body.title.length > 75)
@@ -34,10 +40,10 @@ export async function createPost(req: Request, res: Response) {
     if (!summary || typeof summary.username !== "string")
       return fail(res, 400, "user_summary must contain username.");
   }
-  if (!(await store.user(String(body.user_id))))
+  if (!(await store.user(userId)))
     return fail(res, 404, "User not found.");
   const post = await store.createPost({
-    user_id: String(body.user_id),
+    user_id: userId,
     community_id: body.community_id
       ? String(body.community_id)
       : null,
@@ -58,7 +64,7 @@ export async function getPost(req: Request, res: Response) {
 export async function updatePost(req: Request, res: Response) {
   const post = await store.post(id(req));
   if (!post) return fail(res, 404, "Post not found.");
-  if (req.body.user_id && req.body.user_id !== post.user_id)
+  if (post.user_id !== sessionUserId(req))
     return fail(res, 403, "Only the post owner may edit it.");
   const updated = await store.updatePost(id(req), req.body as Partial<Post>);
   return updated ? ok(res, updated) : fail(res, 404, "Post not found.");
@@ -66,9 +72,7 @@ export async function updatePost(req: Request, res: Response) {
 export async function deletePost(req: Request, res: Response) {
   const post = await store.post(id(req));
   if (!post) return fail(res, 404, "Post not found.");
-  const requestingUserId = String(req.body.user_id ?? "");
-  if (!requestingUserId)
-    return fail(res, 400, "Requesting user_id is required.");
+  const requestingUserId = sessionUserId(req);
   const community = post.community_id
     ? await store.community(post.community_id)
     : null;
@@ -83,3 +87,47 @@ export async function deletePost(req: Request, res: Response) {
 export async function feed(_req: Request, res: Response) {
   return ok(res, await store.feed());
 }
+export async function postLike(req: Request, res: Response): Promise<Response> {
+  const body = req.body as Partial<PostLikeRelationRequest>;
+  const userId = sessionUserId(req);
+  const missing = required(body, ["post_id"]);
+  if (missing.length)
+    return fail(res, 400, `Missing required fields: ${missing.join(", ")}`);
+  if (!(await store.user(userId)) || !(await store.post(body.post_id!)))
+    return fail(res, 404, "User or post not found.");
+  const enabled = req.method === "POST";
+  queueFavoriteEvent({
+    target: "post",
+    targetId: body.post_id!,
+    userId,
+    favorited: enabled,
+  });
+  return ok(res, { favorited: enabled, queued: true });
+}
+export async function save(req: Request, res: Response): Promise<Response> {
+  const body = req.body as Partial<SaveRelationRequest>;
+  const userId = sessionUserId(req);
+  const missing = required(body, ["post_id"]);
+  if (missing.length)
+    return fail(res, 400, `Missing required fields: ${missing.join(", ")}`);
+  if (!(await store.user(userId)) || !(await store.post(body.post_id!)))
+    return fail(res, 404, "User or post not found.");
+  const enabled = req.method === "POST";
+  const changed = numberValue(
+    await neo4jRelations.save(userId, body.post_id!, enabled),
+  );
+  return ok(res, { saved: enabled, changed: Boolean(changed) });
+}
+
+const router = Router();
+router.get("/feed", feed);
+router.post("/", requireSession, createPost);
+router.get("/:id", getPost);
+router.put("/:id", requireSession, updatePost);
+router.delete("/:id", requireSession, deletePost);
+router.use("/:id/comments", commentRouter);
+router.post("/likes", requireSession, postLike);
+router.delete("/likes", requireSession, postLike);
+router.post("/saves", requireSession, save);
+router.delete("/saves", requireSession, save);
+export default router;

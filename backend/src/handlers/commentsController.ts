@@ -1,21 +1,26 @@
 import type { Request, Response } from "express";
-import { fail, id, ok, required } from "../../http.ts";
-import { store } from "../../store.ts";
-import type { Comment } from "../../types.ts";
+import { fail, id, ok, required } from "../http.ts";
+import { store } from "../mongodb.ts";
+import { queueFavoriteEvent } from "../services/favorites.ts";
+import type { Comment, CommentLikeRelationRequest } from "../types.ts";
+import { Router } from "express";
+import { requireSession, sessionUserId } from "../session.ts";
+
 export async function list(req: Request, res: Response) {
   return ok(res, await store.commentsForPost(id(req)));
 }
 export async function create(req: Request, res: Response) {
   console.log(`[http] POST /v1/posts/${id(req)}/comments received`);
-  const missing = required(req.body, ["user_id", "content"]);
+  const userId = sessionUserId(req);
+  const missing = required(req.body, ["content"]);
   if (missing.length)
     return fail(res, 400, `Missing required fields: ${missing.join(", ")}`);
   if (!(await store.post(id(req)))) return fail(res, 404, "Post not found.");
-  if (!(await store.user(String(req.body.user_id))))
+  if (!(await store.user(userId)))
     return fail(res, 404, "User not found.");
   const comment = await store.createComment({
     post_id: id(req),
-    user_id: String(req.body.user_id),
+    user_id: userId,
     root: req.body.root ?? null,
     content: String(req.body.content),
     user_summary: req.body.user_summary,
@@ -25,7 +30,7 @@ export async function create(req: Request, res: Response) {
 export async function update(req: Request, res: Response) {
   const comment = await store.comment(id(req));
   if (!comment) return fail(res, 404, "Comment not found.");
-  if (req.body.user_id && req.body.user_id !== comment.user_id)
+  if (comment.user_id !== sessionUserId(req))
     return fail(res, 403, "Only the comment owner may edit it.");
   if (req.body.content === undefined)
     return fail(res, 400, "Content is required.");
@@ -39,9 +44,7 @@ export async function update(req: Request, res: Response) {
 export async function remove(req: Request, res: Response) {
   const comment = await store.comment(id(req));
   if (!comment) return fail(res, 404, "Comment not found.");
-  const requestingUserId = String(req.body.user_id ?? "");
-  if (!requestingUserId)
-    return fail(res, 400, "Requesting user_id is required.");
+  const requestingUserId = sessionUserId(req);
   const post = await store.post(comment.post_id);
   const community = post?.community_id
     ? await store.community(post.community_id)
@@ -57,3 +60,39 @@ export async function remove(req: Request, res: Response) {
   await store.deleteComment(id(req));
   return ok(res, null, "Comment deleted successfully.");
 }
+export async function commentLike(
+  req: Request,
+  res: Response,
+): Promise<Response> {
+  const body = req.body as Partial<CommentLikeRelationRequest>;
+  const userId = sessionUserId(req);
+  const missing = required(body, ["post_id", "comment_id"]);
+  if (missing.length)
+    return fail(res, 400, `Missing required fields: ${missing.join(", ")}`);
+  const comment = await store.comment(body.comment_id!);
+  if (
+    !(await store.user(userId)) ||
+    !(await store.post(body.post_id!)) ||
+    !comment ||
+    comment.post_id !== body.post_id
+  )
+    return fail(res, 404, "User, post, or comment not found.");
+  const enabled = req.method === "POST";
+  queueFavoriteEvent({
+    target: "comment",
+    targetId: body.comment_id!,
+    userId,
+    favorited: enabled,
+  });
+  return ok(res, { favorited: enabled, queued: true });
+}
+
+const router = Router({ mergeParams: true });
+router.get("/", list);
+router.post("/", requireSession, create);
+router.post("/likes", requireSession, commentLike);
+router.delete("/likes", requireSession, commentLike);
+export default router;
+export const standalone = Router();
+standalone.put("/:id", requireSession, update);
+standalone.delete("/:id", requireSession, remove);

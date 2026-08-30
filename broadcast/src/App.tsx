@@ -21,6 +21,7 @@ function App() {
         <Route path="communities" element={<CommunityExplorePage />} />
         <Route path="community/:communityId" element={<CommunitiesPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="profile/:userId" element={<ProfilePage />} />
         <Route path="create-community" element={<CommunityCreationPage />} />
         <Route path="create" element={<PostSubmissionPage />} />
         <Route path="post/:postId" element={<PostViewPage />} />
@@ -34,4 +35,3 @@ function App() {
 }
 
 export default App;
-

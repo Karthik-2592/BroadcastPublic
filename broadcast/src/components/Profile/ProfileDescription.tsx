@@ -1,11 +1,14 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
 import Avatar from '@mui/material/Avatar';
-import Chip from '@mui/material/Chip';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import Chip from '@mui/material/Chip';
+import type { User } from '../../types/api';
+import { displayName, userHandle } from '../../types/api';
 
-export default function ProfileDescription() {
+export default function ProfileDescription({ user, onEdit }: { user: User; onEdit?: () => void }) {
     return (
         <Box
             sx={{
@@ -39,7 +42,7 @@ export default function ProfileDescription() {
                     >
                         <Avatar
                             alt="Profile"
-                            src=""
+                            src={user.profile_picture ?? undefined}
                             sx={{ width: '100%', height: '100%' }}
                         />
                         <Box
@@ -62,33 +65,32 @@ export default function ProfileDescription() {
                     {/* Name & Handle */}
                     <Box sx={{ flex: 1, mb: 1, mt: 1 }}>
                         <Typography variant="h4" sx={{ fontWeight: 600, color: '#e8e6ef', letterSpacing: '-0.02em' }}>
-                            Alex Rivera
+                            {displayName(user)}
                         </Typography>
                         <Typography variant="body1" sx={{ color: '#d4bbff', mt: 0.5 }}>
-                            @alex_rivera
+                            {userHandle(user)}
                         </Typography>
                     </Box>
 
                     {/* Action Buttons */}
                     <Box sx={{ display: 'flex', gap: 1.5, mb: 1 }}>
-                        <Button
-                            variant="contained"
+                        <IconButton
+                            aria-label="Edit profile"
+                            onClick={onEdit}
                             sx={{
-                                textTransform: 'none',
                                 bgcolor: '#343440', // surface-variant
                                 color: '#e3e0f1', // on-surface
                                 borderRadius: 2,
-                                px: 3,
-                                py: 1,
-                                fontWeight: 500,
+                                width: 44,
+                                height: 44,
                                 '&:hover': {
                                     bgcolor: '#4a4452' // roughly surface-container-highest
                                 },
                                 boxShadow: 1
                             }}
                         >
-                            Edit Profile
-                        </Button>
+                            <EditOutlinedIcon />
+                        </IconButton>
                     </Box>
                 </Box>
 
@@ -99,29 +101,27 @@ export default function ProfileDescription() {
                         sx={{
                             color: '#ccc3d4', // on-surface-variant
                             textAlign: 'justify',
-                            lineHeight: 1.6
+                            lineHeight: 1.8,
+                            fontSize: '1rem'
                         }}
                     >
-                        Senior Full-stack Developer & Tech Enthusiast based in San Francisco. Passionate
-                        about React, Node.js, and building community-driven software. Constantly exploring the
-                        edges of what's possible with web technologies and always open to collaborating on
-                        open-source projects.
+                        {user.profile_description ?? 'No profile description yet.'}
                     </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
-                        {['React', 'Node.js', 'System Architecture'].map((tag) => (
-                            <Chip
-                                key={tag}
-                                label={tag}
-                                size="small"
-                                sx={{
-                                    bgcolor: '#292935', // surface-container-high
-                                    color: '#e3e0f1',
-                                    fontWeight: 500,
-                                    fontSize: '0.75rem'
-                                }}
-                            />
-                        ))}
-                    </Box>
+                </Box>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
+                    {user.interests.map((tag) => (
+                        <Chip
+                            key={tag}
+                            label={tag}
+                            size="small"
+                            sx={{
+                                bgcolor: '#292935', // surface-container-high
+                                color: '#e3e0f1',
+                                fontWeight: 500,
+                                fontSize: '0.75rem'
+                            }}
+                        />
+                    ))}
                 </Box>
             </Box>
         </Box>

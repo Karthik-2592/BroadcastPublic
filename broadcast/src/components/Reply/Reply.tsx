@@ -3,12 +3,11 @@ import debounce from 'lodash.debounce';
 import Collapse from '@mui/material/Collapse';
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
-import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
-import FormatBoldIcon from '@mui/icons-material/FormatBold';
-import CodeIcon from '@mui/icons-material/Code';
-import LinkIcon from '@mui/icons-material/Link';
+import Typography from '@mui/material/Typography';
+
+const REPLY_MAX = 200;
 
 interface ReplyProps {
   open: boolean;
@@ -17,6 +16,7 @@ interface ReplyProps {
 
 export default function Reply({ open, onClose }: ReplyProps) {
   const [replyText, setReplyText] = useState('');
+  const [replyError, setReplyError] = useState('');
 
   const debouncedSubmitReplyApi = useCallback(
     debounce((text: string) => {
@@ -27,10 +27,18 @@ export default function Reply({ open, onClose }: ReplyProps) {
 
   const handleSubmitReply = () => {
     if (!replyText.trim()) return;
+    if (replyText.length > REPLY_MAX) {
+      setReplyError(`Reply must be ${REPLY_MAX} characters or fewer.`);
+      return;
+    }
+    setReplyError('');
     debouncedSubmitReplyApi(replyText);
     setReplyText('');
     onClose?.();
   };
+
+  const isOverLimit = replyText.length > REPLY_MAX;
+
   return (
     <Collapse in={open} unmountOnExit>
       <Box
@@ -68,54 +76,69 @@ export default function Reply({ open, onClose }: ReplyProps) {
 
           {/* Composer area */}
           <Box sx={{ flex: 1 }}>
-            {/* Textarea (UI only) */}
-            <Box
-              component="textarea"
-              placeholder="Write your reply..."
-              rows={3}
-              value={replyText}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReplyText(e.target.value)}
-              sx={{
-                width: '100%',
-                background: 'transparent',
-                border: 'none',
-                outline: 'none',
-                resize: 'none',
-                color: 'text.primary',
-                fontFamily: 'inherit',
-                fontSize: '0.88rem',
-                lineHeight: 1.65,
-                '&::placeholder': {
-                  color: 'text.disabled',
-                },
-              }}
-            />
+            {/* Textarea with char-count chip */}
+            <Box sx={{ position: 'relative' }}>
+              <Box
+                component="textarea"
+                placeholder="Write your reply..."
+                rows={3}
+                value={replyText}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReplyText(e.target.value)}
+                sx={{
+                  width: '100%',
+                  bgcolor: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: 1.5,
+                  p: 1.5,
+                  pb: '28px', // room for char-count chip
+                  color: 'text.primary',
+                  fontFamily: 'inherit',
+                  fontSize: '0.88rem',
+                  lineHeight: 1.65,
+                  resize: 'none',
+                  outline: 'none',
+                  transition: 'border-color 0.2s, background 0.2s',
+                  '&:focus': {
+                    borderColor: 'rgba(179, 136, 255, 0.5)',
+                    bgcolor: 'rgba(179, 136, 255, 0.04)',
+                  },
+                  '&::placeholder': { color: 'text.disabled' },
+                }}
+              />
+              {/* Character count chip */}
+              <Typography
+                component="span"
+                sx={{
+                  position: 'absolute',
+                  bottom: 4,
+                  right: 4,
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  color: isOverLimit ? 'error.main' : 'text.disabled',
+                  bgcolor: 'rgba(0,0,0,0.35)',
+                  borderRadius: 9999,
+                  px: 0.75,
+                  py: 0.15,
+                  lineHeight: 1.6,
+                  pointerEvents: 'none',
+                  transition: 'color 0.2s',
+                }}
+              >
+                {replyText.length}/{REPLY_MAX}
+              </Typography>
+            </Box>
+
+            {/* Inline error */}
+            {replyError && (
+              <Typography variant="caption" sx={{ color: 'error.main', display: 'block', mt: 0.5, fontSize: '0.75rem' }}>
+                {replyError}
+              </Typography>
+            )}
 
             <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', my: 1 }} />
 
             {/* Toolbar row */}
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              {/* Format buttons (UI only) */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-                <IconButton
-                  size="small"
-                  sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'rgba(179,136,255,0.08)' } }}
-                >
-                  <FormatBoldIcon sx={{ fontSize: 18 }} />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'rgba(179,136,255,0.08)' } }}
-                >
-                  <CodeIcon sx={{ fontSize: 18 }} />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'rgba(179,136,255,0.08)' } }}
-                >
-                  <LinkIcon sx={{ fontSize: 18 }} />
-                </IconButton>
-              </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
 
               {/* Action buttons */}
               <Box sx={{ display: 'flex', gap: 1 }}>

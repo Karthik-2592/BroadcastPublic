@@ -15,6 +15,11 @@ import SendRoundedIcon from '@mui/icons-material/SendRounded';
 export default function PostSubmissionPage() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [titleError, setTitleError] = useState('');
+  const [bodyError, setBodyError] = useState('');
+
+  const TITLE_MAX = 75;
+  const BODY_MAX = 300;
 
   const [tagsText, setTagsText] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -90,6 +95,26 @@ export default function PostSubmissionPage() {
   };
 
   const handleSubmit = () => {
+    let valid = true;
+    if (title.trim().length === 0) {
+      setTitleError('Title is required.');
+      valid = false;
+    } else if (title.length > TITLE_MAX) {
+      setTitleError(`Title must be ${TITLE_MAX} characters or fewer.`);
+      valid = false;
+    } else {
+      setTitleError('');
+    }
+
+    if (body.length > BODY_MAX) {
+      setBodyError(`Description must be ${BODY_MAX} characters or fewer.`);
+      valid = false;
+    } else {
+      setBodyError('');
+    }
+
+    if (!valid) return;
+
     const formattedCommunity = communityInput.trim().toLowerCase().replace(/\s+/g, '_');
     debouncedPostSubmitApi({
       title,
@@ -144,82 +169,55 @@ export default function PostSubmissionPage() {
         />
 
         {/* Title input */}
-        <Box sx={{ mb: 2 }}>
+        <Box sx={{ mb: 2, position: 'relative', }}>
           <Input
             placeholder="An interesting title..."
-            fullWidth
             disableUnderline
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             sx={{
-              fontSize: '1.5rem',
+              fontSize: '1.3rem',
               fontWeight: 600,
+              width: '90%',
               color: 'text.primary',
-              letterSpacing: '-0.02em',
+              letterSpacing: '0em',
               '& input::placeholder': {
                 color: 'text.secondary',
                 opacity: 0.6,
               },
+              // ensure enough bottom padding for the chip
             }}
           />
+          {/* Char-count chip */}
+          <Typography
+            component="span"
+            sx={{
+              ml: 1.5,
+              alignSelf: 'center',
+              justifySelf: 'center',
+              fontSize: '0.68rem',
+              fontWeight: 600,
+              color: title.length > TITLE_MAX ? 'error.main' : 'text.disabled',
+              bgcolor: 'rgba(0,0,0,0.35)',
+              borderRadius: 9999,
+              px: 0.75,
+              py: 0.15,
+              lineHeight: 1.6,
+              pointerEvents: 'none',
+              transition: 'color 0.2s',
+            }}
+          >
+            {title.length}/{TITLE_MAX}
+          </Typography>
         </Box>
+        {titleError && (
+          <Typography variant="caption" sx={{ color: 'error.main', display: 'block', mb: 1, ml: 0.5, fontSize: '0.75rem' }}>
+            {titleError}
+          </Typography>
+        )}
 
-        <Divider sx={{ my: 2.5, borderColor: 'rgba(255,255,255,0.06)' }} />
+        <Divider sx={{ my: 2.5, borderColor: 'rgba(255, 255, 255, 0.1)' }} />
 
-        {/* Tags Row */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 3, ml: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Typography
-              variant="caption"
-              sx={{
-                color: 'text.secondary',
-                fontWeight: 600,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                mr: 1,
-              }}
-            >
-              Tags
-            </Typography>
-            <Input
-              placeholder="#tag1 #tag2..."
-              value={tagsText}
-              onChange={(e) => setTagsText(e.target.value)}
-              onKeyDown={handleTagsKeyDown}
-              onBlur={handleTagsProcess}
-              disableUnderline
-              sx={{
-                color: 'text.primary',
-                fontSize: '0.85rem',
-                border: tagError ? '1px solid #ef5350' : '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 1,
-                px: 1,
-                py: 0.5,
-                width: 250,
-                transition: 'border 0.2s',
-                '&:focus-within': {
-                  border: tagError ? '1px solid #ef5350' : '1px solid rgba(179,136,255,0.5)',
-                },
-              }}
-            />
-          </Box>
-          {tags.length > 0 && (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-              {tags.map((tag) => (
-                <Chip
-                  key={tag}
-                  label={tag}
-                  size="small"
-                  sx={{
-                    bgcolor: 'rgba(255, 255, 255, 0.04)',
-                    color: 'text.secondary',
-                    fontSize: '0.8rem',
-                  }}
-                />
-              ))}
-            </Box>
-          )}
-        </Box>
 
         {/* Community selector */}
         <Box
@@ -258,15 +256,15 @@ export default function PostSubmissionPage() {
           />
         </Box>
 
-        <Divider sx={{ my: 2.5, borderColor: 'rgba(255,255,255,0.06)' }} />
+        <Divider sx={{ my: 2.5, borderColor: 'rgba(255,255,255,0.1)' }} />
 
         {/* Post body content */}
-        <Box sx={{ mb: 4, minHeight: 300 }}>
+        <Box sx={{ mb: 1, minHeight: 300, position: 'relative' }}>
           <Input
             placeholder="Share your thoughts, code, or projects..."
             fullWidth
             multiline
-            minRows={12}
+            minRows={8}
             disableUnderline
             value={body}
             onChange={(e) => setBody(e.target.value)}
@@ -278,10 +276,94 @@ export default function PostSubmissionPage() {
                 color: 'text.secondary',
                 opacity: 0.6,
               },
+              // room for chip at bottom
+              '& textarea': { pb: '24px' },
             }}
           />
+          {/* Char-count chip */}
+          <Typography
+            component="span"
+            sx={{
+              position: 'absolute',
+              bottom: 6,
+              right: 4,
+              fontSize: '0.68rem',
+              fontWeight: 600,
+              color: body.length > BODY_MAX ? 'error.main' : 'text.disabled',
+              bgcolor: 'rgba(0,0,0,0.35)',
+              borderRadius: 9999,
+              px: 0.75,
+              py: 0.15,
+              lineHeight: 1.6,
+              pointerEvents: 'none',
+              transition: 'color 0.2s',
+            }}
+          >
+            {body.length}/{BODY_MAX}
+          </Typography>
         </Box>
+        {bodyError && (
+          <Typography variant="caption" sx={{ color: 'error.main', display: 'block', mb: 2, ml: 0.5, fontSize: '0.75rem' }}>
+            {bodyError}
+          </Typography>
+        )}
 
+        <Divider sx={{ my: 2.5, borderColor: 'rgba(255,255,255,0.1)' }} />
+
+        {/* Tags Row */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, ml: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Typography
+              variant="caption"
+              sx={{
+                color: 'text.secondary',
+                fontWeight: 600,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                mr: 1,
+              }}
+            >
+              Tags
+            </Typography>
+            <Input
+              placeholder="#tag1 #tag2..."
+              value={tagsText}
+              onChange={(e) => setTagsText(e.target.value)}
+              onKeyDown={handleTagsKeyDown}
+              onBlur={handleTagsProcess}
+              disableUnderline
+              sx={{
+                color: 'text.primary',
+                fontSize: '0.85rem',
+                border: tagError ? '1px solid #ef5350' : '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 1,
+                px: 1,
+                py: 0.5,
+                width: '100%',
+                transition: 'border 0.2s',
+                '&:focus-within': {
+                  border: tagError ? '1px solid #ef5350' : '1px solid rgba(179,136,255,0.5)',
+                },
+              }}
+            />
+          </Box>
+          {tags.length > 0 && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+              {tags.map((tag) => (
+                <Chip
+                  key={tag}
+                  label={tag}
+                  size="small"
+                  sx={{
+                    bgcolor: 'rgba(255, 255, 255, 0.04)',
+                    color: 'text.secondary',
+                    fontSize: '0.8rem',
+                  }}
+                />
+              ))}
+            </Box>
+          )}
+        </Box>
         {/* Attached Files List */}
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 3 }}>
           {attachments.map((file, index) => (
@@ -311,8 +393,8 @@ export default function PostSubmissionPage() {
             {attachmentError}
           </Typography>
         )}
+        <Divider sx={{ my: 2.5, borderColor: 'rgba(255,255,255,0.1)' }} />
 
-        <Divider sx={{ my: 2.5, borderColor: 'rgba(255,255,255,0.06)' }} />
 
         {/* Bottom Actions */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

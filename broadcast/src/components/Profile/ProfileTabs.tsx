@@ -2,8 +2,12 @@ import { useState, type SyntheticEvent } from 'react';
 import Box from '@mui/material/Box';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
+import Fade from '@mui/material/Fade';
 import PostCard from '../PostCard/PostCard';
 import { mockPosts } from '../../data/mockData';
+import { mockComments } from '../../data/mockData';
+import type { Comment as ApiComment } from '../../types/api';
+import CommentRow from '../Comment/Comment';
 import { useAuth } from '../../context/AuthContext';
 
 interface ProfileTabsProps {
@@ -18,11 +22,15 @@ export default function ProfileTabs({ userId = 'user_1', sessionUserId = 'user_1
 
   const [activeTab, setActiveTab] = useState(0);
 
-  const handleChange = (event: SyntheticEvent, newValue: number) => {
+  const handleChange = (_event: SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
 
   const currentTab = canViewPrivateTabs ? activeTab : 0;
+  const profileComments: ApiComment[] = mockComments.flatMap((comment) => [
+    { ...comment, replies: [] },
+    ...(comment.replies ?? []).map((reply) => ({ ...reply, replies: [] })),
+  ]);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -68,28 +76,27 @@ export default function ProfileTabs({ userId = 'user_1', sessionUserId = 'user_1
               }
             }}
           />
-          {canViewPrivateTabs && (
-            <Tab
-              label="Comments"
-              sx={{
-                textTransform: 'none',
-                borderRadius: 1.5,
-                fontWeight: 500,
-                minHeight: 48,
-                mx: '2px',
-                color: '#ccc3d4',
-                '&.Mui-selected': {
-                  color: '#d4bbff',
-                  backgroundColor: '#343440',
-                  boxShadow: 1
-                },
-                '&:hover:not(.Mui-selected)': {
-                  backgroundColor: '#343440',
-                  color: '#e3e0f1'
-                }
-              }}
-            />
-          )}
+
+          <Tab
+            label="Comments"
+            sx={{
+              textTransform: 'none',
+              borderRadius: 1.5,
+              fontWeight: 500,
+              minHeight: 48,
+              mx: '2px',
+              color: '#ccc3d4',
+              '&.Mui-selected': {
+                color: '#d4bbff',
+                backgroundColor: '#343440',
+                boxShadow: 1
+              },
+              '&:hover:not(.Mui-selected)': {
+                backgroundColor: '#343440',
+                color: '#e3e0f1'
+              }
+            }}
+          />
           {canViewPrivateTabs && (
             <Tab
               label="Saved"
@@ -116,11 +123,13 @@ export default function ProfileTabs({ userId = 'user_1', sessionUserId = 'user_1
       </Box>
 
       {/* Feed Content */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {mockPosts.map((post) => (
-          <PostCard key={post.id} post={post} />
-        ))}
-      </Box>
+      <Fade in timeout={250} key={currentTab}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {currentTab === 1
+            ? profileComments.map((comment) => <CommentRow key={comment.id} comment={comment} canEdit={isOwner} />)
+            : mockPosts.map((post) => <PostCard key={post.id} post={post} canEdit={isOwner} />)}
+        </Box>
+      </Fade>
     </Box>
   );
 }

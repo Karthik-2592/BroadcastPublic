@@ -1,16 +1,73 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
-import CommunityHero from '../components/Community/CommunityHero';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import IconButton from '@mui/material/IconButton';
+import TextField from '@mui/material/TextField';
+import ForumOutlinedIcon from '@mui/icons-material/ForumOutlined';
+import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import UploadOutlinedIcon from '@mui/icons-material/UploadOutlined';
+import Fade from '@mui/material/Fade';
+import { useRef } from 'react';
+import CommunityTagSelector from '../components/Community/CommunityTagSelector';
+import { useAuth } from '../context/AuthContext';
 import CommunitySortTabs from '../components/Community/CommunitySortTabs';
 import CommunityRightSidebar from '../components/Community/CommunityRightSidebar';
 import PostCard from '../components/PostCard/PostCard';
-import { mockPosts, type MockPost } from '../data/mockData';
+import { exploreCommunities, mockPosts } from '../data/mockData';
+import type { Post, Tag } from '../types/api';
 
 export default function CommunitiesPage() {
+  const navigate = useNavigate();
+  const { communityId = 'ec1' } = useParams<{ communityId: string }>();
+  const { isAuthenticated, isMember } = useAuth();
+  const community = exploreCommunities.find(({ id }) => id === communityId) ?? exploreCommunities[0];
   const [sortTab, setSortTab] = useState<'new' | 'top'>('new');
+  const [isCommunityMember, setIsCommunityMember] = useState(isMember);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [description, setDescription] = useState(community.community_desc);
+  const [guidelines, setGuidelines] = useState('Be respectful and constructive.');
+  const [tags, setTags] = useState<Tag[]>(['Technology']);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+  const [bannerImage, setBannerImage] = useState<string | null>(null);
+  const isAdmin = isAuthenticated && isCommunityMember && (communityId === 'ec1' || communityId === 'c1');
 
-  const displayedPosts: MockPost[] = sortTab === 'top'
-    ? [...mockPosts].sort((a, b) => b.likes - a.likes)
+  useEffect(() => setIsCommunityMember(isMember), [isMember, communityId]);
+
+  const handleJoin = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    setIsCommunityMember(true);
+  };
+
+  const handleEdit = async () => {
+    await fetch(`/v1/communities/${community.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ community_name: name, community_desc: description, guidelines, tags }),
+    }).catch(() => undefined);
+    setIsEditOpen(false);
+  };
+
+  const handleDelete = async () => {
+    await fetch(`/v1/communities/${community.id}`, { method: 'DELETE' }).catch(() => undefined);
+    setIsDeleteOpen(false);
+    setIsEditOpen(false);
+    navigate('/communities');
+  };
+
+  const displayedPosts: Post[] = sortTab === 'top'
+    ? [...mockPosts].sort((a, b) => b.favorite_count - a.favorite_count)
     : mockPosts;
 
   return (
@@ -25,8 +82,25 @@ export default function CommunitiesPage() {
         pl: 4,
         maxWidth: '1080px'
       }}>
-        {/* Community Banner Hero */}
-        <CommunityHero />
+        <Card sx={{ bgcolor: 'background.paper', borderRadius: 2, overflow: 'hidden' }}>
+          <Box sx={{ height: 260, width: '100%', position: 'relative', background: community.bannerGradient }}>
+            <Box sx={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, #1a1a2e, transparent)', opacity: 0.8 }} />
+            <Typography variant="h4" component="h1" sx={{ position: 'absolute', bottom: 20, left: 24, color: 'text.primary', fontWeight: 600, zIndex: 1 }}>{community.community_name}</Typography>
+          </Box>
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3, lineHeight: 1.6 }}>{community.community_desc}</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}><ForumOutlinedIcon sx={{ color: 'text.secondary', fontSize: 18 }} /><Typography variant="body2">{community.post_count}</Typography></Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}><GroupOutlinedIcon sx={{ color: 'text.secondary', fontSize: 18 }} /><Typography variant="body2">{community.population}</Typography></Box>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }} onClick={(event) => event.stopPropagation()}>
+                {!isAuthenticated || !isCommunityMember ? <Button variant="contained" size="small" onClick={handleJoin}>Join</Button> : <Button variant="contained" size="small" onClick={() => navigate('/create')}>Create post</Button>}
+                {isAdmin && <IconButton aria-label="Edit community" onClick={() => setIsEditOpen(true)} sx={{ color: 'primary.light', bgcolor: 'rgba(179,136,255,0.1)', borderRadius: 2 }}><EditOutlinedIcon /></IconButton>}
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
       </Box>
 
       <Box
@@ -45,18 +119,108 @@ export default function CommunitiesPage() {
           <CommunitySortTabs activeTab={sortTab} onTabChange={setSortTab} />
 
           {/* Reused Post Cards */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 3 }}>
-            {displayedPosts.map((post) => (
-              <PostCard key={post.id} post={post} />
-            ))}
-          </Box>
+          <Fade in timeout={250} key={sortTab}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 3 }}>
+              {displayedPosts.map((post) => (
+                <PostCard key={post.id} post={post} />
+              ))}
+            </Box>
+          </Fade>
         </Box>
 
         <Box sx={{ maxHeight: '100%' }}>
-          <CommunityRightSidebar />
+          <CommunityRightSidebar community={community} />
         </Box>
       </Box>
+
+      <Dialog open={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        maxWidth="md"
+        fullWidth
+        disableScrollLock={true}>
+        <DialogContent sx={{ p: 0, bgcolor: '#1a1a2e' }}>
+          <Box sx={{ height: 2, background: 'linear-gradient(90deg, transparent, #b388ff, transparent)' }} />
+          <Box sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <Box><Typography variant="h6" sx={{ fontWeight: 700 }}>Edit community</Typography><Typography variant="body2">Update your community details.</Typography></Box>
+            <IconButton aria-label="Close edit community" onClick={() => setIsEditOpen(false)}><CloseRoundedIcon /></IconButton>
+          </Box>
+          <Box sx={{ p: { xs: 3, md: 4 }, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <Box sx={{ height: 160, borderRadius: 2, background: bannerImage ? `url(${bannerImage}) center/cover` : community.bannerGradient, display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', p: 2 }}>
+              <input ref={bannerInputRef} hidden type="file" accept="image/png,image/jpeg,image/jpg" onChange={(event) => { const file = event.target.files?.[0]; if (file) setBannerImage(URL.createObjectURL(file)); }} />
+              <Button variant="contained" startIcon={<UploadOutlinedIcon />} onClick={() => bannerInputRef.current?.click()}>Upload banner</Button>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 60, py: 1 }}>
+              <TextField
+                fullWidth
+                slotProps={{
+                  input: {
+                    readOnly: true
+                  }
+                }}
+                label="Community Name"
+                defaultValue={community.community_name}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 4,
+                    border: '1px solid rgba(255, 255, 255, 0.36)',
+                    bgcolor: 'rgba(31, 19, 36, 0.53)'
+                  },
+                  '& . MuiFormLabel-root': {
+                    fontSize: '1.2rem'
+                  }
+                }}
+              />
+            </Box>
+            <TextField
+              label="Community Description"
+              multiline rows={4}
+              fullWidth value={description}
+              onChange={(event) => setDescription(event.target.value.slice(0, 200))}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 4,
+                  border: '1px solid rgba(255, 255, 255, 0.36)',
+                  bgcolor: 'rgba(31, 19, 36, 0.53)'
+                },
+                '& . MuiFormLabel-root': {
+                  fontSize: '1.2rem'
+                }
+              }}
+            />
+            <CommunityTagSelector selectedTags={tags} onChange={setTags} />
+            <TextField
+              label="Community Guidelines"
+              multiline
+              rows={5}
+              fullWidth
+              value={guidelines}
+              onChange={(event) => setGuidelines(event.target.value.slice(0, 200))}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 4,
+                  border: '1px solid rgba(255, 255, 255, 0.36)',
+                  bgcolor: 'rgba(31, 19, 36, 0.53)'
+                },
+                '& . MuiFormLabel-root': {
+                  fontSize: '1.2rem'
+                }
+              }}
+            />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.06)', pt: 3 }}>
+              <Button color="error" variant="outlined" onClick={() => setIsDeleteOpen(true)}>Delete</Button>
+              <Box sx={{ display: 'flex', gap: 1.5 }}><Button variant="outlined" onClick={() => setIsEditOpen(false)}>Cancel</Button><Button variant="contained" onClick={handleEdit}>Edit</Button></Box>
+            </Box>
+          </Box>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} maxWidth="xs" fullWidth>
+        <DialogContent sx={{ p: 4, bgcolor: '#1a1a2e' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Delete community?</Typography>
+          <Typography variant="body2" sx={{ mb: 3 }}>This action cannot be undone. Are you sure you want to delete this community?</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}><Button variant="outlined" onClick={() => setIsDeleteOpen(false)}>Cancel</Button><Button color="error" variant="contained" onClick={handleDelete}>Confirm delete</Button></Box>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
-

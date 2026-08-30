@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const env = {
+  sessionSecret: process.env.SESSION_SECRET ?? "development-only-session-secret",
   port: Number(process.env.PORT ?? 3001),
   mongoUri: process.env.MONGODB_URI ?? "mongodb://127.0.0.1:27017",
   mongoDatabase: process.env.MONGODB_DATABASE ?? "broadcast",

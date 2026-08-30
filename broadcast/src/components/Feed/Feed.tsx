@@ -2,10 +2,16 @@
 // Receives mock post data and maps each entry to a PostCard.
 
 import Box from '@mui/material/Box';
+import { useState } from 'react';
 import PostCard from '../PostCard/PostCard';
 import { mockPosts } from '../../data/mockData';
+import UserRecommendations from './UserRecommendations';
 
 export default function Feed() {
+  const [showRecommendations] = useState(true);
+  const firstPosts = mockPosts.slice(0, 8);
+  const remainingPosts = mockPosts.slice(8);
+
   return (
     <Box
       sx={{
@@ -18,7 +24,11 @@ export default function Feed() {
         gap: 2,
       }}
     >
-      {mockPosts.map((post) => (
+      {firstPosts.map((post) => (
+        <PostCard key={post.id} post={post} />
+      ))}
+      {showRecommendations && <UserRecommendations />}
+      {remainingPosts.map((post) => (
         <PostCard key={post.id} post={post} />
       ))}
     </Box>

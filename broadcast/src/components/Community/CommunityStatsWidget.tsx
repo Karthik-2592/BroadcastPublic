@@ -1,8 +1,10 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import type { Community } from '../../types/api';
+import { formatCount } from '../../types/api';
 
-export default function CommunityStatsWidget() {
+export default function CommunityStatsWidget({ community }: { community: Community }) {
   return (
     <Box
       sx={{
@@ -44,7 +46,7 @@ export default function CommunityStatsWidget() {
       }}>
         <Box sx={{ bgcolor: 'rgba(255, 255, 255, 0.04)', p: 1.5, borderRadius: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <Typography variant="h6" sx={{ color: 'primary.light', fontWeight: 700, lineHeight: 1.2, fontSize: '1.1rem' }}>
-            12.4k
+            {formatCount(community.population)}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.72rem' }}>
             Members
@@ -53,7 +55,7 @@ export default function CommunityStatsWidget() {
 
         <Box sx={{ bgcolor: 'rgba(255, 255, 255, 0.04)', p: 1.5, borderRadius: 2, display: 'flex', flexDirection: 'column', alignItems: 'center ' }}>
           <Typography variant="h6" sx={{ color: 'text.primary', fontWeight: 700, lineHeight: 1.2, fontSize: '1.1rem' }}>
-            1.2k
+            {formatCount(community.post_count)}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.72rem' }}>
             Posts
@@ -63,4 +65,3 @@ export default function CommunityStatsWidget() {
     </Box>
   );
 }
-

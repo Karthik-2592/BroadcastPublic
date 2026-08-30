@@ -1,5 +1,5 @@
 import neo4j, { type Driver, type Integer, type Session } from "neo4j-driver";
-import { env } from "../config/env.ts";
+import { env } from "./config/env.ts";
 
 const uri = env.neo4jUri;
 const username = env.neo4jUsername;

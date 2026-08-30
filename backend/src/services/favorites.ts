@@ -1,5 +1,5 @@
-import { store } from "../store.ts";
-import { neo4jRelations, numberValue } from "../relations/neo4j.ts";
+import { store } from "../mongodb.ts";
+import { neo4jRelations, numberValue } from "../neo4j.ts";
 import { env } from "../config/env.ts";
 
 type FavoriteTarget = "post" | "comment";

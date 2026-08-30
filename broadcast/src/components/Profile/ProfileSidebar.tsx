@@ -8,11 +8,20 @@ import TableContainer from '@mui/material/TableContainer';
 import TableRow from '@mui/material/TableRow';
 import Divider from '@mui/material/Divider';
 import Avatar from '@mui/material/Avatar';
-import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import type { User, UserSummary } from '../../types/api';
+import { displayName, formatCount, userHandle } from '../../types/api';
 
-export default function ProfileSidebar() {
+interface ProfileSidebarProps {
+  user: User;
+  followers: UserSummary[];
+  following: UserSummary[];
+  showViewAll?: boolean;
+  onViewFollowers?: () => void;
+  onViewFollowing?: () => void;
+}
+
+export default function ProfileSidebar({ user, followers, following, showViewAll = false, onViewFollowers, onViewFollowing }: ProfileSidebarProps) {
   return (
     <Box sx={{ position: 'sticky', top: 96, display: 'flex', flexDirection: 'column', gap: 3, width: '280px', minWidth: '280px' }}>
       <Card
@@ -33,27 +42,27 @@ export default function ProfileSidebar() {
               <TableBody>
                 <TableRow>
                   <TableCell sx={{ pb: 5, width: '50%' }}>
-                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>1.2k</Typography>
+                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>{formatCount(user.follower_count)}</Typography>
                     <Typography variant="caption" sx={{ color: '#9e9bab', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>Followers</Typography>
                   </TableCell>
                   <TableCell sx={{ pb: 5, width: '50%' }}>
-                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>850</Typography>
+                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>{formatCount(user.following_count)}</Typography>
                     <Typography variant="caption" sx={{ color: '#9e9bab', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>Following</Typography>
                   </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell sx={{ pb: 5, width: '50%' }}>
-                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>124</Typography>
+                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>{formatCount(user.post_count ?? 0)}</Typography>
                     <Typography variant="caption" sx={{ color: '#9e9bab', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>Posts</Typography>
                   </TableCell>
                   <TableCell sx={{ pb: 5, width: '50%' }}>
-                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>Oct '21</Typography>
+                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>{user.joined_at ? new Date(user.joined_at).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }) : '—'}</Typography>
                     <Typography variant="caption" sx={{ color: '#9e9bab', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>Joined</Typography>
                   </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell sx={{ width: '50%' }}>
-                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>12</Typography>
+                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>{formatCount(user.community_count ?? 0)}</Typography>
                     <Typography variant="caption" sx={{ color: '#9e9bab', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>Communities</Typography>
                   </TableCell>
                   <TableCell sx={{ width: '50%' }} />
@@ -71,18 +80,12 @@ export default function ProfileSidebar() {
             <Typography variant="subtitle1" sx={{ color: '#e8e6ef', fontWeight: 500 }}>
               Recent Followers
             </Typography>
-            <Button size="small" sx={{ textTransform: 'none', color: '#d4bbff', fontSize: '0.75rem', minWidth: 0, '&:hover': { textDecoration: 'underline' } }}>
-              View All
-            </Button>
+            {showViewAll && <Button size="small" onClick={onViewFollowers} sx={{ textTransform: 'none', color: '#d4bbff', fontSize: '0.75rem', minWidth: 0, '&:hover': { textDecoration: 'underline' } }}>View All</Button>}
           </Box>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {[
-              { name: 'Alice Chen', handle: '@alice_dev', img: '' },
-              { name: 'Marcus Webb', handle: '@mwebb_ui', img: '' },
-              { name: 'Priya Sharma', handle: '@priya_codes', img: '' }
-            ].map((user, idx) => (
+            {followers.map((follower) => (
               <Box
-                key={idx}
+                key={follower.id}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
@@ -94,18 +97,15 @@ export default function ProfileSidebar() {
                   '&:hover': { bgcolor: '#292935' } // hover:bg-surface-container-high
                 }}
               >
-                <Avatar src={user.img} sx={{ width: 32, height: 32, bgcolor: '#343440' }} />
+                <Avatar src={follower.profile_picture ?? undefined} sx={{ width: 32, height: 32, bgcolor: '#343440' }}>{displayName(follower).charAt(0)}</Avatar>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="body2" sx={{ color: '#e3e0f1', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {user.name}
+                    {displayName(follower)}
                   </Typography>
                   <Typography variant="caption" sx={{ color: '#9e9bab', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
-                    {user.handle}
+                    {userHandle(follower)}
                   </Typography>
                 </Box>
-                <IconButton size="small" sx={{ color: '#d4bbff', '&:hover': { bgcolor: 'rgba(212,187,255,0.1)' } }}>
-                  <PersonAddIcon fontSize="small" />
-                </IconButton>
               </Box>
             ))}
           </Box>
@@ -119,18 +119,12 @@ export default function ProfileSidebar() {
             <Typography variant="subtitle1" sx={{ color: '#e8e6ef', fontWeight: 500 }}>
               Following
             </Typography>
-            <Button size="small" sx={{ textTransform: 'none', color: '#d4bbff', fontSize: '0.75rem', minWidth: 0, '&:hover': { textDecoration: 'underline' } }}>
-              View All
-            </Button>
+            {showViewAll && <Button size="small" onClick={onViewFollowing} sx={{ textTransform: 'none', color: '#d4bbff', fontSize: '0.75rem', minWidth: 0, '&:hover': { textDecoration: 'underline' } }}>View All</Button>}
           </Box>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {[
-              { name: 'Dan Abramov', handle: '@dan_abramov', img: '' },
-              { name: 'Sarah Drasner', handle: '@sarah_edo', img: '' },
-              { name: 'Vercel', handle: '@vercel', img: '' }
-            ].map((user, idx) => (
+            {following.map((followed) => (
               <Box
-                key={idx}
+                key={followed.id}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
@@ -142,13 +136,13 @@ export default function ProfileSidebar() {
                   '&:hover': { bgcolor: '#292935' }
                 }}
               >
-                <Avatar src={user.img} sx={{ width: 32, height: 32, bgcolor: '#343440' }} />
+                <Avatar src={followed.profile_picture ?? undefined} sx={{ width: 32, height: 32, bgcolor: '#343440' }}>{displayName(followed).charAt(0)}</Avatar>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="body2" sx={{ color: '#e3e0f1', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {user.name}
+                    {displayName(followed)}
                   </Typography>
                   <Typography variant="caption" sx={{ color: '#9e9bab', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
-                    {user.handle}
+                    {userHandle(followed)}
                   </Typography>
                 </Box>
               </Box>

@@ -1,5 +1,4 @@
-import { useState, useCallback } from 'react';
-import debounce from 'lodash.debounce';
+import { useRef, useState } from 'react';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
@@ -8,39 +7,118 @@ import InputAdornment from '@mui/material/InputAdornment';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import List from '@mui/material/List';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemText from '@mui/material/ListItemText';
+import CircularProgress from '@mui/material/CircularProgress';
 import SearchIcon from '@mui/icons-material/Search';
+import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
+import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutlined';
 import NotificationsNoneOutlinedIcon from '@mui/icons-material/NotificationsNoneOutlined';
 import CellTowerRoundedIcon from '@mui/icons-material/CellTowerRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import { useNavigate } from 'react-router-dom';
+import { mockPosts, popularCommunities, userCommunities, followedUsers } from '../../data/mockData';
+
+type SearchResultType = 'post' | 'community' | 'user';
+
+interface SearchResult {
+  id: string;
+  type: SearchResultType;
+  name: string;
+  count: number;
+}
+
+const localSearch = (query: string): SearchResult[] => {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return [];
+
+  const posts: SearchResult[] = mockPosts
+    .filter(({ title, content }) => `${title} ${content}`.toLowerCase().includes(normalizedQuery))
+    .map(({ id, title, favorite_count }) => ({ id, type: 'post', name: title, count: favorite_count }));
+  const communities: SearchResult[] = [...userCommunities, ...popularCommunities]
+    .filter(({ community_name }) => community_name.toLowerCase().includes(normalizedQuery))
+    .map(({ id, community_name, population }) => ({ id, type: 'community', name: community_name, count: population }));
+  const users: SearchResult[] = followedUsers
+    .filter(({ profile_name, username }) => `${profile_name ?? ''} ${username}`.toLowerCase().includes(normalizedQuery))
+    .map(({ id, profile_name, username }) => ({ id, type: 'user', name: profile_name ?? username, count: 0 }));
+
+  return [...posts, ...communities, ...users].slice(0, 10);
+};
+
+const resultIcon = (type: SearchResultType) => {
+  if (type === 'post') return <ArticleOutlinedIcon fontSize="small" />;
+  if (type === 'community') return <GroupsOutlinedIcon fontSize="small" />;
+  return <PersonOutlineIcon fontSize="small" />;
+};
+
+const resultCountLabel = (result: SearchResult) => {
+  if (result.type === 'post') return `${result.count} favorites`;
+  if (result.type === 'community') return `${result.count} members`;
+  return `${result.count} followers`;
+};
 
 export default function TopBar() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchRequest = useRef(0);
 
-  const submitSearch = (query: string) => {
-    if (!query.trim()) return;
-    console.log(`[API MOCK] Submitting search query:`, query);
+  const submitSearch = async (query: string) => {
+    const trimmedQuery = query.trim();
+    setIsSearchOpen(true);
+    if (!trimmedQuery) {
+      setSearchResults([]);
+      return;
+    }
+
+    const requestId = ++searchRequest.current;
+    setIsSearching(true);
+    let results = localSearch(trimmedQuery);
+
+    // The endpoint is intentionally provisional until the search API is available.
+    try {
+      const response = await fetch(`/v1/search?q=${encodeURIComponent(trimmedQuery)}`);
+      if (response.ok) {
+        const body = await response.json() as { data?: SearchResult[] };
+        if (Array.isArray(body.data)) results = body.data.slice(0, 10);
+      }
+    } catch {
+      // Keep the temporary local results available while the API is blank.
+    }
+
+    if (requestId === searchRequest.current) {
+      setSearchResults(results);
+      setIsSearching(false);
+    }
   };
 
-  const debouncedSearchApi = useCallback(
-    debounce((query: string) => {
-      submitSearch(query);
-    }, 500),
-    []
-  );
-
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
+    const val = e.target.value.slice(0, 50);
     setSearchQuery(val);
-    debouncedSearchApi(val);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      debouncedSearchApi.cancel();
       submitSearch(searchQuery);
     }
+  };
+
+  const handleSearchBlur = (e: React.FocusEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+      setIsSearchOpen(false);
+    }
+  };
+
+  const handleResultClick = (result: SearchResult) => {
+    setIsSearchOpen(false);
+    if (result.type === 'post') navigate(`/post/${result.id}`);
+    if (result.type === 'community') navigate(`/community/${result.id}`);
+    if (result.type === 'user') navigate(`/profile/${result.id}`);
   };
 
   return (
@@ -60,7 +138,7 @@ export default function TopBar() {
           justifyContent: 'space-between',
           minHeight: { xs: 60 },
           px: { xs: 2, md: 3 },
-          background: 'rgba(10, 10, 10, 0.75)',
+          background: 'rgba(10, 10, 10, 0.55)',
           backdropFilter: 'blur(10px)',
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
         }}
@@ -90,7 +168,9 @@ export default function TopBar() {
             justifyContent: 'center',
             maxWidth: 640,
             mx: 'auto',
+            position: 'relative',
           }}
+          onBlur={handleSearchBlur}
         >
           <TextField
             size="small"
@@ -103,12 +183,81 @@ export default function TopBar() {
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                    <IconButton
+                      aria-label="Search"
+                      size="small"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => submitSearch(searchQuery)}
+                      sx={{ color: 'text.secondary', p: 0.25 }}
+                    >
+                      <SearchIcon sx={{ fontSize: 20 }} />
+                    </IconButton>
                   </InputAdornment>
                 ),
+                inputProps: { maxLength: 50 },
               },
             }}
           />
+          {isSearchOpen && (
+            <Paper
+              elevation={8}
+              sx={{
+                position: 'absolute',
+                top: 'calc(100% + 16px)',
+                left: 0,
+                right: 0,
+                zIndex: 1200,
+                overflow: 'hidden',
+                background: 'rgba(10, 10, 10, 0.75)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: 4
+              }}
+            >
+              {isSearching ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                  <CircularProgress size={20} />
+                </Box>
+              ) : searchResults.length > 0 ? (
+                <List disablePadding>
+                  {searchResults.map((result) => (
+                    <ListItemButton
+                      key={`${result.type}-${result.id}`}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleResultClick(result)}
+                      sx={{ borderRadius: 0, px: 2, py: 1 }}
+                    >
+                      <Box sx={{ display: 'flex', color: 'primary.light', mr: 1.5 }}>
+                        {resultIcon(result.type)}
+                      </Box>
+                      <ListItemText
+                        primary={result.name}
+                        secondary={resultCountLabel(result)}
+                        slotProps={{
+                          primary: {
+                            sx: {
+                              fontSize: '0.9rem',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }
+                          },
+                          secondary: {
+                            sx: {
+                              fontSize: '0.75rem'
+                            }
+                          }
+                        }}
+                      />
+                    </ListItemButton>
+                  ))}
+                </List>
+              ) : (
+                <Typography sx={{ p: 2, color: 'text.secondary', fontSize: '0.85rem' }}>
+                  No results found
+                </Typography>
+              )}
+            </Paper>
+          )}
         </Box>
 
         {/* Post Creation CTA & Account controls */}
@@ -182,4 +331,3 @@ export default function TopBar() {
     </AppBar>
   );
 }
-

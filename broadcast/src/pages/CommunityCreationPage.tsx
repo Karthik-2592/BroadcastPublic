@@ -1,17 +1,88 @@
+import { useState } from 'react';
 import {
   Box,
   Typography,
   Button,
   TextField,
-  Chip,
   IconButton,
 } from '@mui/material';
 import {
   Edit as EditIcon,
   ArrowForward as ArrowForwardIcon
 } from '@mui/icons-material';
+import CommunityTagSelector from '../components/Community/CommunityTagSelector';
+import type { Tag } from '../types/api';
+
+const NAME_MAX = 50;
+const DESC_MAX = 200;
+const GUIDELINES_MAX = 200;
 
 export default function CommunityCreationPage() {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [guidelines, setGuidelines] = useState('');
+  const [tags, setTags] = useState<Tag[]>([]);
+
+  const [nameError, setNameError] = useState('');
+  const [descError, setDescError] = useState('');
+  const [guidelinesError, setGuidelinesError] = useState('');
+
+  const handleCreate = () => {
+    let valid = true;
+
+    if (name.trim().length === 0) {
+      setNameError('Community name is required.');
+      valid = false;
+    } else if (name.length > NAME_MAX) {
+      setNameError(`Name must be ${NAME_MAX} characters or fewer.`);
+      valid = false;
+    } else {
+      setNameError('');
+    }
+
+    if (description.length > DESC_MAX) {
+      setDescError(`Description must be ${DESC_MAX} characters or fewer.`);
+      valid = false;
+    } else {
+      setDescError('');
+    }
+
+    if (guidelines.length > GUIDELINES_MAX) {
+      setGuidelinesError(`Guidelines must be ${GUIDELINES_MAX} characters or fewer.`);
+      valid = false;
+    } else {
+      setGuidelinesError('');
+    }
+
+    if (!valid) return;
+    console.log('[API MOCK] Create community:', { name, description, guidelines, tags });
+  };
+
+  // Reusable chip component
+  const CharCountChip = ({ current, max }: { current: number; max: number }) => (
+    <Typography
+      component="span"
+      sx={{
+        position: 'absolute',
+        bottom: 8,
+        right: 10,
+        fontSize: '0.68rem',
+        fontWeight: 600,
+        color: current > max ? 'error.main' : 'text.disabled',
+        bgcolor: 'rgba(0,0,0,0.35)',
+        borderRadius: 9999,
+        px: 0.75,
+        py: 0.15,
+        lineHeight: 1.6,
+        pointerEvents: 'none',
+        transition: 'color 0.2s',
+        zIndex: 1,
+      }}
+    >
+      {current}/{max}
+    </Typography>
+  );
+
   return (
     <Box
       sx={{
@@ -31,7 +102,7 @@ export default function CommunityCreationPage() {
     >
 
       <Box sx={{ width: '100%', maxWidth: 'md', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 10 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', mb: 4, ml: 1 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', mb: 4, ml: 2 }}>
           <Typography variant="h4" component="h1" sx={{ fontWeight: 600, color: 'text.primary' }} gutterBottom>
             Create New Community
           </Typography>
@@ -41,13 +112,13 @@ export default function CommunityCreationPage() {
         </Box>
 
         {/* Outer-container : [flex-col, variable height, full width, no background, gap between elements ] */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', bgcolor: 'transparent', gap: 4 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', bgcolor: 'transparent', gap: 4, pl: 1 }}>
 
           {/* Community Banner preview container : [full width, fixed height, flex-col, background: image] */}
           <Box
             sx={{
               width: '100%',
-              height: 256,
+              height: 260,
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'flex-end',
@@ -102,7 +173,6 @@ export default function CommunityCreationPage() {
               width: '100%',
               height: 86,
               alignItems: 'center',
-
             }}>
 
               <Box
@@ -119,6 +189,7 @@ export default function CommunityCreationPage() {
                   width: '100%',
                   transition: 'border 0.2s',
                   '&:focus-within': { border: '1px solid rgba(179,136,255,0.5)' },
+                  position: 'relative',
                 }}
               >
                 <Typography
@@ -128,29 +199,40 @@ export default function CommunityCreationPage() {
                     fontWeight: 600,
                     letterSpacing: '0.08em',
                     textTransform: 'uppercase',
+                    flexShrink: 0,
                   }}
                 >
                   Community Name
                 </Typography>
-                <Box sx={{ width: '1px', height: 16, bgcolor: 'rgba(255,255,255,0.15)' }} />
+                <Box sx={{ width: '1px', height: 16, bgcolor: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
                 <TextField
                   variant="standard"
                   placeholder="YourCommunityName"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   slotProps={{
                     input: {
                       sx: {
                         fontWeight: 500,
                         fontSize: '0.9rem',
                         color: 'text.primary',
+                        // room for chip
+                        pr: '68px',
                       },
                       disableUnderline: true
-
                     }
                   }}
                   sx={{ flex: 1 }}
                 />
+                {/* Char-count chip */}
+                <CharCountChip current={name.length} max={NAME_MAX} />
               </Box>
             </Box>
+            {nameError && (
+              <Typography variant="caption" sx={{ color: 'error.main', display: 'block', mb: 1, ml: 0.5, fontSize: '0.75rem' }}>
+                {nameError}
+              </Typography>
+            )}
 
             {/* Horizontal divider (faint horizontal separator line) */}
             <Box sx={{ width: '100%', height: '1px', bgcolor: 'divider', mb: 3 }} />
@@ -160,7 +242,7 @@ export default function CommunityCreationPage() {
               display: 'flex',
               flexDirection: 'column',
               width: '100%',
-              mb: 3
+              mb: 1
             }}>
 
               {/* Text box: [fixed with, Text: "Community Description", medium weight font, large size font] */}
@@ -176,61 +258,44 @@ export default function CommunityCreationPage() {
                 </Typography>
               </Box>
 
-              {/* Text Area: [full width, Placeholder: "Describe your community", medium weight font, small size font] */}
-              <TextField
-                fullWidth
-                multiline
-                rows={4}
-                variant="outlined"
-                placeholder="Describe your community"
-                slotProps={
-                  {
-                    input: {
-                      sx: { fontWeight: 500, fontSize: '0.875rem' }
-                    }
+              {/* Text Area with char-count chip */}
+              <Box sx={{ position: 'relative' }}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  variant="outlined"
+                  placeholder="Describe your community"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  slotProps={
+                    {
+                      input: {
+                        sx: { fontWeight: 500, fontSize: '0.875rem', pb: '28px' }
+                      }
+                    }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      bgcolor: 'background.paper',
+                      borderRadius: 2
+                    },
                   }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: 'background.paper',
-                    borderRadius: 2
-
-                  },
-                }}
-              />
+                />
+                <CharCountChip current={description.length} max={DESC_MAX} />
+              </Box>
             </Box>
+            {descError && (
+              <Typography variant="caption" sx={{ color: 'error.main', display: 'block', mb: 2, ml: 0.5, fontSize: '0.75rem' }}>
+                {descError}
+              </Typography>
+            )}
+
             {/* Horizontal divider (faint horizontal separator line) */}
             <Box sx={{ width: '100%', height: '1px', bgcolor: 'divider', mb: 3 }} />
 
-            {/* Community Tags container: [flex-col, full width, variable height, no border] */}
             <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 1 }}>
 
-              {/* Text box: [fixed width, Text: "Community Tags", medium weight font, large size font] */}
-              <Box sx={{ width: 250, mb: 1, ml: 1 }}>
-                <Typography sx={{
-                  color: 'text.secondary',
-                  fontWeight: 500,
-                  fontSize: '0.75rem',
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                }}>
-                  Community Tags
-                </Typography>
-              </Box>
-
-              {/* Tags list: [flex row with wrap enabled, full width] */}
-              <Box sx={{
-                display: 'flex',
-                flexDirection: 'row',
-                flexWrap: 'wrap',
-                width: '100%',
-                gap: 1,
-                px: 1
-              }}>
-                {/* <Tag1> : [fixed width fits content, rounded borders, sufficient padding] */}
-                <Chip label="Gaming" color="primary" sx={{ borderRadius: 4, px: 1, py: 2 }} />
-                <Chip label="Technology" variant="outlined" sx={{ borderRadius: 4, px: 1, py: 2 }} />
-                <Chip label="Art & Design" variant="outlined" sx={{ borderRadius: 4, px: 1, py: 2 }} />
-              </Box>
+              <CommunityTagSelector selectedTags={tags} onChange={setTags} />
             </Box>
 
           </Box>
@@ -259,32 +324,41 @@ export default function CommunityCreationPage() {
               </Typography>
             </Box>
 
-            {/* Text Area: [full width, placeholder: "Your community Guidelines", medium weight font, small size font] */}
-            <TextField
-              fullWidth
-              multiline
-              rows={5}
-              variant="outlined"
-              placeholder="Your community Guidelines"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  bgcolor: 'background.paper',
-                  borderRadius: 3
-                },
-                fontWeight: 500,
-                fontSize: '0.875rem'
-              }}
-            />
+            {/* Text Area with char-count chip */}
+            <Box sx={{ position: 'relative' }}>
+              <TextField
+                fullWidth
+                multiline
+                rows={5}
+                variant="outlined"
+                placeholder="Your community Guidelines"
+                value={guidelines}
+                onChange={(e) => setGuidelines(e.target.value)}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    bgcolor: 'background.paper',
+                    borderRadius: 3
+                  },
+                  '& .MuiInputBase-input': { pb: '28px' },
+                  fontWeight: 500,
+                  fontSize: '0.875rem'
+                }}
+              />
+              <CharCountChip current={guidelines.length} max={GUIDELINES_MAX} />
+            </Box>
+            {guidelinesError && (
+              <Typography variant="caption" sx={{ color: 'error.main', display: 'block', mt: 0.5, ml: 0.5, fontSize: '0.75rem' }}>
+                {guidelinesError}
+              </Typography>
+            )}
+
           </Box>
 
         </Box>
 
         {/* Action Bar */}
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 4 }}>
-          <Button variant="text" color="inherit">
-            Cancel
-          </Button>
-          <Button variant="contained" color="primary" size="large" endIcon={<ArrowForwardIcon />}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', mt: 4 }}>
+          <Button variant="contained" color="primary" size="large" endIcon={<ArrowForwardIcon />} onClick={handleCreate}>
             Create Community
           </Button>
         </Box>

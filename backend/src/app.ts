@@ -1,22 +1,23 @@
 import express, { type Express } from "express";
-import auth from "./handlers/auth/routes.ts";
-import users from "./handlers/users/routes.ts";
-import posts from "./handlers/posts/routes.ts";
-import { standalone as comments } from "./handlers/comments/routes.ts";
-import communities from "./handlers/communities/routes.ts";
-import notifications from "./handlers/notifications/routes.ts";
-import { store } from "./store.ts";
+import auth from "./handlers/authController.ts";
+import users from "./handlers/usersController.ts";
+import posts from "./handlers/postsController.ts";
+import { standalone as comments } from "./handlers/commentsController.ts";
+import communities from "./handlers/communitiesController.ts";
+import notifications from "./handlers/notificationsController.ts";
+import { store } from "./mongodb.ts";
 import { startAggregationWorker } from "./services/favorites.ts";
-import relations from "./relations/routes.ts";
 import cors from "cors";
 import { logFailure } from "./http.ts";
+import { sessionMiddleware } from "./session.ts";
 
 export function createApp(): Express {
   const app = express();
-  app.use(cors({ origin: true }));
+  app.use(cors({ origin: true, credentials: true }));
+  app.use(sessionMiddleware);
 
   startAggregationWorker();
-  app.use(express.json({ limit: "2mb" }));
+  app.use(express.json({ limit: "4mb" }));
   app.get("/health", async (_req, res) => {
     let connected = false;
     try {
@@ -38,7 +39,6 @@ export function createApp(): Express {
   app.use("/v1/comments", comments);
   app.use("/v1/communities", communities);
   app.use("/v1/notifications", notifications);
-  app.use("/v1/relations", relations);
   app.use((req, res) => {
     logFailure(req, 404, "Route not found.");
     return res

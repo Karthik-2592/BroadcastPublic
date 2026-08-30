@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
-export default function CommunityGuidelinesWidget() {
+export default function CommunityGuidelinesWidget({ guidelines }: { guidelines: string[] }) {
   return (
     <Box
       sx={{
@@ -38,10 +38,7 @@ export default function CommunityGuidelinesWidget() {
           lineHeight: 1.6,
         }}
       >
-        <li>Be respectful and inclusive to all community members.</li>
-        <li>Keep discussions relevant to web development and engineering.</li>
-        <li>Format code snippets clearly and provide context for technical questions.</li>
-        <li>No self-promotion, spam, or off-topic advertising.</li>
+        {guidelines.map((guideline) => <li key={guideline}>{guideline}</li>)}
       </Box>
     </Box>
   );

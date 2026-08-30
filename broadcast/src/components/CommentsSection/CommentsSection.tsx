@@ -3,23 +3,22 @@ import debounce from 'lodash.debounce';
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
-import FormatBoldIcon from '@mui/icons-material/FormatBold';
-import CodeIcon from '@mui/icons-material/Code';
-import LinkIcon from '@mui/icons-material/Link';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Comment from '../Comment/Comment';
-import type { MockComment } from '../../data/mockData';
+import type { Comment as ApiComment } from '../../types/api';
 import { mockComments } from '../../data/mockData';
 
 interface CommentsSectionProps {
-  comments?: MockComment[];
+  comments?: ApiComment[];
 }
+
+const COMMENT_MAX = 200;
 
 export default function CommentsSection({ comments = mockComments }: CommentsSectionProps) {
   const [commentText, setCommentText] = useState('');
+  const [commentError, setCommentError] = useState('');
 
   const debouncedSubmitCommentApi = useCallback(
     debounce((text: string) => {
@@ -30,6 +29,11 @@ export default function CommentsSection({ comments = mockComments }: CommentsSec
 
   const handleSubmitComment = () => {
     if (!commentText.trim()) return;
+    if (commentText.length > COMMENT_MAX) {
+      setCommentError(`Comment must be ${COMMENT_MAX} characters or fewer.`);
+      return;
+    }
+    setCommentError('');
     debouncedSubmitCommentApi(commentText);
     setCommentText('');
   };
@@ -66,56 +70,66 @@ export default function CommentsSection({ comments = mockComments }: CommentsSec
 
         {/* Input area */}
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          <Box
-            component="textarea"
-            placeholder="Add to the discussion..."
-            rows={2}
-            value={commentText}
-            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCommentText(e.target.value)}
-            sx={{
-              width: '100%',
-              bgcolor: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              borderRadius: 1.5,
-              p: 1.5,
-              color: 'text.primary',
-              fontFamily: 'inherit',
-              fontSize: '0.88rem',
-              lineHeight: 1.65,
-              resize: 'none',
-              outline: 'none',
-              transition: 'border-color 0.2s, background 0.2s',
-              '&:focus': {
-                borderColor: 'rgba(179, 136, 255, 0.5)',
-                bgcolor: 'rgba(179, 136, 255, 0.04)',
-              },
-              '&::placeholder': { color: 'text.disabled' },
-            }}
-          />
+          {/* Textarea with char-count chip */}
+          <Box sx={{ position: 'relative' }}>
+            <Box
+              component="textarea"
+              placeholder="Add to the discussion..."
+              rows={2}
+              value={commentText}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCommentText(e.target.value)}
+              sx={{
+                width: '100%',
+                bgcolor: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: 1.5,
+                p: 1.5,
+                pb: '28px', // room for char-count chip
+                color: 'text.primary',
+                fontFamily: 'inherit',
+                fontSize: '0.88rem',
+                lineHeight: 1.65,
+                resize: 'none',
+                outline: 'none',
+                transition: 'border-color 0.2s, background 0.2s',
+                '&:focus': {
+                  borderColor: 'rgba(179, 136, 255, 0.5)',
+                  bgcolor: 'rgba(179, 136, 255, 0.04)',
+                },
+                '&::placeholder': { color: 'text.disabled' },
+              }}
+            />
+            {/* Character count chip */}
+            <Typography
+              component="span"
+              sx={{
+                position: 'absolute',
+                bottom: 6,
+                right: 8,
+                fontSize: '0.68rem',
+                fontWeight: 600,
+                color: commentText.length > COMMENT_MAX ? 'error.main' : 'text.disabled',
+                bgcolor: 'rgba(0,0,0,0.35)',
+                borderRadius: 9999,
+                px: 0.75,
+                py: 0.15,
+                lineHeight: 1.6,
+                pointerEvents: 'none',
+                transition: 'color 0.2s',
+              }}
+            >
+              {commentText.length}/{COMMENT_MAX}
+            </Typography>
+          </Box>
+          {/* Inline error */}
+          {commentError && (
+            <Typography variant="caption" sx={{ color: 'error.main', mt: -1, fontSize: '0.75rem' }}>
+              {commentError}
+            </Typography>
+          )}
 
           {/* Toolbar */}
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Box sx={{ display: 'flex', gap: 0.25 }}>
-              <IconButton
-                size="small"
-                sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'rgba(179,136,255,0.08)' } }}
-              >
-                <FormatBoldIcon sx={{ fontSize: 18 }} />
-              </IconButton>
-              <IconButton
-                size="small"
-                sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'rgba(179,136,255,0.08)' } }}
-              >
-                <CodeIcon sx={{ fontSize: 18 }} />
-              </IconButton>
-              <IconButton
-                size="small"
-                sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'rgba(179,136,255,0.08)' } }}
-              >
-                <LinkIcon sx={{ fontSize: 18 }} />
-              </IconButton>
-            </Box>
-
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
             <Button
               size="small"
               variant="contained"

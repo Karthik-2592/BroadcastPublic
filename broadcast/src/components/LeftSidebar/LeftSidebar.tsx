@@ -13,6 +13,8 @@ import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import { userCommunities } from '../../data/mockData';
+import { useAuth } from '../../context/AuthContext';
+import { displayName, userHandle } from '../../types/api';
 
 // Navigation items corresponding to the wireframe's sidebar tabs
 const navItems = [
@@ -24,6 +26,7 @@ const navItems = [
 export default function LeftSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
 
   return (
     <Box
@@ -115,17 +118,18 @@ export default function LeftSidebar() {
                 sx={{
                   width: 26,
                   height: 26,
-                  bgcolor: community.avatarColor,
+                  bgcolor: community.bannerGradient ? 'primary.main' : 'primary.main',
+                  background: community.bannerGradient,
                   fontSize: '0.7rem',
                   fontWeight: 600,
                   border: 'none',
                 }}
               >
-                {community.name.charAt(0)}
+                {community.community_name.charAt(0)}
               </Avatar>
             </ListItemIcon>
             <ListItemText
-              primary={community.name}
+              primary={community.community_name}
               slotProps={{
                 primary: {
                   sx: {
@@ -143,7 +147,7 @@ export default function LeftSidebar() {
 
       <Divider sx={{ my: 2 }} />
 
-      {/* User profile stub */}
+      {/* User profile stub — shows logged-in user from AuthContext */}
       <Box
         sx={{
           display: 'flex',
@@ -157,16 +161,19 @@ export default function LeftSidebar() {
         }}
         onClick={() => navigate('/profile')}
       >
-        <Avatar sx={{ width: 32, height: 32, bgcolor: '#7c4dff', fontSize: '0.85rem' }}>U</Avatar>
+        <Avatar sx={{ width: 32, height: 32, bgcolor: '#7c4dff', fontSize: '0.85rem' }}>
+          {currentUser ? displayName(currentUser).charAt(0).toUpperCase() : 'G'}
+        </Avatar>
         <Box>
           <Typography variant="subtitle2" sx={{ color: 'text.primary', fontSize: '0.85rem', fontWeight: 500 }}>
-            Guest User
+            {currentUser ? displayName(currentUser) : 'Guest'}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            @guest
+            {currentUser ? userHandle(currentUser) : '@guest'}
           </Typography>
         </Box>
       </Box>
     </Box>
   );
 }
+

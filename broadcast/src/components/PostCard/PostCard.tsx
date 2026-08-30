@@ -1,7 +1,7 @@
 // PostCard — Renders a post entry in either 'compact' (feed/explore/profile) or 'expanded' (post view) variant.
 // Supports toggleable Like/Bookmark states, author profile routing, and an Options dropdown with a Report action.
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import debounce from 'lodash.debounce';
 import Card from '@mui/material/Card';
@@ -16,6 +16,10 @@ import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import Input from '@mui/material/Input';
+import TextField from '@mui/material/TextField';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutlined';
@@ -24,21 +28,223 @@ import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined';
-import type { MockPost } from '../../data/mockData';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import type { Post } from '../../types/api';
 
-interface PostCardProps {
-  post: MockPost;
-  variant?: 'compact' | 'expanded';
+function PostEditDialog({ post, open, onClose }: { post: Post; open: boolean; onClose: () => void }) {
+  const [title, setTitle] = useState(post.title);
+  const [body, setBody] = useState(post.content);
+  const [tagsText, setTagsText] = useState(post.tags.map((tag) => tag.startsWith('#') ? tag : `#${tag}`).join(' '));
+  const [tags, setTags] = useState<string[]>(post.tags.map((tag) => tag.startsWith('#') ? tag : `#${tag}`));
+  const [tagError, setTagError] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
+  const handleOpen = () => {
+    setTitle(post.title);
+    setBody(post.content);
+    setTagsText(post.tags.map((tag) => tag.startsWith('#') ? tag : `#${tag}`).join(' '));
+    setTags(post.tags.map((tag) => tag.startsWith('#') ? tag : `#${tag}`));
+    setTagError(false);
+  };
+
+  useEffect(() => {
+    if (open) handleOpen();
+  }, [open, post]);
+
+  const handleTagsProcess = () => {
+    if (!tagsText.trim()) {
+      setTagError(false);
+      return;
+    }
+    if (!/^[a-zA-Z0-9#\s]*$/.test(tagsText)) {
+      setTagError(true);
+      return;
+    }
+    setTagError(false);
+    const matches = tagsText.match(/#\w+/g) || [];
+    setTags([...new Set(matches)]);
+  };
+
+  const handleTagsKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleTagsProcess();
+    }
+  };
+
+  const handleEdit = async () => {
+    handleTagsProcess();
+    await fetch(`/v1/posts/${post.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, content: body, tags }),
+    }).catch(() => undefined);
+    onClose();
+  };
+
+  const handleDelete = async () => {
+    await fetch(`/v1/posts/${post.id}`, { method: 'DELETE' }).catch(() => undefined);
+    setIsDeleteOpen(false);
+    onClose();
+  };
+
+  return (
+    <>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        disableScrollLock={true}
+        slotProps={{
+          backdrop: { sx: { backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'brightness(0.5) blur(4px)' } },
+          paper: { sx: { width: '100%', maxWidth: 720, bgcolor: '#1a1a2e', color: 'text.primary', borderRadius: 3, border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 16px 48px rgba(0,0,0,0.6)', m: 2, overflow: 'hidden' } },
+        }}
+      >
+        <Box sx={{ height: 2, background: 'linear-gradient(90deg, transparent, #b388ff, transparent)' }} />
+        <Box sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>Edit post</Typography>
+          <IconButton aria-label="Close edit post" onClick={onClose} sx={{ color: 'text.secondary' }}>
+            <CloseRoundedIcon />
+          </IconButton>
+        </Box>
+        <DialogContent sx={{ p: { xs: 3, md: 4 } }}>
+          <TextField
+            label="Title"
+            fullWidth
+            value={title}
+            onChange={(event) => setTitle(event.target.value.slice(0, 75))}
+            sx={{
+              fontSize: '1.3rem',
+              fontWeight: 600,
+              color: 'text.primary',
+              mb: 4,
+              '& .MuiInputBase-input': {
+                border: '1px solid rgba(255,255,255,0.23)',
+                borderRadius: 60,
+              }
+            }}
+          />
+          <Box sx={{
+            display: 'flex', alignItems: 'center', gap: 2,
+            bgcolor: 'rgba(31,18,36,0.53)',
+            border: '1px solid rgba(255, 255, 255, 0.23)',
+            borderRadius: 10, px: 2.5, py: 1, mb: 3
+          }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Community</Typography>
+            <Box sx={{ width: '1px', height: 16, bgcolor: 'rgba(31,19,36,0.53)', borderRadius: '60px', border: '1px solid rgba(255, 255, 255, 0.45)' }} />
+            <TextField
+              value="Global"
+              disabled
+              variant="standard"
+              fullWidth
+              sx={{
+                '& .MuiInputBase-input': {
+                  color: 'text.primary',
+                  fontSize: '0.9rem',
+                  fontWeight: 500
+                },
+                '& .MuiInput-root:before, & .MuiInput-root:after': { display: 'none' }
+              }} />
+          </Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <TextField
+              label="Body"
+              multiline
+              minRows={6}
+              value={body}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                setBody(event.target.value.slice(0, 300))
+              }
+              variant="outlined"
+              fullWidth
+              sx={{
+                background: 'rgba(31, 19, 36, 0.53)',
+                borderRadius: 4,
+                '& .MuiOutlinedInput-root': {
+                  padding: '16px 20px',
+                  fontFamily: 'inherit',
+                  fontSize: '1rem',
+                  border: '1px solid rgba(255, 255, 255, 0.23)',
+                  lineHeight: 1.85,
+                  color: 'inherit',
+                  resize: 'none',
+                  borderRadius: 4,
+                  mb: 4
+                },
+                '& .MuiFormLabel-root': {
+                  fontSize: "1.2rem",
+                }
+              }}
+            />
+          </Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 3, ml: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Tags</Typography>
+              <Input fullWidth value={tagsText}
+                onChange={(event) => setTagsText(event.target.value)}
+                onKeyDown={handleTagsKeyDown}
+                onBlur={handleTagsProcess}
+                placeholder="#tag1 #tag2..."
+                disableUnderline
+                sx={{
+                  color: 'text.primary',
+                  fontSize: '0.85rem',
+                  border: tagError ? '1px solid #ef5350' : '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 1,
+                  px: 1,
+                  py: 0.5,
+                  width: '100%',
+                  transition: 'border 0.2s',
+                  '&:focus-within': {
+                    border: tagError ? '1px solid #ef5350' : '1px solid rgba(179,136,255,0.5)'
+                  }
+                }} />
+            </Box>
+            {tags.length > 0 && (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                {tags.map((tag) => <Chip key={tag} label={tag} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.04)', color: 'text.secondary', fontSize: '0.8rem' }} />)}
+              </Box>
+            )}
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', pt: 3 }}>
+            <Button color="error" variant="outlined" onClick={() => setIsDeleteOpen(true)}>Delete</Button>
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
+              <Button variant="outlined" onClick={onClose}>Cancel</Button>
+              <Button variant="contained" onClick={handleEdit}>Edit</Button>
+            </Box>
+          </Box>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} maxWidth="xs" fullWidth>
+        <DialogContent sx={{ p: 4, bgcolor: '#1a1a2e' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Delete post?</Typography>
+          <Typography variant="body2" sx={{ mb: 3 }}>This action cannot be undone. Are you sure you want to delete this post?</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+            <Button variant="outlined" onClick={() => setIsDeleteOpen(false)}>Cancel</Button>
+            <Button color="error" variant="contained" onClick={handleDelete}>Confirm delete</Button>
+          </Box>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }
 
-export default function PostCard({ post, variant = 'compact' }: PostCardProps) {
+interface PostCardProps {
+  post: Post;
+  variant?: 'compact' | 'expanded';
+  canEdit?: boolean;
+}
+
+export default function PostCard({ post, variant = 'compact', canEdit = false }: PostCardProps) {
   const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(post.likes);
+  const [likeCount, setLikeCount] = useState(post.favorite_count);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [optionsAnchor, setOptionsAnchor] = useState<null | HTMLElement>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   const isExpanded = variant === 'expanded';
+  const author = post.user_summary;
 
   // Debounced API callbacks for mock server interaction
   const debouncedLikeApi = useCallback(
@@ -90,6 +296,12 @@ export default function PostCard({ post, variant = 'compact' }: PostCardProps) {
     navigate('/placeholder');
   };
 
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOptionsAnchor(null);
+    setIsEditOpen(true);
+  };
+
   const handleNavigateProfile = (e: React.MouseEvent) => {
     e.stopPropagation();
     navigate('/profile');
@@ -137,13 +349,13 @@ export default function PostCard({ post, variant = 'compact' }: PostCardProps) {
                   sx={{
                     width: 48,
                     height: 48,
-                    bgcolor: post.author.avatarColor,
+                    bgcolor: author?.avatarColor ?? '#7c4dff',
                     fontWeight: 700,
                     fontSize: '1rem',
                     border: '2px solid rgba(255,255,255,0.1)',
                   }}
                 >
-                  {post.author.name.charAt(0)}
+                  {(author?.profile_name ?? author?.username ?? '?').charAt(0)}
                 </Avatar>
               </Box>
               <Box
@@ -159,13 +371,15 @@ export default function PostCard({ post, variant = 'compact' }: PostCardProps) {
                     '&:hover': { color: 'primary.light' },
                   }}
                 >
-                  {post.author.name}
+                  {author?.profile_name ?? author?.username ?? 'Unknown'}
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.78rem' }}>
-                  {post.author.handle} · {post.timestamp}
+                  @{author?.username ?? 'unknown'} · {post.time_created}
                 </Typography>
               </Box>
             </Box>
+
+
 
             <IconButton
               size="small"
@@ -353,7 +567,25 @@ export default function PostCard({ post, variant = 'compact' }: PostCardProps) {
             <FlagOutlinedIcon fontSize="small" />
             Report
           </MenuItem>
+          {canEdit && (
+            <MenuItem onClick={handleEdit} sx={{
+              fontSize: '0.84rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              px: 2,
+              py: 0.8,
+            }}>
+              <EditOutlinedIcon fontSize="small"
+                sx={{
+                  '&:hover': { color: 'primary.light' },
+                }}
+              />
+              Edit
+            </MenuItem>
+          )}
         </Menu>
+        <PostEditDialog post={post} open={isEditOpen} onClose={() => setIsEditOpen(false)} />
       </Box>
     );
   }
@@ -367,17 +599,17 @@ export default function PostCard({ post, variant = 'compact' }: PostCardProps) {
           <Box
             sx={{ display: 'flex', alignItems: 'center', flex: 1, }}
           >
-            <Box onClick={handleNavigateProfile} sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <Box onClick={handleNavigateProfile} sx={{ display: 'flex', alignItems: 'flex-start', cursor: 'pointer' }}>
               <Avatar
                 sx={{
                   width: 38,
                   height: 38,
-                  bgcolor: post.author.avatarColor,
+                  bgcolor: author?.avatarColor ?? '#7c4dff',
                   fontSize: '0.9rem',
                   fontWeight: 600,
                 }}
               >
-                {post.author.name.charAt(0)}
+                {(author?.profile_name ?? author?.username ?? '?').charAt(0)}
               </Avatar>
 
               <Box sx={{ ml: 1.5 }}>
@@ -391,12 +623,18 @@ export default function PostCard({ post, variant = 'compact' }: PostCardProps) {
                     '&:hover': { color: 'primary.light' },
                   }}
                 >
-                  {post.author.name}
+                  {author?.profile_name ?? author?.username ?? 'Unknown'}
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  {post.author.handle} · {post.timestamp}
+                  @{author?.username ?? 'unknown'} · {post.time_created}
                 </Typography>
               </Box>
+
+              {post.recommendationReason && (
+                <Typography variant="caption" sx={{ display: 'block', color: 'secondary.light', fontSize: '0.72rem', textAlign: 'right', mt: 0.5 }}>
+                  {post.recommendationReason}
+                </Typography>
+              )}
             </Box>
           </Box>
 
@@ -408,6 +646,7 @@ export default function PostCard({ post, variant = 'compact' }: PostCardProps) {
             <MoreHorizIcon fontSize="small" />
           </IconButton>
         </Box>
+
 
         {/* Clickable content area: title, body, media → navigates to post view */}
         <Box
@@ -506,7 +745,7 @@ export default function PostCard({ post, variant = 'compact' }: PostCardProps) {
             <ChatBubbleOutlineIcon fontSize="small" />
           </IconButton>
           <Typography variant="caption" sx={{ fontSize: '0.78rem', fontWeight: 500 }}>
-            {post.comments}
+            {post.comment_count}
           </Typography>
         </Box>
 
@@ -588,8 +827,23 @@ export default function PostCard({ post, variant = 'compact' }: PostCardProps) {
           <FlagOutlinedIcon fontSize="small" />
           Report
         </MenuItem>
+        {canEdit && (
+          <MenuItem onClick={handleEdit} sx={{
+            fontSize: '0.84rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            px: 2,
+            py: 0.8,
+            '&:hover': { bgcolor: 'rgba(180, 136, 255, 0.1)' },
+
+          }}>
+            <EditOutlinedIcon fontSize="small" />
+            Edit
+          </MenuItem>
+        )}
       </Menu>
+      <PostEditDialog post={post} open={isEditOpen} onClose={() => setIsEditOpen(false)} />
     </Card >
   );
 }
-

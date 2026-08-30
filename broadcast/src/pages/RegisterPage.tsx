@@ -136,7 +136,7 @@ function InterestsDialog({
           paper: {
             sx: {
               width: '100%',
-              maxWidth: 420,
+              maxWidth: 480,
               height: 380,
               bgcolor: '#1a1a2e',
               color: 'text.primary',
@@ -505,8 +505,15 @@ function StepOne({ onContinue, handleBack }: { onContinue: () => void; handleBac
 }
 
 // ─── Step 2 ───────────────────────────────────────────────────────────────────
+const DISPLAY_NAME_MAX = 50;
+const BIO_MAX = 200;
+
 function StepTwo({ handleBack }: { handleBack: () => void }) {
   const [selectedInterests, setSelectedInterests] = useState<Set<string>>(new Set());
+  const [displayName, setDisplayName] = useState('');
+  const [bio, setBio] = useState('');
+  const [displayNameError, setDisplayNameError] = useState('');
+  const [bioError, setBioError] = useState('');
 
   const toggleInterest = (interest: string) => {
     setSelectedInterests((prev) => {
@@ -520,12 +527,36 @@ function StepTwo({ handleBack }: { handleBack: () => void }) {
     });
   };
 
+  const handleCompleteRegistration = () => {
+    let valid = true;
+
+    if (displayName.trim().length === 0) {
+      setDisplayNameError('Display name is required.');
+      valid = false;
+    } else if (displayName.length > DISPLAY_NAME_MAX) {
+      setDisplayNameError(`Display name must be ${DISPLAY_NAME_MAX} characters or fewer.`);
+      valid = false;
+    } else {
+      setDisplayNameError('');
+    }
+
+    if (bio.length > BIO_MAX) {
+      setBioError(`Bio must be ${BIO_MAX} characters or fewer.`);
+      valid = false;
+    } else {
+      setBioError('');
+    }
+
+    if (!valid) return;
+    console.log('[API MOCK] Complete registration:', { displayName, bio, interests: Array.from(selectedInterests) });
+  };
+
   return (
     <Box
       sx={{
         position: 'relative',
         width: '100%',
-        maxWidth: 480,
+        maxWidth: 520,
         bgcolor: '#1a1a2e',
         borderRadius: 3,
         border: '1px solid rgba(255,255,255,0.06)',
@@ -701,32 +732,63 @@ function StepTwo({ handleBack }: { handleBack: () => void }) {
             <Typography variant="caption" sx={{ color: 'text.primary', fontWeight: 500, ml: 0.5, fontSize: '0.8rem' }}>
               Display Name
             </Typography>
-            <TextField
-              id="reg-display-name"
-              placeholder="e.g. CodeNinja88"
-              fullWidth
-              size="small"
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <PersonOutlineOutlined sx={{ color: 'text.secondary', fontSize: 20 }} />
-                    </InputAdornment>
-                  ),
-                },
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
+            <Box sx={{ position: 'relative' }}>
+              <TextField
+                id="reg-display-name"
+                placeholder="e.g. CodeNinja88"
+                fullWidth
+                size="small"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <PersonOutlineOutlined sx={{ color: 'text.secondary', fontSize: 20 }} />
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 9999,
+                    bgcolor: 'rgba(255,255,255,0.06)',
+                    color: 'text.primary',
+                    '& fieldset': { borderColor: 'transparent' },
+                    '&:hover fieldset': { borderColor: 'rgba(179,136,255,0.3)' },
+                    '&.Mui-focused fieldset': { borderColor: 'primary.main' },
+                  },
+                  '& .MuiInputBase-input': { py: 1.5, pr: '72px' },
+                }}
+              />
+              {/* Char-count chip */}
+              <Typography
+                component="span"
+                sx={{
+                  position: 'absolute',
+                  top: '50%',
+                  right: 14,
+                  transform: 'translateY(-50%)',
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  color: displayName.length > DISPLAY_NAME_MAX ? 'error.main' : 'text.disabled',
+                  bgcolor: 'rgba(0,0,0,0.35)',
                   borderRadius: 9999,
-                  bgcolor: 'rgba(255,255,255,0.06)',
-                  color: 'text.primary',
-                  '& fieldset': { borderColor: 'transparent' },
-                  '&:hover fieldset': { borderColor: 'rgba(179,136,255,0.3)' },
-                  '&.Mui-focused fieldset': { borderColor: 'primary.main' },
-                },
-                '& .MuiInputBase-input': { py: 1.5 },
-              }}
-            />
+                  px: 0.75,
+                  py: 0.15,
+                  lineHeight: 1.6,
+                  pointerEvents: 'none',
+                  transition: 'color 0.2s',
+                }}
+              >
+                {displayName.length}/{DISPLAY_NAME_MAX}
+              </Typography>
+            </Box>
+            {displayNameError && (
+              <Typography variant="caption" sx={{ color: 'error.main', ml: 0.5, fontSize: '0.75rem' }}>
+                {displayNameError}
+              </Typography>
+            )}
           </Box>
 
           {/* Bio */}
@@ -734,27 +796,58 @@ function StepTwo({ handleBack }: { handleBack: () => void }) {
             <Typography variant="caption" sx={{ color: 'text.primary', fontWeight: 500, ml: 0.5, fontSize: '0.8rem' }}>
               Bio
             </Typography>
-            <Box
-              component={Textarea}
-              id="reg-bio"
-              minRows={3}
-              placeholder="Tell the community a bit about yourself..."
-              style={{
-                width: '100%',
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid transparent',
-                borderRadius: 12,
-                padding: '12px 16px',
-                color: 'inherit',
-                fontFamily: 'inherit',
-                fontSize: '0.88rem',
-                lineHeight: 1.65,
-                resize: 'none',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-                boxSizing: 'border-box',
-              }}
-            />
+            <Box sx={{ position: 'relative' }}>
+              <Box
+                component={Textarea}
+                id="reg-bio"
+                minRows={3}
+                placeholder="Tell the community a bit about yourself..."
+                value={bio}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setBio(e.target.value)}
+                style={{
+                  width: '100%',
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid transparent',
+                  borderRadius: 12,
+                  padding: '12px 16px',
+                  paddingBottom: '28px',
+                  color: 'inherit',
+                  fontFamily: 'inherit',
+                  fontSize: '0.88rem',
+                  lineHeight: 1.65,
+                  resize: 'none',
+                  outline: 'none',
+                  transition: 'border-color 0.2s',
+                  boxSizing: 'border-box',
+                }}
+              />
+              {/* Char-count chip */}
+              <Typography
+                component="span"
+                sx={{
+                  position: 'absolute',
+                  bottom: 8,
+                  right: 12,
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  color: bio.length > BIO_MAX ? 'error.main' : 'text.disabled',
+                  bgcolor: 'rgba(0,0,0,0.35)',
+                  borderRadius: 9999,
+                  px: 0.75,
+                  py: 0.15,
+                  lineHeight: 1.6,
+                  pointerEvents: 'none',
+                  transition: 'color 0.2s',
+                }}
+              >
+                {bio.length}/{BIO_MAX}
+              </Typography>
+            </Box>
+            {bioError && (
+              <Typography variant="caption" sx={{ color: 'error.main', ml: 0.5, fontSize: '0.75rem' }}>
+                {bioError}
+              </Typography>
+            )}
           </Box>
 
           {/* Interests Dialog Component */}
@@ -774,6 +867,7 @@ function StepTwo({ handleBack }: { handleBack: () => void }) {
             fullWidth
             variant="contained"
             endIcon={<ArrowForwardIcon />}
+            onClick={handleCompleteRegistration}
             sx={{
               mt: 1,
               py: 1.75,

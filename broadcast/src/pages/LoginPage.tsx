@@ -110,7 +110,7 @@ export default function LoginPage() {
           sx={{
             position: 'relative',
             width: '100%',
-            maxWidth: 420,
+            maxWidth: 480,
             bgcolor: '#1a1a2e',
             borderRadius: 3,
             border: '1px solid rgba(255,255,255,0.06)',
