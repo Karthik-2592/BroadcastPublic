@@ -7,10 +7,23 @@ import { Router } from "express";
 import { requireSession, sessionUserId } from "../session.ts";
 
 export async function list(req: Request, res: Response) {
-  return ok(res, await store.commentsForPost(id(req)));
+  try {
+    const page = await store.commentsForPost(id(req), null, typeof req.query.cursor === "string" ? req.query.cursor : undefined);
+    return ok(res, page.items, "Operation completed successfully.", 200, page.nextCursor);
+  } catch {
+    return fail(res, 400, "Malformed cursor.");
+  }
+}
+export async function replies(req: Request, res: Response) {
+  try {
+    const page = await store.repliesForComment(id(req), typeof req.query.cursor === "string" ? req.query.cursor : undefined);
+    return ok(res, page.items, "Operation completed successfully.", 200, page.nextCursor);
+  } catch {
+    return fail(res, 400, "Malformed cursor.");
+  }
 }
 export async function create(req: Request, res: Response) {
-  console.log(`[http] POST /v1/posts/${id(req)}/comments received`);
+  console.log(`[http] POST /posts/${id(req)}/comments received`);
   const userId = sessionUserId(req);
   const missing = required(req.body, ["content"]);
   if (missing.length)
@@ -94,5 +107,6 @@ router.post("/likes", requireSession, commentLike);
 router.delete("/likes", requireSession, commentLike);
 export default router;
 export const standalone = Router();
+standalone.get("/:id/replies", replies);
 standalone.put("/:id", requireSession, update);
 standalone.delete("/:id", requireSession, remove);

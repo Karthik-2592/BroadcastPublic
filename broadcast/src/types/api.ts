@@ -51,6 +51,7 @@ export interface Post {
   favorite_count: number;
   comment_count: number;
   time_created: string;
+  last_edited_at?: string | null;
   mediaPlaceholder?: string;
   recommendationReason?: string;
 }
@@ -66,6 +67,7 @@ export interface Comment {
   favorite_count: number;
   reply_count: number;
   timestamp: string;
+  last_edited_at?: string | null;
   /**
    * UI-only: lazily populated when the user expands replies.
    * The backend returns only top-level comments; replies are fetched on demand.
@@ -80,6 +82,7 @@ export interface Community {
   community_desc: string;
   admin_id: Id | null;
   tags: string[];
+  community_guidelines?: string;
   /** URL to the community banner image; null / undefined means no banner uploaded. */
   community_banner?: string | null;
   /**
@@ -156,6 +159,7 @@ export interface CommunityCreateRequest {
   user_id: Id;
   community_name: string;
   community_desc: string;
+  community_guidelines: string;
   tags?: string[];
   community_banner?: string;
 }

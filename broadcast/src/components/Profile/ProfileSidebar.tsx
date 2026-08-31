@@ -72,83 +72,93 @@ export default function ProfileSidebar({ user, followers, following, showViewAll
           </TableContainer>
         </Box>
 
-        <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.06)', mx: 3 }} />
+        {showViewAll && <>
+          <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.06)', mx: 3 }} />
 
-        {/* Recent Followers */}
-        <Box sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="subtitle1" sx={{ color: '#e8e6ef', fontWeight: 500 }}>
-              Recent Followers
-            </Typography>
-            {showViewAll && <Button size="small" onClick={onViewFollowers} sx={{ textTransform: 'none', color: '#d4bbff', fontSize: '0.75rem', minWidth: 0, '&:hover': { textDecoration: 'underline' } }}>View All</Button>}
-          </Box>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {followers.map((follower) => (
-              <Box
-                key={follower.id}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1.5,
-                  p: 1,
-                  mx: -1,
-                  borderRadius: 2,
-                  cursor: 'pointer',
-                  '&:hover': { bgcolor: '#292935' } // hover:bg-surface-container-high
-                }}
-              >
-                <Avatar src={follower.profile_picture ?? undefined} sx={{ width: 32, height: 32, bgcolor: '#343440' }}>{displayName(follower).charAt(0)}</Avatar>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body2" sx={{ color: '#e3e0f1', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {displayName(follower)}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#9e9bab', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
-                    {userHandle(follower)}
-                  </Typography>
+          {/* Recent Followers */}
+          <Box sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="subtitle1" sx={{ color: '#e8e6ef', fontWeight: 500 }}>
+                Recent Followers
+              </Typography>
+              {showViewAll && followers.length !== 0 && <Button size="small" onClick={onViewFollowers} sx={{ textTransform: 'none', color: '#d4bbff', fontSize: '0.75rem', minWidth: 0, '&:hover': { textDecoration: 'underline' } }}>View All</Button>}
+            </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {followers.length === 0 ? (
+                <Typography variant="body2" sx={{ color: '#9e9bab', py: 1 }}>
+                  You have no followers
+                </Typography>
+              ) : followers.map((follower) => (
+                <Box
+                  key={follower.id}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                    p: 1,
+                    mx: -1,
+                    borderRadius: 2,
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: '#292935' } // hover:bg-surface-container-high
+                  }}
+                >
+                  <Avatar src={follower.profile_picture ?? undefined} sx={{ width: 32, height: 32, bgcolor: '#343440' }}>{displayName(follower).charAt(0)}</Avatar>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ color: '#e3e0f1', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {displayName(follower)}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#9e9bab', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                      {userHandle(follower)}
+                    </Typography>
+                  </Box>
                 </Box>
-              </Box>
-            ))}
+              ))}
+            </Box>
           </Box>
-        </Box>
 
-        <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.06)', mx: 3 }} />
+          <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.06)', mx: 3 }} />
 
-        {/* Following */}
-        <Box sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="subtitle1" sx={{ color: '#e8e6ef', fontWeight: 500 }}>
-              Following
-            </Typography>
-            {showViewAll && <Button size="small" onClick={onViewFollowing} sx={{ textTransform: 'none', color: '#d4bbff', fontSize: '0.75rem', minWidth: 0, '&:hover': { textDecoration: 'underline' } }}>View All</Button>}
-          </Box>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {following.map((followed) => (
-              <Box
-                key={followed.id}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1.5,
-                  p: 1,
-                  mx: -1,
-                  borderRadius: 2,
-                  cursor: 'pointer',
-                  '&:hover': { bgcolor: '#292935' }
-                }}
-              >
-                <Avatar src={followed.profile_picture ?? undefined} sx={{ width: 32, height: 32, bgcolor: '#343440' }}>{displayName(followed).charAt(0)}</Avatar>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body2" sx={{ color: '#e3e0f1', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {displayName(followed)}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#9e9bab', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
-                    {userHandle(followed)}
-                  </Typography>
+          {/* Following */}
+          <Box sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="subtitle1" sx={{ color: '#e8e6ef', fontWeight: 500 }}>
+                Following
+              </Typography>
+              {showViewAll && following.length !== 0 && <Button size="small" onClick={onViewFollowing} sx={{ textTransform: 'none', color: '#d4bbff', fontSize: '0.75rem', minWidth: 0, '&:hover': { textDecoration: 'underline' } }}>View All</Button>}
+            </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {following.length === 0 ? (
+                <Typography variant="body2" sx={{ color: '#9e9bab', py: 1 }}>
+                  You have not followed anyone
+                </Typography>
+              ) : following.map((followed) => (
+                <Box
+                  key={followed.id}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                    p: 1,
+                    mx: -1,
+                    borderRadius: 2,
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: '#292935' }
+                  }}
+                >
+                  <Avatar src={followed.profile_picture ?? undefined} sx={{ width: 32, height: 32, bgcolor: '#343440' }}>{displayName(followed).charAt(0)}</Avatar>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ color: '#e3e0f1', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {displayName(followed)}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#9e9bab', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                      {userHandle(followed)}
+                    </Typography>
+                  </Box>
                 </Box>
-              </Box>
-            ))}
+              ))}
+            </Box>
           </Box>
-        </Box>
+        </>}
       </Card>
     </Box>
   );

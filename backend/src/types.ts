@@ -25,6 +25,7 @@ export interface Post {
   favorite_count: number;
   comment_count: number;
   time_created: string;
+  last_edited_at?: string | null;
 }
 export interface Comment {
   id: Id;
@@ -36,6 +37,7 @@ export interface Comment {
   favorite_count: number;
   reply_count: number;
   timestamp: string;
+  last_edited_at?: string | null;
 }
 export interface Community {
   id: Id;
@@ -43,6 +45,7 @@ export interface Community {
   community_desc: string;
   admin_id: Id | null;
   tags: string[];
+  community_guidelines: string;
   community_banner?: unknown;
   population: number;
   post_count: number;
@@ -95,6 +98,7 @@ export interface CommunityCreateRequest {
   user_id: Id;
   community_name: string;
   community_desc: string;
+  community_guidelines: string;
   tags?: string[];
   community_banner?: unknown;
 }
@@ -130,21 +134,20 @@ export interface MembershipRelationRequest {
   community_id: string;
 }
 
-export enum Tag {
-  Art = "Art",
-  BusinessFinance = "Business & Finance",
-  FashionBeauty = "Fashion & Beauty",
-  Travelling = "Travelling",
-  Sports = "Sports",
-  Food = "Food",
-  Technology = "Technology",
-  Books = "Books",
-  Health = "Health",
-  Games = "Games",
-  FilmsTV = "Films & TV",
-  Nature = "Nature",
-  NewsPolitics = "News & Politics",
-  Science = "Science",
-  PopCulture = "Pop Culture",
-  Lifestyle = "Lifestyle",
-}
+export type Tag =
+  | "Art"
+  | "Business & Finance"
+  | "Fashion & Beauty"
+  | "Travelling"
+  | "Sports"
+  | "Food"
+  | "Technology"
+  | "Books"
+  | "Health"
+  | "Games"
+  | "Films & TV"
+  | "Nature"
+  | "News & Politics"
+  | "Science"
+  | "Pop Culture"
+  | "Lifestyle";

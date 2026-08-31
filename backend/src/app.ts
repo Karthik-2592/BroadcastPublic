@@ -10,6 +10,8 @@ import { startAggregationWorker } from "./services/favorites.ts";
 import cors from "cors";
 import { logFailure } from "./http.ts";
 import { sessionMiddleware } from "./session.ts";
+import { search } from "./handlers/searchController.ts";
+import { imageUpload, saveMedia, mediaCategories, type MediaCategory } from "./media.ts";
 
 export function createApp(): Express {
   const app = express();
@@ -18,6 +20,15 @@ export function createApp(): Express {
 
   startAggregationWorker();
   app.use(express.json({ limit: "4mb" }));
+  app.get("/search", search);
+  app.post("/media/:category/:documentId", imageUpload.array("media", 3), async (req, res) => {
+    const category = req.params.category as MediaCategory;
+    if (!(category in mediaCategories)) return res.status(400).json({ success: false, message: "Invalid media category." });
+    const files = (((req as unknown as { files?: import("./media.ts").UploadedFile[] }).files) ?? []);
+    if (!files.length) return res.status(400).json({ success: false, message: "At least one image is required." });
+    const saved = await Promise.all(files.map((file, index) => saveMedia(file, req.params.documentId, category, category === "post" ? index + 1 : 0)));
+    return res.status(201).json({ success: true, message: "Media uploaded successfully.", data: saved });
+  });
   app.get("/health", async (_req, res) => {
     let connected = false;
     try {
@@ -33,12 +44,12 @@ export function createApp(): Express {
       data: { database: connected ? "connected" : "unavailable" },
     });
   });
-  app.use("/v1", auth);
-  app.use("/v1/users", users);
-  app.use("/v1/posts", posts);
-  app.use("/v1/comments", comments);
-  app.use("/v1/communities", communities);
-  app.use("/v1/notifications", notifications);
+  app.use("/auth", auth);
+  app.use("/users", users);
+  app.use("/posts", posts);
+  app.use("/comments", comments);
+  app.use("/communities", communities);
+  app.use("/notifications", notifications);
   app.use((req, res) => {
     logFailure(req, 404, "Route not found.");
     return res

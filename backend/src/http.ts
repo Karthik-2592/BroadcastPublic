@@ -5,7 +5,8 @@ export const ok = (
   data: unknown,
   message = "Operation completed successfully.",
   status = 200,
-) => res.status(status).json({ success: true, message, data });
+  cursor?: string,
+) => res.status(status).json({ success: true, message, data, ...(cursor === undefined ? {} : { cursor }) });
 export const logFailure = (
   req: Request,
   status: number,

@@ -5,6 +5,7 @@ import { neo4jRelations, numberValue } from "../neo4j.ts"
 import type { FollowRelationRequest, User } from "../types.ts";
 import { Router } from "express";
 import { requireSession, sessionUserId } from "../session.ts";
+import { decodeCursor, nextCursor } from "../cursor.ts";
 
 export async function getUser(req: Request, res: Response) {
   const user = await store.user(id(req));
@@ -18,6 +19,7 @@ export async function updateUser(req: Request, res: Response) {
   if (req.body.pinned_posts && req.body.pinned_posts.length > 4)
     return fail(res, 400, "A user may pin at most four posts.");
   const updated = await store.updateUser(userId, req.body as Partial<User>);
+  if (updated && Array.isArray(req.body.interests)) await neo4jRelations.interestIn(userId, updated.interests);
   return updated ? ok(res, updated) : fail(res, 404, "User not found.");
 }
 export async function deleteUser(req: Request, res: Response) {
@@ -25,6 +27,7 @@ export async function deleteUser(req: Request, res: Response) {
   if (id(req) !== userId) return fail(res, 403, "Only the account owner may delete it.");
   if (!(await store.deleteUser(userId)))
     return fail(res, 404, "User not found.");
+  await neo4jRelations.deleteUserNode(userId);
   return ok(res, null, "User deleted successfully.");
 }
 export async function searchUsers(req: Request, res: Response) {
@@ -33,8 +36,32 @@ export async function searchUsers(req: Request, res: Response) {
   return ok(res, users);
 }
 export async function recommendations(req: Request, res: Response) {
-  const users = await store.recommendations(id(req));
-  return users ? ok(res, users) : fail(res, 404, "User not found.");
+  if (!(await store.user(id(req)))) return fail(res, 404, "User not found.");
+  const groups = await Promise.all([
+    neo4jRelations.userRecommendationsByInterests(id(req)),
+    neo4jRelations.userRecommendationsByCommunities(id(req)),
+    neo4jRelations.userRecommendationsByFollowNetwork(id(req)),
+  ]);
+  const ranked = groups.flat().reduce((result, item) => {
+    result.set(item.id, (result.get(item.id) ?? 0) + item.score);
+    return result;
+  }, new Map<string, number>());
+  const ids = [...ranked.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([userId]) => userId);
+  return ok(res, await store.usersByIds(ids));
+}
+export async function listRelatedUsers(req: Request, res: Response) {
+  const user = await store.user(id(req));
+  if (!user) return fail(res, 404, "User not found.");
+  const direction = (req.params.relation ?? (req.path.endsWith("/followers") ? "followers" : "following")) as "followers" | "following";
+  try {
+    const filters = { user_id: id(req), relation: direction };
+    const page = decodeCursor(typeof req.query.cursor === "string" ? req.query.cursor : undefined, filters);
+    const userIds = await neo4jRelations.relatedUserIds(id(req), direction, page.offset, 11);
+    const users = await store.usersByIds(userIds.slice(0, 10));
+    return ok(res, users, "Operation completed successfully.", 200, nextCursor(page.offset, userIds.length, 10, filters));
+  } catch {
+    return fail(res, 400, "Malformed cursor.");
+  }
 }
 export async function follow(req: Request, res: Response): Promise<Response> {
   const body = req.body as Partial<FollowRelationRequest>;
@@ -66,6 +93,8 @@ export async function follow(req: Request, res: Response): Promise<Response> {
 const router = Router();
 router.get("/search", searchUsers);
 router.get("/:id/recommendations", recommendations);
+router.get("/:id/followers", listRelatedUsers);
+router.get("/:id/following", listRelatedUsers);
 router.get("/:id", getUser);
 router.put("/:id", requireSession, updateUser);
 router.delete("/:id", requireSession, deleteUser);

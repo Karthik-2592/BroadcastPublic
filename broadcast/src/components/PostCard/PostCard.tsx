@@ -31,6 +31,53 @@ import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import type { Post } from '../../types/api';
+import { EditedIndicator } from '../Reply/Reply';
+import { useAuth } from '../../context/AuthContext';
+
+function PostMediaCarousel({ media, placeholder, height }: { media?: unknown[]; placeholder?: string; height: number }) {
+  const mediaItems = (media ?? []).map((item) => {
+    if (typeof item === 'string') return item;
+    if (item && typeof item === 'object') {
+      const value = item as Record<string, unknown>;
+      return typeof value.url === 'string' ? value.url : typeof value.path === 'string' ? value.path : null;
+    }
+    return null;
+  }).filter((item): item is string => Boolean(item));
+  const [activeIndex, setActiveIndex] = useState(0);
+  const activeMedia = mediaItems[activeIndex];
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [mediaItems.length]);
+
+  if (!activeMedia && !placeholder) return null;
+
+  return (
+    <Box sx={{ position: 'relative', width: '100%', height, borderRadius: 2, overflow: 'hidden', mb: 1.5, border: '1px solid rgba(255,255,255,0.06)' }}>
+      <Box
+        component={activeMedia ? 'img' : 'div'}
+        src={activeMedia}
+        alt="Post media"
+        sx={{ width: '100%', height: '100%', objectFit: 'cover', background: activeMedia ? undefined : placeholder }}
+      />
+      {mediaItems.length > 1 && (
+        <Box sx={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 0.75, px: 1, py: 0.75, borderRadius: 9999, bgcolor: 'rgba(0,0,0,0.45)' }}>
+          {mediaItems.map((item, index) => (
+            <Box
+              key={`${item}-${index}`}
+              component="button"
+              type="button"
+              aria-label={`Show media ${index + 1}`}
+              aria-current={index === activeIndex ? 'true' : undefined}
+              onClick={(event) => { event.stopPropagation(); setActiveIndex(index); }}
+              sx={{ width: 8, height: 8, p: 0, minWidth: 0, border: 0, borderRadius: '50%', cursor: 'pointer', bgcolor: index === activeIndex ? 'primary.light' : 'rgba(255,255,255,0.55)', transition: 'transform 0.15s, background-color 0.15s', '&:hover': { transform: 'scale(1.25)' } }}
+            />
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+}
 
 function PostEditDialog({ post, open, onClose }: { post: Post; open: boolean; onClose: () => void }) {
   const [title, setTitle] = useState(post.title);
@@ -75,7 +122,7 @@ function PostEditDialog({ post, open, onClose }: { post: Post; open: boolean; on
 
   const handleEdit = async () => {
     handleTagsProcess();
-    await fetch(`/v1/posts/${post.id}`, {
+    await fetch(`/posts/${post.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, content: body, tags }),
@@ -84,7 +131,7 @@ function PostEditDialog({ post, open, onClose }: { post: Post; open: boolean; on
   };
 
   const handleDelete = async () => {
-    await fetch(`/v1/posts/${post.id}`, { method: 'DELETE' }).catch(() => undefined);
+    await fetch(`/posts/${post.id}`, { method: 'DELETE' }).catch(() => undefined);
     setIsDeleteOpen(false);
     onClose();
   };
@@ -237,6 +284,7 @@ interface PostCardProps {
 
 export default function PostCard({ post, variant = 'compact', canEdit = false }: PostCardProps) {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post.favorite_count);
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -263,6 +311,10 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
 
   const handleToggleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
     setIsLiked((prev) => {
       const next = !prev;
       setLikeCount((c) => (next ? c + 1 : c - 1));
@@ -273,6 +325,10 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
 
   const handleToggleBookmark = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
     setIsBookmarked((prev) => {
       const next = !prev;
       debouncedBookmarkApi(post.id, next);
@@ -293,7 +349,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
   const handleReport = (e: React.MouseEvent) => {
     e.stopPropagation();
     setOptionsAnchor(null);
-    navigate('/placeholder');
+    navigate(isAuthenticated ? '/placeholder' : '/login');
   };
 
   const handleEdit = (e: React.MouseEvent) => {
@@ -375,6 +431,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.78rem' }}>
                   @{author?.username ?? 'unknown'} · {post.time_created}
+                  <EditedIndicator edited={Boolean(post.last_edited_at)} />
                 </Typography>
               </Box>
             </Box>
@@ -416,18 +473,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
               {post.content}
             </Typography>
 
-            {/* Optional media placeholder */}
-            {post.mediaPlaceholder && (
-              <Box
-                sx={{
-                  width: '100%',
-                  height: 240,
-                  borderRadius: 2,
-                  background: post.mediaPlaceholder,
-                  border: '1px solid rgba(255,255,255,0.06)',
-                }}
-              />
-            )}
+            <PostMediaCarousel media={post.media} placeholder={post.mediaPlaceholder} height={240} />
 
             {/* Tags */}
             {post.tags.length > 0 && (
@@ -627,6 +673,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                   @{author?.username ?? 'unknown'} · {post.time_created}
+                  <EditedIndicator edited={Boolean(post.last_edited_at)} />
                 </Typography>
               </Box>
 
@@ -663,18 +710,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
             {post.content}
           </Typography>
 
-          {/* Optional Media Placeholder */}
-          {post.mediaPlaceholder && (
-            <Box
-              sx={{
-                width: '100%',
-                height: 220,
-                borderRadius: 2,
-                background: post.mediaPlaceholder,
-                mb: 1.5,
-              }}
-            />
-          )}
+          <PostMediaCarousel media={post.media} placeholder={post.mediaPlaceholder} height={220} />
         </Box>
 
         {/* Tags */}

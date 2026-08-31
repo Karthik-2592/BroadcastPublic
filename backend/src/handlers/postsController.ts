@@ -54,7 +54,7 @@ export async function createPost(req: Request, res: Response) {
     media: body.media ?? [],
     popularity_score: 0,
   });
-  await neo4jRelations.createPostNode(post.id);
+  await neo4jRelations.createPostNode(post.id, post.community_id);
   return ok(res, post, "Post created successfully.", 201);
 }
 export async function getPost(req: Request, res: Response) {
@@ -67,6 +67,7 @@ export async function updatePost(req: Request, res: Response) {
   if (post.user_id !== sessionUserId(req))
     return fail(res, 403, "Only the post owner may edit it.");
   const updated = await store.updatePost(id(req), req.body as Partial<Post>);
+  if (updated) await neo4jRelations.setPostCommunity(updated.id, updated.community_id ?? null);
   return updated ? ok(res, updated) : fail(res, 404, "Post not found.");
 }
 export async function deletePost(req: Request, res: Response) {
@@ -85,7 +86,12 @@ export async function deletePost(req: Request, res: Response) {
   return ok(res, null, "Post deleted successfully.");
 }
 export async function feed(_req: Request, res: Response) {
-  return ok(res, await store.feed());
+  try {
+    const page = await store.feed(typeof _req.query.cursor === "string" ? _req.query.cursor : undefined);
+    return ok(res, page.items, "Operation completed successfully.", 200, page.nextCursor);
+  } catch {
+    return fail(res, 400, "Malformed cursor.");
+  }
 }
 export async function postLike(req: Request, res: Response): Promise<Response> {
   const body = req.body as Partial<PostLikeRelationRequest>;

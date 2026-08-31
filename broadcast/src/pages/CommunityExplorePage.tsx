@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import debounce from 'lodash.debounce';
 import Box from '@mui/material/Box';
@@ -8,13 +8,36 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import ForumOutlinedIcon from '@mui/icons-material/ForumOutlined';
 import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
+import CircularProgress from '@mui/material/CircularProgress';
 import { exploreCommunities } from '../data/mockData';
 
 export default function CommunityExplorePage() {
   const navigate = useNavigate();
+  const [communities, setCommunities] = useState(exploreCommunities);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [joinedMap, setJoinedMap] = useState<Record<string, boolean>>(() =>
     exploreCommunities.reduce((acc, c) => ({ ...acc, [c.id]: c.joinState === 'joined' }), {})
   );
+
+  const loadCommunities = useCallback(async (nextCursor?: string | null) => {
+    setLoading(true);
+    try {
+      const query = nextCursor ? `?cursor=${encodeURIComponent(nextCursor)}` : '';
+      const response = await fetch(`/communities/recommendations${query}`);
+      if (!response.ok) throw new Error('Unable to load communities');
+      const body = await response.json() as { data?: typeof exploreCommunities; cursor?: string };
+      const page = Array.isArray(body.data) ? body.data : [];
+      setCommunities((current) => nextCursor ? [...current, ...page] : page);
+      setCursor(body.cursor === 'null' ? null : body.cursor ?? null);
+    } catch {
+      // Keep the mock communities available while the backend is unavailable.
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadCommunities(); }, [loadCommunities]);
 
   const debouncedJoinApi = useCallback(
     debounce((communityId: string, joinState: boolean) => {
@@ -71,7 +94,7 @@ export default function CommunityExplorePage() {
         <Box
           sx={{
             display: 'grid',
-            gridTemplateColumns: '1fr 0.28fr',
+            gridTemplateColumns: '1fr 0.23fr',
             justifyContent: 'center',
             gap: 4,
             width: '100%',
@@ -79,7 +102,11 @@ export default function CommunityExplorePage() {
           }}
         >
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {exploreCommunities.map((community) => {
+            {communities.length === 0 ? (
+              <Typography sx={{ py: 8, textAlign: 'center', color: 'text.secondary' }}>
+                Nothing to see here
+              </Typography>
+            ) : communities.map((community) => {
               const isJoined = joinedMap[community.id] ?? (community.joinState === 'joined');
               return (
                 <Card
@@ -214,6 +241,9 @@ export default function CommunityExplorePage() {
                 </Card>
               );
             })}
+            {cursor && <Button variant="outlined" onClick={() => void loadCommunities(cursor)} disabled={loading} sx={{ alignSelf: 'stretch' }}>
+              {loading ? <CircularProgress size={18} /> : 'Load more communities'}
+            </Button>}
           </Box>
         </Box>
       </Box>

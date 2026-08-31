@@ -255,6 +255,32 @@ function InterestsDialog({
 // ─── Step 1 ───────────────────────────────────────────────────────────────────
 function StepOne({ onContinue, handleBack }: { onContinue: () => void; handleBack: () => void }) {
   const navigate = useNavigate();
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateAndContinue = () => {
+    const nextErrors: Record<string, string> = {};
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (username.length < 4 || username.length > 24) {
+      nextErrors.username = 'Username must be between 4 and 24 characters.';
+    }
+    if (!emailPattern.test(email)) {
+      nextErrors.email = 'Enter a valid email address.';
+    }
+    if (password.length < 8 || password.length > 24) {
+      nextErrors.password = 'Password must be between 8 and 24 characters.';
+    }
+    if (confirmPassword !== password) {
+      nextErrors.confirmPassword = 'Passwords do not match.';
+    }
+
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length === 0) onContinue();
+  };
 
   return (
     <Box
@@ -379,6 +405,10 @@ function StepOne({ onContinue, handleBack }: { onContinue: () => void; handleBac
             placeholder="Enter username"
             fullWidth
             size="small"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            error={Boolean(errors.username)}
+            helperText={errors.username}
             slotProps={{
               input: {
                 startAdornment: (
@@ -397,6 +427,10 @@ function StepOne({ onContinue, handleBack }: { onContinue: () => void; handleBac
             placeholder="name@example.com"
             fullWidth
             size="small"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            error={Boolean(errors.email)}
+            helperText={errors.email}
             slotProps={{
               input: {
                 startAdornment: (
@@ -415,6 +449,10 @@ function StepOne({ onContinue, handleBack }: { onContinue: () => void; handleBac
             placeholder="••••••••"
             fullWidth
             size="small"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            error={Boolean(errors.password)}
+            helperText={errors.password}
             slotProps={{
               input: {
                 startAdornment: (
@@ -433,6 +471,10 @@ function StepOne({ onContinue, handleBack }: { onContinue: () => void; handleBac
             placeholder="••••••••"
             fullWidth
             size="small"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            error={Boolean(errors.confirmPassword)}
+            helperText={errors.confirmPassword}
             slotProps={{
               input: {
                 startAdornment: (
@@ -452,7 +494,7 @@ function StepOne({ onContinue, handleBack }: { onContinue: () => void; handleBac
               fullWidth
               variant="contained"
               endIcon={<ArrowForwardIcon />}
-              onClick={onContinue}
+              onClick={validateAndContinue}
               sx={{
                 py: 1.5,
                 background: 'linear-gradient(135deg, #b388ff 0%, #7c4dff 100%)',
@@ -505,7 +547,7 @@ function StepOne({ onContinue, handleBack }: { onContinue: () => void; handleBac
 }
 
 // ─── Step 2 ───────────────────────────────────────────────────────────────────
-const DISPLAY_NAME_MAX = 50;
+const DISPLAY_NAME_MAX = 64;
 const BIO_MAX = 200;
 
 function StepTwo({ handleBack }: { handleBack: () => void }) {
@@ -514,6 +556,14 @@ function StepTwo({ handleBack }: { handleBack: () => void }) {
   const [bio, setBio] = useState('');
   const [displayNameError, setDisplayNameError] = useState('');
   const [bioError, setBioError] = useState('');
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+    setProfileImage(URL.createObjectURL(file));
+  };
 
   const toggleInterest = (interest: string) => {
     setSelectedInterests((prev) => {
@@ -680,6 +730,7 @@ function StepTwo({ handleBack }: { handleBack: () => void }) {
           {/* Avatar upload */}
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
             <Box
+              component="label"
               sx={{
                 position: 'relative',
                 width: 96,
@@ -700,7 +751,12 @@ function StepTwo({ handleBack }: { handleBack: () => void }) {
                 },
               }}
             >
-              <PersonOutlineOutlined sx={{ color: 'text.secondary', fontSize: 40 }} />
+              {profileImage ? (
+                <Box component="img" src={profileImage} alt="Profile preview" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <PersonOutlineOutlined sx={{ color: 'text.secondary', fontSize: 40 }} />
+              )}
+              <input hidden accept="image/*" type="file" onChange={handleImageChange} />
               <Box
                 className="upload-overlay"
                 sx={{
@@ -972,6 +1028,7 @@ export default function RegisterPage() {
 
       {/* Branding */}
       <Box
+        onClick={() => navigate('/')}
         sx={{
           display: 'flex',
           alignItems: 'center',

@@ -11,19 +11,27 @@ export async function create(req: Request, res: Response) {
   const missing = required(req.body, [
     "community_name",
     "community_desc",
+    "community_guidelines",
   ]);
   if (missing.length)
     return fail(res, 400, `Missing required fields: ${missing.join(", ")}`);
+  if (
+    typeof req.body.community_guidelines !== "string" ||
+    req.body.community_guidelines.length > 300
+  )
+    return fail(res, 400, "community_guidelines must be a string of at most 300 characters.");
   if (!(await store.user(userId)))
     return fail(res, 404, "User not found.");
   const community = await store.createCommunity({
     community_name: String(req.body.community_name),
     community_desc: String(req.body.community_desc),
+    community_guidelines: String(req.body.community_guidelines),
     admin_id: userId,
     tags: Array.isArray(req.body.tags) ? req.body.tags : [],
     community_banner: req.body.community_banner,
   });
   await neo4jRelations.createCommunityNode(community.id);
+  await neo4jRelations.associatedWith(community.id, community.tags);
   return ok(res, community, "Community created successfully.", 201);
 }
 export async function get(req: Request, res: Response) {
@@ -31,6 +39,15 @@ export async function get(req: Request, res: Response) {
   return community
     ? ok(res, community)
     : fail(res, 404, "Community not found.");
+}
+export async function posts(req: Request, res: Response) {
+  const sort = req.query.sort === "top" ? "top" : "new";
+  try {
+    const page = await store.postsForCommunity(id(req), typeof req.query.cursor === "string" ? req.query.cursor : undefined, sort);
+    return ok(res, page.items, "Operation completed successfully.", 200, page.nextCursor);
+  } catch {
+    return fail(res, 400, "Malformed cursor.");
+  }
 }
 export async function update(req: Request, res: Response) {
   const community = await store.community(id(req));
@@ -41,6 +58,7 @@ export async function update(req: Request, res: Response) {
     id(req),
     req.body as Partial<Community>,
   );
+  if (updated && Array.isArray(req.body.tags)) await neo4jRelations.associatedWith(updated.id, updated.tags);
   return updated ? ok(res, updated) : fail(res, 404, "Community not found.");
 }
 export async function remove(req: Request, res: Response) {
@@ -49,10 +67,31 @@ export async function remove(req: Request, res: Response) {
   if (sessionUserId(req) !== community.admin_id)
     return fail(res, 403, "Only the community admin may delete it.");
   await store.deleteCommunity(id(req));
+  await neo4jRelations.deleteCommunityNode(id(req));
   return ok(res, null, "Community deleted successfully.");
 }
 export async function recommendations(_req: Request, res: Response) {
-  return ok(res, await store.communityRecommendations());
+  try {
+    const page = await store.communityRecommendations(typeof _req.query.cursor === "string" ? _req.query.cursor : undefined);
+    return ok(res, page.items, "Operation completed successfully.", 200, page.nextCursor);
+  } catch {
+    return fail(res, 400, "Malformed cursor.");
+  }
+}
+export async function personalizedRecommendations(req: Request, res: Response) {
+  const userId = String(req.params.userId);
+  if (!(await store.user(userId))) return fail(res, 404, "User not found.");
+  const groups = await Promise.all([
+    neo4jRelations.communityRecommendationsByInterests(userId),
+    neo4jRelations.communityRecommendationsByFollowNetwork(userId),
+    neo4jRelations.communityRecommendationsByLikedPosts(userId),
+  ]);
+  const ranked = groups.flat().reduce((result, item) => {
+    result.set(item.id, (result.get(item.id) ?? 0) + item.score);
+    return result;
+  }, new Map<string, number>());
+  const ids = [...ranked.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([communityId]) => communityId);
+  return ok(res, await store.communitiesByIds(ids));
 }
 export async function moderate(req: Request, res: Response): Promise<Response> {
   const body = req.body as Partial<ModeratorRelationRequest>;
@@ -112,7 +151,9 @@ export async function membership(
 
 const r = Router();
 r.get("/recommendations", recommendations);
+r.get("/recommendations/:userId", personalizedRecommendations);
 r.post("/", requireSession, create);
+r.get("/:id/posts", posts);
 r.get("/:id", get);
 r.put("/:id", requireSession, update);
 r.delete("/:id", requireSession, remove);

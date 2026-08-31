@@ -6,26 +6,39 @@ import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const REPLY_MAX = 200;
+
+export function EditedIndicator({ edited }: { edited: boolean }) {
+  return edited ? <Typography component="span"> · edited</Typography> : null;
+}
 
 interface ReplyProps {
   open: boolean;
   onClose?: () => void;
+  parentCommentId?: string;
 }
 
-export default function Reply({ open, onClose }: ReplyProps) {
+export default function Reply({ open, onClose, parentCommentId }: ReplyProps) {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [replyText, setReplyText] = useState('');
   const [replyError, setReplyError] = useState('');
 
   const debouncedSubmitReplyApi = useCallback(
     debounce((text: string) => {
-      console.log(`[API MOCK] Submitted reply:`, text);
+      console.log(`[API MOCK] Submitted reply to ${parentCommentId ?? 'comment'}:`, text);
     }, 500),
     []
   );
 
   const handleSubmitReply = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
     if (!replyText.trim()) return;
     if (replyText.length > REPLY_MAX) {
       setReplyError(`Reply must be ${REPLY_MAX} characters or fewer.`);

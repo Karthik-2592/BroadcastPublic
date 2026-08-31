@@ -18,6 +18,7 @@ import type {
   User,
 } from "./types.ts";
 import { env } from "./config/env.ts";
+import { decodeCursor, nextCursor } from "./cursor.ts";
 
 type UserDocument = Omit<User, "id" | "pinned_posts"> & {
   _id: ObjectId;
@@ -26,23 +27,25 @@ type UserDocument = Omit<User, "id" | "pinned_posts"> & {
 };
 type PostDocument = Omit<
   Post,
-  "id" | "user_id" | "community_id" | "time_created" | "popularity_score"
+  "id" | "user_id" | "community_id" | "time_created" | "last_edited_at" | "popularity_score"
 > & {
   _id: ObjectId;
   user_id: ObjectId | null;
   community_id?: ObjectId | null;
   time_created: Date;
+  last_edited_at?: Date | null;
   popularity_score: Double | number;
 };
 type CommentDocument = Omit<
   Comment,
-  "id" | "post_id" | "user_id" | "root" | "timestamp"
+  "id" | "post_id" | "user_id" | "root" | "timestamp" | "last_edited_at"
 > & {
   _id: ObjectId;
   post_id: ObjectId;
   user_id: ObjectId | null;
   root: ObjectId | null;
   timestamp: Date;
+  last_edited_at?: Date | null;
 };
 type CommunityDocument = Omit<Community, "id" | "admin_id" | "timestamp"> & {
   _id: ObjectId;
@@ -96,6 +99,7 @@ const safePost = (post: PostDocument): Post => {
     community_id: post.community_id ? apiId(post.community_id) : null,
     popularity_score: Number(post.popularity_score.valueOf()),
     time_created: post.time_created.toISOString(),
+    last_edited_at: post.last_edited_at?.toISOString() ?? null,
   };
 };
 const safeComment = (comment: CommentDocument): Comment => {
@@ -107,6 +111,7 @@ const safeComment = (comment: CommentDocument): Comment => {
     user_id: comment.user_id ? apiId(comment.user_id) : null,
     root: comment.root ? apiId(comment.root) : null,
     timestamp: comment.timestamp.toISOString(),
+    last_edited_at: comment.last_edited_at?.toISOString() ?? null,
   };
 };
 const safeCommunity = (community: CommunityDocument): Community => {
@@ -229,6 +234,15 @@ export class MongoStore {
       )
       : null;
   }
+  async usersByIds(ids: string[]) {
+    const objectIds = ids.map(oid).filter((value): value is ObjectId => value !== null);
+    if (!objectIds.length) return [];
+    return this.log("users.findByIds", () =>
+      this.collection<UserDocument>("users")
+        .then((c) => c.find({ _id: { $in: objectIds } }).project({ password: 0 }).toArray())
+        .then((users) => users.map((user) => safeUser(user as UserDocument))),
+    );
+  }
   async updateUser(id: string, changes: Partial<User>) {
     const objectId = oid(id);
     if (!objectId) return null;
@@ -286,6 +300,19 @@ export class MongoStore {
       return users.map((user) => safeUser(user as UserDocument));
     });
   }
+  async search(query: string) {
+    const expression = { $regex: query, $options: "i" };
+    const [users, posts, communities] = await Promise.all([
+      this.collection<UserDocument>("users").then((c) => c.find({ $or: [{ username: expression }, { profile_name: expression }] }).project({ password: 0 }).limit(10).toArray()),
+      this.collection<PostDocument>("posts").then((c) => c.find({ title: expression }).limit(10).toArray()),
+      this.collection<CommunityDocument>("communities").then((c) => c.find({ community_name: expression }).limit(10).toArray()),
+    ]);
+    return {
+      users: users.map((user) => safeUser(user as UserDocument)),
+      posts: posts.map((post) => safePost(post)),
+      communities: communities.map((community) => safeCommunity(community)),
+    };
+  }
   async recommendations(id: string) {
     const user = await this.user(id);
     if (!user) return null;
@@ -328,6 +355,7 @@ export class MongoStore {
       favorite_count: 0,
       comment_count: 0,
       time_created: new Date(),
+      last_edited_at: null,
     };
     return this.log("posts.insertOne", async () => {
       await (await this.collection<PostDocument>("posts")).insertOne(post);
@@ -344,6 +372,33 @@ export class MongoStore {
       )
       : null;
   }
+  async postsByIds(ids: string[]) {
+    const objectIds = ids.map(oid).filter((value): value is ObjectId => value !== null);
+    if (!objectIds.length) return [];
+    return this.log("posts.findByIds", () =>
+      this.collection<PostDocument>("posts")
+        .then((c) => c.find({ _id: { $in: objectIds } }).toArray())
+        .then((posts) => posts.map((post) => safePost(post))),
+    );
+  }
+  async postsByUserIds(userIds: string[]) {
+    const objectIds = userIds.map(oid).filter((value): value is ObjectId => value !== null);
+    if (!objectIds.length) return [];
+    return this.log("posts.findByUserIds", () =>
+      this.collection<PostDocument>("posts")
+        .then((c) => c.find({ user_id: { $in: objectIds } }).sort({ time_created: -1 }).toArray())
+        .then((posts) => posts.map((post) => safePost(post))),
+    );
+  }
+  async postsByCommunityIds(communityIds: string[]) {
+    const objectIds = communityIds.map(oid).filter((value): value is ObjectId => value !== null);
+    if (!objectIds.length) return [];
+    return this.log("posts.findByCommunityIds", () =>
+      this.collection<PostDocument>("posts")
+        .then((c) => c.find({ community_id: { $in: objectIds } }).sort({ time_created: -1 }).toArray())
+        .then((posts) => posts.map((post) => safePost(post))),
+    );
+  }
   async updatePost(id: string, changes: Partial<Post>) {
     const objectId = oid(id);
     if (!objectId) return null;
@@ -355,6 +410,7 @@ export class MongoStore {
             "id",
             "user_id",
             "time_created",
+            "last_edited_at",
             "favorite_count",
             "comment_count",
             "popularity_score",
@@ -363,7 +419,10 @@ export class MongoStore {
     );
     return this.log("posts.updateOne", async () => {
       const posts = await this.collection<PostDocument>("posts");
-      await posts.updateOne({ _id: objectId }, { $set: update });
+      await posts.updateOne(
+        { _id: objectId },
+        { $set: { ...update, last_edited_at: new Date() } },
+      );
       const post = await posts.findOne({ _id: objectId });
       return post ? safePost(post) : null;
     });
@@ -382,12 +441,16 @@ export class MongoStore {
       return Boolean(result.deletedCount);
     });
   }
-  async feed() {
-    return this.log("posts.find", () =>
+  async feed(cursor?: string) {
+    const page = decodeCursor(cursor, { sort: "time_created" });
+    const limit = 10;
+    const posts = await this.log("posts.find", () =>
       this.collection<PostDocument>("posts")
-        .then((c) => c.find().sort({ time_created: -1 }).limit(FEED_LIMIT).toArray())
-        .then((posts) => posts.map(safePost)),
+        .then((c) => c.find().sort({ time_created: -1, _id: -1 }).skip(page.offset).limit(limit + 1).toArray())
+        .then((items) => items.map(safePost)),
     );
+    const items = posts.slice(0, limit);
+    return { items, nextCursor: nextCursor(page.offset, posts.length, limit, { sort: "time_created" }) };
   }
   async incrementPostFavoriteCount(postId: string, delta: number) {
     const objectId = oid(postId);
@@ -500,20 +563,44 @@ export class MongoStore {
     );
     return true;
   }
-  async commentsForPost(postId: string) {
-    return this.log("comments.find", () =>
+  async commentsForPost(postId: string, root: string | null = null, cursor?: string) {
+    const filters = { post_id: postId, root: root ?? "null" };
+    const page = decodeCursor(cursor, filters);
+    const limit = 10;
+    const comments = await this.log("comments.find", () =>
       this.collection<CommentDocument>("comments")
-        .then((c) =>
-          c
-            .find({ post_id: oid(postId)! })
-            .sort({ timestamp: 1 })
-            .toArray(),
-        )
+        .then((c) => c.find({ post_id: oid(postId)!, root: root ? oid(root) : null }).sort({ timestamp: 1, _id: 1 }).skip(page.offset).limit(limit + 1).toArray())
         .then((items) => items.map(safeComment)),
     );
+    const items = comments.slice(0, limit);
+    return { items, nextCursor: nextCursor(page.offset, comments.length, limit, filters) };
+  }
+  async postsForCommunity(communityId: string, cursor?: string, sort: "new" | "top" = "new") {
+    const filters = { community_id: communityId, sort };
+    const page = decodeCursor(cursor, filters);
+    const limit = 10;
+    const posts = await this.log("posts.findByCommunity", () =>
+      this.collection<PostDocument>("posts")
+        .then((c) => c.find({ community_id: oid(communityId)! }).sort(sort === "top" ? { favorite_count: -1, _id: -1 } : { time_created: -1, _id: -1 }).skip(page.offset).limit(limit + 1).toArray())
+        .then((items) => items.map(safePost)),
+    );
+    const items = posts.slice(0, limit);
+    return { items, nextCursor: nextCursor(page.offset, posts.length, limit, filters) };
+  }
+  async repliesForComment(commentId: string, cursor?: string) {
+    const filters = { root: commentId };
+    const page = decodeCursor(cursor, filters);
+    const limit = 5;
+    const replies = await this.log("comments.replies.find", () =>
+      this.collection<CommentDocument>("comments")
+        .then((c) => c.find({ root: oid(commentId)! }).sort({ timestamp: 1, _id: 1 }).skip(page.offset).limit(limit + 1).toArray())
+        .then((items) => items.map(safeComment)),
+    );
+    const items = replies.slice(0, limit);
+    return { items, nextCursor: nextCursor(page.offset, replies.length, limit, filters) };
   }
   async createComment(
-    input: Omit<Comment, "id" | "timestamp" | "favorite_count" | "reply_count">,
+    input: Omit<Comment, "id" | "timestamp" | "last_edited_at" | "favorite_count" | "reply_count">,
   ) {
     const comment: CommentDocument = {
       _id: new ObjectId(),
@@ -525,6 +612,7 @@ export class MongoStore {
       favorite_count: 0,
       reply_count: 0,
       timestamp: new Date(),
+      last_edited_at: null,
     };
     return this.log("comments.insertOne", async () => {
       await (
@@ -546,6 +634,24 @@ export class MongoStore {
       )
       : null;
   }
+  async commentsByIds(ids: string[]) {
+    const objectIds = ids.map(oid).filter((value): value is ObjectId => value !== null);
+    if (!objectIds.length) return [];
+    return this.log("comments.findByIds", () =>
+      this.collection<CommentDocument>("comments")
+        .then((c) => c.find({ _id: { $in: objectIds } }).toArray())
+        .then((comments) => comments.map((comment) => safeComment(comment))),
+    );
+  }
+  async commentsByPostIds(postIds: string[]) {
+    const objectIds = postIds.map(oid).filter((value): value is ObjectId => value !== null);
+    if (!objectIds.length) return [];
+    return this.log("comments.findByPostIds", () =>
+      this.collection<CommentDocument>("comments")
+        .then((c) => c.find({ post_id: { $in: objectIds } }).sort({ timestamp: 1 }).toArray())
+        .then((comments) => comments.map((comment) => safeComment(comment))),
+    );
+  }
   async updateComment(id: string, content: string, userSummary?: unknown) {
     const objectId = oid(id);
     if (!objectId) return null;
@@ -556,6 +662,7 @@ export class MongoStore {
         {
           $set: {
             content,
+            last_edited_at: new Date(),
             ...(userSummary === undefined ? {} : { user_summary: userSummary }),
           },
         },
@@ -654,11 +761,24 @@ export class MongoStore {
     );
     return Boolean(result.deletedCount);
   }
-  async communityRecommendations() {
-    return this.log("communities.find", () =>
+  async communityRecommendations(cursor?: string) {
+    const page = decodeCursor(cursor, { sort: "population" });
+    const limit = 10;
+    const communities = await this.log("communities.find", () =>
       this.collection<CommunityDocument>("communities")
-        .then((c) => c.find().sort({ population: -1 }).limit(COMMUNITY_LIMIT).toArray())
+        .then((c) => c.find().sort({ population: -1, _id: -1 }).skip(page.offset).limit(limit + 1).toArray())
         .then((items) => items.map(safeCommunity)),
+    );
+    const items = communities.slice(0, limit);
+    return { items, nextCursor: nextCursor(page.offset, communities.length, limit, { sort: "population" }) };
+  }
+  async communitiesByIds(ids: string[]) {
+    const objectIds = ids.map(oid).filter((value): value is ObjectId => value !== null);
+    if (!objectIds.length) return [];
+    return this.log("communities.findByIds", () =>
+      this.collection<CommunityDocument>("communities")
+        .then((c) => c.find({ _id: { $in: objectIds } }).toArray())
+        .then((items) => items.map((item) => safeCommunity(item))),
     );
   }
   async notifications(userId?: string) {

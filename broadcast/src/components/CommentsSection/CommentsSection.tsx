@@ -1,24 +1,90 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import debounce from 'lodash.debounce';
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
+import CircularProgress from '@mui/material/CircularProgress';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Comment from '../Comment/Comment';
 import type { Comment as ApiComment } from '../../types/api';
 import { mockComments } from '../../data/mockData';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import FetchErrorDialog from '../FetchErrorDialog';
 
 interface CommentsSectionProps {
   comments?: ApiComment[];
+  postId?: string;
 }
 
 const COMMENT_MAX = 200;
+const INITIAL_REPLIES_LIMIT = 5;
 
-export default function CommentsSection({ comments = mockComments }: CommentsSectionProps) {
+export default function CommentsSection({ comments = mockComments, postId }: CommentsSectionProps) {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [commentText, setCommentText] = useState('');
   const [commentError, setCommentError] = useState('');
+  const [loadedReplies, setLoadedReplies] = useState<Record<string, ApiComment[]>>({});
+  const [replyCursors, setReplyCursors] = useState<Record<string, string | null>>({});
+  const [loadingReplies, setLoadingReplies] = useState<Record<string, boolean>>({});
+  const [visibleComments, setVisibleComments] = useState<ApiComment[]>(comments);
+  const [commentsCursor, setCommentsCursor] = useState<string | null>(null);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [hasFetchError, setHasFetchError] = useState(false);
+
+  const loadComments = useCallback(async (nextCursor?: string | null) => {
+    if (!postId) return;
+    setLoadingComments(true);
+    try {
+      const query = nextCursor ? `?cursor=${encodeURIComponent(nextCursor)}` : '';
+      const response = await fetch(`/posts/${postId}/comments${query}`);
+      if (!response.ok) throw new Error('Unable to load comments');
+      const body = await response.json() as { data?: ApiComment[]; cursor?: string };
+      const page = body.data ?? [];
+      setVisibleComments((current) => nextCursor ? [...current, ...page] : page);
+      setCommentsCursor(body.cursor === 'null' ? null : body.cursor ?? null);
+    } catch {
+      setHasFetchError(true);
+    } finally {
+      setLoadingComments(false);
+    }
+  }, [postId]);
+
+  useEffect(() => {
+    setVisibleComments(comments);
+    setCommentsCursor(null);
+    if (postId) void loadComments();
+  }, [comments, loadComments, postId]);
+
+  const loadReplies = useCallback(async (comment: ApiComment, nextCursor?: string | null) => {
+    if ((!nextCursor && loadedReplies[comment.id]) || loadingReplies[comment.id]) return;
+
+    setLoadingReplies((current) => ({ ...current, [comment.id]: true }));
+
+    try {
+      const query = nextCursor ? `&cursor=${encodeURIComponent(nextCursor)}` : '';
+      const response = await fetch(`/comments/${comment.id}/replies?limit=${INITIAL_REPLIES_LIMIT}${query}`);
+      if (!response.ok) throw new Error('Unable to load replies');
+
+      const payload = await response.json() as { data?: ApiComment[]; cursor?: string } | ApiComment[];
+      const replies = Array.isArray(payload) ? payload : payload.data ?? [];
+      setLoadedReplies((current) => ({ ...current, [comment.id]: nextCursor ? [...(current[comment.id] ?? []), ...replies] : replies.slice(0, INITIAL_REPLIES_LIMIT) }));
+      if (!Array.isArray(payload)) setReplyCursors((current) => ({ ...current, [comment.id]: payload.cursor === 'null' ? null : payload.cursor ?? null }));
+    } catch {
+      setHasFetchError(true);
+      // Keep the prototype usable until the replies endpoint is available.
+      setLoadedReplies((current) => ({
+        ...current,
+        [comment.id]: nextCursor ? current[comment.id] ?? [] : (comment.replies ?? []).slice(0, INITIAL_REPLIES_LIMIT),
+      }));
+      setReplyCursors((current) => ({ ...current, [comment.id]: null }));
+    } finally {
+      setLoadingReplies((current) => ({ ...current, [comment.id]: false }));
+    }
+  }, [loadedReplies, loadingReplies]);
 
   const debouncedSubmitCommentApi = useCallback(
     debounce((text: string) => {
@@ -40,7 +106,7 @@ export default function CommentsSection({ comments = mockComments }: CommentsSec
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
       {/* ── Comment Submit Section ── */}
-      <Box
+      {isAuthenticated ? <Box
         sx={{
           display: 'flex',
           alignItems: 'flex-start',
@@ -154,7 +220,11 @@ export default function CommentsSection({ comments = mockComments }: CommentsSec
             </Button>
           </Box>
         </Box>
-      </Box>
+      </Box> : (
+        <Button variant="outlined" onClick={() => navigate('/login')} sx={{ alignSelf: 'stretch', py: 2, borderRadius: 3, textTransform: 'none' }}>
+          Log in to join the discussion
+        </Button>
+      )}
 
       {/* ── Comments header ── */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -184,16 +254,27 @@ export default function CommentsSection({ comments = mockComments }: CommentsSec
 
       {/* ── Comment threads list ── */}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {comments.map((comment) => (
-          <Comment key={comment.id} comment={comment} />
+        {visibleComments.length === 0 ? (
+          <Typography sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
+            Be the first to comment
+          </Typography>
+        ) : visibleComments.map((comment) => (
+          <Comment
+            key={comment.id}
+            comment={{ ...comment, replies: loadedReplies[comment.id] }}
+            onLoadReplies={(nextCursor) => loadReplies(comment, nextCursor)}
+            repliesCursor={replyCursors[comment.id] ?? null}
+            repliesLoading={loadingReplies[comment.id] ?? false}
+          />
         ))}
       </Box>
 
       {/* ── Load more button ── */}
-      <Button
+      {commentsCursor && <Button
         fullWidth
         variant="outlined"
         endIcon={<ExpandMoreIcon />}
+        onClick={() => void loadComments(commentsCursor)}
         sx={{
           borderColor: 'rgba(255,255,255,0.1)',
           color: 'text.secondary',
@@ -212,8 +293,9 @@ export default function CommentsSection({ comments = mockComments }: CommentsSec
           '& .MuiButton-endIcon': { transition: 'transform 0.2s ease' },
         }}
       >
-        Load more comments
-      </Button>
+        {loadingComments ? <CircularProgress size={18} /> : 'Load more comments'}
+      </Button>}
+      <FetchErrorDialog open={hasFetchError} onClose={() => setHasFetchError(false)} />
     </Box>
   );
 }

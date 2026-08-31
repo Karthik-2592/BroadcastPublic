@@ -1,14 +1,16 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
+import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined';
 import Chip from '@mui/material/Chip';
 import type { User } from '../../types/api';
 import { displayName, userHandle } from '../../types/api';
 
-export default function ProfileDescription({ user, onEdit }: { user: User; onEdit?: () => void }) {
+export default function ProfileDescription({ user, onEdit, isOwner = true, onFollow, onReport, isFollowing = false }: { user: User; onEdit?: () => void; isOwner?: boolean; onFollow?: () => void; onReport?: () => void; isFollowing?: boolean }) {
     return (
         <Box
             sx={{
@@ -74,7 +76,7 @@ export default function ProfileDescription({ user, onEdit }: { user: User; onEdi
 
                     {/* Action Buttons */}
                     <Box sx={{ display: 'flex', gap: 1.5, mb: 1 }}>
-                        <IconButton
+                        {isOwner ? <IconButton
                             aria-label="Edit profile"
                             onClick={onEdit}
                             sx={{
@@ -90,7 +92,10 @@ export default function ProfileDescription({ user, onEdit }: { user: User; onEdi
                             }}
                         >
                             <EditOutlinedIcon />
-                        </IconButton>
+                        </IconButton> : <>
+                            <Button variant={isFollowing ? 'outlined' : 'contained'} onClick={onFollow} sx={{ textTransform: 'none', borderRadius: 2 }}>{isFollowing ? 'Following' : 'Follow'}</Button>
+                            <IconButton aria-label="Report profile" onClick={onReport} sx={{ color: 'error.light' }}><FlagOutlinedIcon /></IconButton>
+                        </>}
                     </Box>
                 </Box>
 
@@ -109,7 +114,7 @@ export default function ProfileDescription({ user, onEdit }: { user: User; onEdi
                     </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
-                    {user.interests.map((tag) => (
+                    {user.interests?.length > 0 && user.interests.map((tag) => (
                         <Chip
                             key={tag}
                             label={tag}

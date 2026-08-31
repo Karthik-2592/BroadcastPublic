@@ -22,11 +22,18 @@ export default function CommunityCreationPage() {
   const [description, setDescription] = useState('');
   const [guidelines, setGuidelines] = useState('');
   const [tags, setTags] = useState<Tag[]>([]);
+  const [communityImage, setCommunityImage] = useState<string | null>(null);
 
   const [nameError, setNameError] = useState('');
   const [descError, setDescError] = useState('');
   const [guidelinesError, setGuidelinesError] = useState('');
 
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+    setCommunityImage(URL.createObjectURL(file));
+  };
   const handleCreate = () => {
     let valid = true;
 
@@ -124,7 +131,7 @@ export default function CommunityCreationPage() {
               justifyContent: 'flex-end',
               p: 3,
               borderRadius: 3,
-              backgroundImage: 'url()', // Placeholder for image
+            backgroundImage: communityImage ? `url(${communityImage})` : undefined,
               bgcolor: '#b388ff',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
@@ -140,6 +147,8 @@ export default function CommunityCreationPage() {
 
             {/* Edit button [fixed height, fixed width, circular, align self to flex-end, justify self to flex end] */}
             <IconButton
+              component="label"
+              aria-label="Upload community image"
               sx={{
                 width: 48,
                 height: 48,
@@ -152,6 +161,7 @@ export default function CommunityCreationPage() {
               }}
             >
               <EditIcon />
+              <input hidden accept="image/*" type="file" onChange={handleImageChange} />
             </IconButton>
           </Box>
 

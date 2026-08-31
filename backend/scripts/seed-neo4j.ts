@@ -13,7 +13,7 @@ const neo4jDatabase = env.neo4jDatabase;
 
 console.log(neo4jPassword);
 
-type MongoEntity = { _id: ObjectId };
+type MongoEntity = { _id: ObjectId; community_id?: ObjectId | null };
 type MongoCommunity = MongoEntity & { admin_id: ObjectId };
 type RelationPair = { userId: string; targetId: string };
 type ModeratorRelation = {
@@ -75,7 +75,7 @@ async function seed() {
     const database = mongo.db(databaseName);
     const [users, posts, communities] = await Promise.all([
       database.collection<MongoEntity>("users").find({}, { projection: { _id: 1 } }).toArray(),
-      database.collection<MongoEntity>("posts").find({}, { projection: { _id: 1 } }).toArray(),
+      database.collection<MongoEntity>("posts").find({}, { projection: { _id: 1, community_id: 1 } }).toArray(),
       database
         .collection<MongoCommunity>("communities")
         .find({}, { projection: { _id: 1, admin_id: 1 } })
@@ -111,6 +111,16 @@ async function seed() {
         userId: randomChoice(userIds),
         communityId: community._id.toHexString(),
       }));
+
+      await write(
+        session,
+        "BELONGS_TO relations",
+        `UNWIND $relations AS relation
+         MATCH (post:POST {post_id: relation.postId}),
+               (community:COMMUNITY {community_id: relation.communityId})
+         MERGE (post)-[:BELONGS_TO]->(community)`,
+        { relations: posts.flatMap((post) => post.community_id ? [{ postId: post._id.toHexString(), communityId: post.community_id.toHexString() }] : []) },
+      );
 
       await write(
         session,

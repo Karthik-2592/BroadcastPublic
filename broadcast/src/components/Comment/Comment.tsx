@@ -22,14 +22,18 @@ import ReplyIcon from '@mui/icons-material/Reply';
 import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
-import Reply from '../Reply/Reply';
+import Reply, { EditedIndicator } from '../Reply/Reply';
 import type { Comment as ApiComment } from '../../types/api';
+import { useAuth } from '../../context/AuthContext';
 
 interface CommentProps {
   comment: ApiComment;
   /** Indent level — 0 for top-level, 1 for nested replies */
   depth?: number;
   canEdit?: boolean;
+  onLoadReplies?: (cursor?: string | null) => Promise<void>;
+  repliesLoading?: boolean;
+  repliesCursor?: string | null;
 }
 
 function CommentEditDialog({ comment, open, onClose }: { comment: ApiComment; open: boolean; onClose: () => void }) {
@@ -43,7 +47,7 @@ function CommentEditDialog({ comment, open, onClose }: { comment: ApiComment; op
 
   const handleEdit = async () => {
     if (!commentText.trim() || commentText.length > COMMENT_MAX) return;
-    await fetch(`/v1/comments/${comment.id}`, {
+    await fetch(`/comments/${comment.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: commentText }),
@@ -52,7 +56,7 @@ function CommentEditDialog({ comment, open, onClose }: { comment: ApiComment; op
   };
 
   const handleDelete = async () => {
-    await fetch(`/v1/comments/${comment.id}`, { method: 'DELETE' }).catch(() => undefined);
+    await fetch(`/comments/${comment.id}`, { method: 'DELETE' }).catch(() => undefined);
     setIsDeleteOpen(false);
     onClose();
   };
@@ -107,9 +111,11 @@ function CommentEditDialog({ comment, open, onClose }: { comment: ApiComment; op
   );
 }
 
-export default function Comment({ comment, depth = 0, canEdit = false }: CommentProps) {
+export default function Comment({ comment, depth = 0, canEdit = false, onLoadReplies, repliesLoading = false, repliesCursor = null }: CommentProps) {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [replyOpen, setReplyOpen] = useState(false);
+  const [repliesOpen, setRepliesOpen] = useState(false);
   const [optionsAnchor, setOptionsAnchor] = useState<null | HTMLElement>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
 
@@ -127,7 +133,7 @@ export default function Comment({ comment, depth = 0, canEdit = false }: Comment
   const handleReport = (e: React.MouseEvent) => {
     e.stopPropagation();
     setOptionsAnchor(null);
-    navigate('/placeholder');
+    navigate(isAuthenticated ? '/placeholder' : '/login');
   };
 
   const debouncedLikeApi = useCallback(
@@ -139,6 +145,10 @@ export default function Comment({ comment, depth = 0, canEdit = false }: Comment
 
   const handleToggleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
     setIsLiked((prev) => {
       const next = !prev;
       console.log("hello")
@@ -146,6 +156,16 @@ export default function Comment({ comment, depth = 0, canEdit = false }: Comment
       debouncedLikeApi(comment.id, next);
       return next;
     });
+  };
+
+  const handleToggleReplies = async () => {
+    if (repliesOpen) {
+      setRepliesOpen(false);
+      return;
+    }
+
+    await onLoadReplies?.();
+    setRepliesOpen(true);
   };
 
   return (
@@ -205,7 +225,7 @@ export default function Comment({ comment, depth = 0, canEdit = false }: Comment
                 </Typography>
               )}
               <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.72rem' }}>
-                • {comment.timestamp}
+                • {comment.timestamp}<EditedIndicator edited={Boolean(comment.last_edited_at)} />
               </Typography>
             </Box>
             <IconButton
@@ -293,7 +313,7 @@ export default function Comment({ comment, depth = 0, canEdit = false }: Comment
               <Button
                 size="small"
                 startIcon={<ReplyIcon sx={{ fontSize: 15 }} />}
-                onClick={() => setReplyOpen((prev) => !prev)}
+                onClick={() => isAuthenticated ? setReplyOpen((prev) => !prev) : navigate('/login')}
                 sx={{
                   color: replyOpen ? 'primary.light' : 'text.secondary',
                   textTransform: 'none',
@@ -308,6 +328,21 @@ export default function Comment({ comment, depth = 0, canEdit = false }: Comment
                 Reply
               </Button>
             )}
+            {!isNested && repliesOpen && repliesCursor && (
+              <Button size="small" onClick={() => void onLoadReplies?.(repliesCursor)} disabled={repliesLoading} sx={{ color: 'text.secondary', textTransform: 'none', fontSize: '0.78rem', minWidth: 0 }}>
+                {repliesLoading ? 'Loading replies…' : 'Load more replies'}
+              </Button>
+            )}
+            {!isNested && (
+              <Button
+                size="small"
+                onClick={handleToggleReplies}
+                disabled={repliesLoading}
+                sx={{ color: repliesOpen ? 'primary.light' : 'text.secondary', textTransform: 'none', fontSize: '0.78rem', fontWeight: 500, px: 1, py: 0.25, minWidth: 0 }}
+              >
+                {repliesLoading ? 'Loading replies…' : repliesOpen ? 'Hide replies' : `${comment.reply_count} ${comment.reply_count === 1 ? 'reply' : 'replies'}`}
+              </Button>
+            )}
           </Box>
         </Box>
       </Box>
@@ -315,14 +350,18 @@ export default function Comment({ comment, depth = 0, canEdit = false }: Comment
       {/* Inline reply composer — toggled by Reply button (only for top-level comments) */}
       {!isNested && (
         <Box sx={{ ml: 7 }}>
-          <Reply open={replyOpen} onClose={() => setReplyOpen(false)} />
+          <Reply open={replyOpen} onClose={() => setReplyOpen(false)} parentCommentId={comment.id} />
         </Box>
       )}
 
       {/* Nested replies — restricted to depth 1 (only top-level comments can render replies) */}
-      {depth === 0 &&
-        comment.replies?.map((reply) => (
+      {depth === 0 && repliesOpen &&
+        (comment.replies?.length ? comment.replies.map((reply) => (
           <Comment key={reply.id} comment={reply} depth={1} />
+        )) : (
+          <Typography sx={{ ml: 7, pb: 2, color: 'text.secondary', fontSize: '0.8rem' }}>
+            No replies so far
+          </Typography>
         ))}
     </Box>
   );

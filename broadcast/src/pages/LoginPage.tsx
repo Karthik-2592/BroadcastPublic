@@ -88,7 +88,20 @@ export default function LoginPage() {
       />
 
       {/* Branding */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 4, position: 'relative', zIndex: 2 }}>
+      <Box
+        onClick={() => navigate('/')}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          mb: 4,
+          position: 'fixed',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          top: '5%',
+          zIndex: 2,
+          cursor: 'pointer'
+        }}>
         <CellTowerRoundedIcon sx={{ color: 'primary.light', fontSize: 28 }} />
         <Typography
           variant="h6"

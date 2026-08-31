@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
@@ -20,20 +20,28 @@ import { currentUser, mockFollowers, mockFollowing } from '../data/mockData';
 import type { UserSummary } from '../types/api';
 import { displayName, userHandle } from '../types/api';
 import { useAuth } from '../context/AuthContext';
+import FetchErrorDialog from '../components/FetchErrorDialog';
+import CommunityTagSelector from '../components/Community/CommunityTagSelector';
+import type { Tag } from '../types/api';
 
 type UserListType = 'followers' | 'following';
 
-function UserListDialog({ open, type, users, onClose, onFetch }: { open: boolean; type: UserListType; users: UserSummary[]; onClose: () => void; onFetch: () => Promise<UserSummary[]> }) {
+function UserListDialog({ open, type, users, onClose, onFetch }: { open: boolean; type: UserListType; users: UserSummary[]; onClose: () => void; onFetch: (cursor?: string | null) => Promise<{ users: UserSummary[]; cursor: string | null }> }) {
   const navigate = useNavigate();
   const [loadedUsers, setLoadedUsers] = useState<UserSummary[]>(users);
   const [loading, setLoading] = useState(false);
+  const [cursor, setCursor] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     let active = true;
     setLoading(true);
+    setCursor(null);
     onFetch().then((result) => {
-      if (active) setLoadedUsers(result);
+      if (active) {
+        setLoadedUsers(result.users);
+        setCursor(result.cursor);
+      }
     }).finally(() => {
       if (active) setLoading(false);
     });
@@ -42,6 +50,15 @@ function UserListDialog({ open, type, users, onClose, onFetch }: { open: boolean
 
   const handleBlur = (event: React.FocusEvent<HTMLDivElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onClose();
+  };
+
+  const loadMore = () => {
+    if (!cursor || loading) return;
+    setLoading(true);
+    onFetch(cursor).then((result) => {
+      setLoadedUsers((current) => [...current, ...result.users]);
+      setCursor(result.cursor);
+    }).finally(() => setLoading(false));
   };
 
   return (
@@ -53,12 +70,19 @@ function UserListDialog({ open, type, users, onClose, onFetch }: { open: boolean
           <IconButton aria-label="Close user list" onClick={onClose} sx={{ color: 'text.secondary' }}><CloseIcon /></IconButton>
         </Box>
         <Box sx={{ p: 2 }}>
-          {loading ? <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress size={24} /></Box> : loadedUsers.map((user) => (
+          {loading && loadedUsers.length === 0 ? <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress size={24} /></Box> : loadedUsers.length === 0 ? (
+            <Typography sx={{ py: 3, textAlign: 'center', color: 'text.secondary' }}>
+              {type === 'followers' ? 'You have no followers' : 'You have not followed anyone'}
+            </Typography>
+          ) : loadedUsers.map((user) => (
             <Box key={user.id} onClick={() => { onClose(); navigate(`/profile/${user.id}`); }} sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.25, borderRadius: 2, cursor: 'pointer', '&:hover': { bgcolor: 'rgba(255,255,255,0.06)' } }}>
               <Avatar src={user.profile_picture ?? undefined} sx={{ width: 36, height: 36, bgcolor: '#343440' }}>{displayName(user).charAt(0)}</Avatar>
               <Box sx={{ minWidth: 0 }}><Typography variant="body2" sx={{ fontWeight: 600 }}>{displayName(user)}</Typography><Typography variant="caption" sx={{ color: 'text.secondary' }}>{userHandle(user)}</Typography></Box>
             </Box>
           ))}
+          {cursor && <Button fullWidth variant="outlined" onClick={loadMore} disabled={loading} sx={{ mt: 1 }}>
+            {loading ? <CircularProgress size={18} /> : `Load more ${type}`}
+          </Button>}
         </Box>
       </DialogContent>
     </Dialog>
@@ -67,45 +91,65 @@ function UserListDialog({ open, type, users, onClose, onFetch }: { open: boolean
 
 export default function ProfilePage() {
   const navigate = useNavigate();
+  const { userId: viewedUserId } = useParams<{ userId: string }>();
   const { isAuthenticated, currentUser: sessionUser } = useAuth();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [displayName, setDisplayName] = useState(currentUser.profile_name ?? currentUser.username);
   const [bio, setBio] = useState(currentUser.profile_description ?? '');
+  const [interests, setInterests] = useState<Tag[]>(() => (currentUser.interests ?? []) as Tag[]);
   const profilePictureInputRef = useRef<HTMLInputElement>(null);
   const [profilePicture, setProfilePicture] = useState<string | null>(currentUser.profile_picture ?? null);
   const [userListType, setUserListType] = useState<UserListType>('followers');
   const [isUserListOpen, setIsUserListOpen] = useState(false);
-  const isOwnProfile = isAuthenticated && sessionUser?.id === currentUser.id;
+  const [hasFetchError, setHasFetchError] = useState(false);
+  const isOwnProfile = isAuthenticated && sessionUser?.id === (viewedUserId ?? currentUser.id);
+  const [isFollowing, setIsFollowing] = useState(false);
 
-  const fetchFollowers = useCallback(async () => {
+  const handleFollow = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    setIsFollowing((previous) => !previous);
+  };
+
+  const fetchFollowers = useCallback(async (cursor?: string | null) => {
     try {
-      const response = await fetch(`/v1/users/${currentUser.id}/followers`);
+      const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+      const response = await fetch(`/users/${currentUser.id}/followers${query}`);
       if (response.ok) {
-        const body = await response.json() as { data?: UserSummary[] };
-        if (Array.isArray(body.data)) return body.data;
+        const body = await response.json() as { data?: UserSummary[]; cursor?: string };
+        return { users: Array.isArray(body.data) ? body.data : [], cursor: body.cursor === 'null' ? null : body.cursor ?? null };
       }
-    } catch { /* Future endpoint is not available yet. */ }
-    return mockFollowers;
+      setHasFetchError(true);
+    } catch {
+      setHasFetchError(true);
+    }
+    return { users: mockFollowers, cursor: null };
   }, []);
 
-  const fetchFollowing = useCallback(async () => {
+  const fetchFollowing = useCallback(async (cursor?: string | null) => {
     try {
-      const response = await fetch(`/v1/users/${currentUser.id}/following`);
+      const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+      const response = await fetch(`/users/${currentUser.id}/following${query}`);
       if (response.ok) {
-        const body = await response.json() as { data?: UserSummary[] };
-        if (Array.isArray(body.data)) return body.data;
+        const body = await response.json() as { data?: UserSummary[]; cursor?: string };
+        return { users: Array.isArray(body.data) ? body.data : [], cursor: body.cursor === 'null' ? null : body.cursor ?? null };
       }
-    } catch { /* Future endpoint is not available yet. */ }
-    return mockFollowing;
+      setHasFetchError(true);
+    } catch {
+      setHasFetchError(true);
+    }
+    return { users: mockFollowing, cursor: null };
   }, []);
 
   const handleConfirmEdit = async () => {
     // Placeholder callback for the future profile update endpoint.
-    await fetch('/v1/users/profile', {
+    await fetch(`/users/${currentUser.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile_name: displayName, profile_description: bio, profile_picture: profilePicture }),
+      body: JSON.stringify({ profile_name: displayName, profile_description: bio, profile_picture: profilePicture, interests }),
     }).catch(() => undefined);
     setIsEditOpen(false);
   };
@@ -120,7 +164,7 @@ export default function ProfilePage() {
   return (
     <>
       <div className="flex flex-col relative py-6 w-[65%] mx-auto pl-8">
-        <ProfileDescription user={currentUser} onEdit={() => setIsEditOpen(true)} />
+        <ProfileDescription user={currentUser} isOwner={isOwnProfile} isFollowing={isFollowing} onEdit={() => setIsEditOpen(true)} onFollow={handleFollow} onReport={() => navigate(isAuthenticated ? '/placeholder' : '/login')} />
       </div>
       <Box
         sx={{
@@ -135,7 +179,7 @@ export default function ProfilePage() {
         }}
       >
         <Box sx={{ justifySelf: 'end', width: '100%', maxWidth: 720 }}>
-          <ProfileTabs userId={currentUser.id} sessionUserId={currentUser.id} />
+          <ProfileTabs userId={viewedUserId ?? currentUser.id} sessionUserId={sessionUser?.id} />
         </Box>
         <Box sx={{ maxHeight: '100%' }}>
           <ProfileSidebar user={currentUser} followers={mockFollowers} following={mockFollowing} showViewAll={isOwnProfile} onViewFollowers={() => { setUserListType('followers'); setIsUserListOpen(true); }} onViewFollowing={() => { setUserListType('following'); setIsUserListOpen(true); }} />
@@ -235,6 +279,8 @@ export default function ProfilePage() {
             />
           </Box>
 
+          <CommunityTagSelector selectedTags={interests} onChange={setInterests} />
+
           <Box sx={{ display: 'flex', width: '100%', gap: 1.5, borderTop: '1px solid rgba(255,255,255,0.06)', pt: 3 }}>
             <Button color="error" variant="outlined" onClick={() => setIsDeleteOpen(true)}
               sx={{ alignSelf: 'flex-start' }}>
@@ -255,6 +301,7 @@ export default function ProfilePage() {
         onClose={() => setIsUserListOpen(false)}
         onFetch={userListType === 'followers' ? fetchFollowers : fetchFollowing}
       />
+      <FetchErrorDialog open={hasFetchError} onClose={() => setHasFetchError(false)} />
 
       <Dialog open={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} maxWidth="xs" fullWidth>
         <DialogContent sx={{ p: 4, bgcolor: '#1a1a2e' }}>

@@ -26,7 +26,7 @@ const navItems = [
 export default function LeftSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, isAuthenticated } = useAuth();
 
   return (
     <Box
@@ -76,7 +76,7 @@ export default function LeftSidebar() {
       </List>
 
       {/* Create Community Action Button */}
-      <Box sx={{ px: 0.5, my: 1 }}>
+      {isAuthenticated && <Box sx={{ px: 0.5, my: 1 }}>
         <Button
           fullWidth
           variant="contained"
@@ -95,7 +95,7 @@ export default function LeftSidebar() {
         >
           Create your community
         </Button>
-      </Box>
+      </Box>}
 
       <Divider sx={{ my: 2 }} />
 
@@ -157,23 +157,22 @@ export default function LeftSidebar() {
           py: 1,
           borderRadius: 2,
           cursor: 'pointer',
-          '&:hover': { bgcolor: 'rgba(255,255,255,0.04)' },
+          '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.5)' },
         }}
-        onClick={() => navigate('/profile')}
+        onClick={() => navigate(isAuthenticated ? '/profile' : '/login')}
       >
         <Avatar sx={{ width: 32, height: 32, bgcolor: '#7c4dff', fontSize: '0.85rem' }}>
           {currentUser ? displayName(currentUser).charAt(0).toUpperCase() : 'G'}
         </Avatar>
         <Box>
           <Typography variant="subtitle2" sx={{ color: 'text.primary', fontSize: '0.85rem', fontWeight: 500 }}>
-            {currentUser ? displayName(currentUser) : 'Guest'}
+            {isAuthenticated && currentUser ? displayName(currentUser) : 'Join Broadcast'}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            {currentUser ? userHandle(currentUser) : '@guest'}
+            {isAuthenticated && currentUser ? userHandle(currentUser) : 'Sign in to get started'}
           </Typography>
         </Box>
       </Box>
     </Box>
   );
 }
-

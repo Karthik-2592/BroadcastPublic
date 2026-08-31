@@ -5,13 +5,16 @@
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "mongodb": "^7.5.0",
+    "multer": "^2.3.0",
     "neo4j-driver": "^6.2.0",
     "path": "^0.12.7"
   },
   "scripts": {
     "db:init": "node --experimental-strip-types scripts/initialize-mongodb.ts",
+    "db:reset": "node --experimental-strip-types scripts/reset.ts",
     "db:seed": "node --experimental-strip-types scripts/seed-mongodb.ts",
     "neo4j:seed": "node --experimental-strip-types scripts/seed-neo4j.ts",
+    "media:test": "node --experimental-strip-types scripts/test-upload.ts",
     "start": "node --experimental-strip-types index.ts",
     "typecheck": "tsc --noEmit"
   },

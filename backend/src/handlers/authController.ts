@@ -15,6 +15,7 @@ export async function register(req: Request, res: Response): Promise<Response> {
   const user = await store.register(body as RegisterRequest);
   if (!user) return fail(res, 409, "Username or email is already in use.");
   await neo4jRelations.createUserNode(user.id);
+  await neo4jRelations.interestIn(user.id, user.interests);
   return ok(res, user, "User registered successfully.", 201);
 }
 export async function login(req: Request, res: Response): Promise<Response> {

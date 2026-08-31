@@ -124,7 +124,7 @@ const theme = createTheme({
               borderColor: 'rgba(179, 136, 255, 0.3)',
             },
             '&.Mui-focused fieldset': {
-              borderColor: '#b388ff',
+              borderColor: '#b388ffff',
             },
           },
         },

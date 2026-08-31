@@ -1,4 +1,5 @@
 import { MongoClient, type Db } from "mongodb";
+import neo4j from "neo4j-driver";
 import { env } from "../src/config/env.ts";
 
 const uri = env.mongoUri;
@@ -39,7 +40,7 @@ const collections: CollectionDefinition[] = [
               mime_type: { bsonType: "string" },
             },
           },
-          profile_description: { bsonType: "string", maxLength: 200 },
+          profile_description: { bsonType: "string", maxLength: 300 },
           follower_count: { bsonType: "int" },
           following_count: { bsonType: "int" },
           pinned_posts: { bsonType: "array", items: { bsonType: "objectId" } },
@@ -70,12 +71,13 @@ const collections: CollectionDefinition[] = [
           user_id: { bsonType: ["objectId", "null"] },
           community_id: { bsonType: ["objectId", "null"] },
           title: { bsonType: "string", maxLength: 75 },
-          content: { bsonType: "string", maxLength: 200 },
+          content: { bsonType: "string", maxLength: 300 },
           tags: { bsonType: "array", items: { bsonType: "string" } },
           favorite_count: { bsonType: "int" },
           popularity_score: { bsonType: "double" },
           comment_count: { bsonType: "int" },
           time_created: { bsonType: "date" },
+          last_edited_at: { bsonType: ["date", "null"] },
           media: {
             bsonType: "array",
             items: {
@@ -110,10 +112,11 @@ const collections: CollectionDefinition[] = [
           post_id: { bsonType: "objectId" },
           user_id: { bsonType: ["objectId", "null"] },
           root: { bsonType: ["objectId", "null"] },
-          content: { bsonType: "string", maxLength: 500 },
+          content: { bsonType: "string", maxLength: 300 },
           reply_count: { bsonType: "int" },
           favorite_count: { bsonType: "int" },
           timestamp: { bsonType: "date" },
+          last_edited_at: { bsonType: ["date", "null"] },
           user_summary: {
             bsonType: "object",
             required: ["username", "profile_picture"],
@@ -148,6 +151,7 @@ const collections: CollectionDefinition[] = [
         properties: {
           community_name: { bsonType: "string" },
           community_desc: { bsonType: "string" },
+          community_guidelines: { bsonType: "string", maxLength: 300 },
           admin_id: { bsonType: "objectId" },
           population: { bsonType: "int" },
           community_banner: {
@@ -257,7 +261,44 @@ async function initialize() {
   }
 }
 
-initialize().catch((error) => {
-  console.error("[mongo:init] failed", error);
+async function initializeNeo4j() {
+  const driver = neo4j.driver(
+    env.neo4jUri,
+    neo4j.auth.basic(env.neo4jUsername, env.neo4jPassword),
+  );
+  const session = driver.session({ database: env.neo4jDatabase });
+  const indexes = [
+    ["user_user_id_index", "USER", "user_id"],
+    ["post_post_id_index", "POST", "post_id"],
+    ["community_community_id_index", "COMMUNITY", "community_id"],
+  ] as const;
+
+  try {
+    await session.executeWrite((transaction) =>
+      transaction.run("CREATE CONSTRAINT interest_name_unique IF NOT EXISTS FOR (interest:INTEREST) REQUIRE interest.interest IS UNIQUE"),
+    );
+    const interests = ["Art", "Business & Finance", "Fashion & Beauty", "Travelling", "Sports", "Food", "Technology", "Books", "Health", "Games", "Films & TV", "Nature", "News & Politics", "Science", "Pop Culture", "Lifestyle"];
+    await session.executeWrite((transaction) => transaction.run("UNWIND $interests AS interest MERGE (:INTEREST {interest: interest})", { interests }));
+    for (const [name, label, property] of indexes) {
+      await session.executeWrite((transaction) =>
+        transaction.run(
+          `CREATE INDEX ${name} IF NOT EXISTS FOR (node:${label}) ON (node.${property})`,
+        ),
+      );
+      console.log(`[neo4j:init] index ${name}: created or verified`);
+    }
+  } finally {
+    await session.close();
+    await driver.close();
+  }
+}
+
+async function initializeAll() {
+  await initialize();
+  await initializeNeo4j();
+}
+
+initializeAll().catch((error) => {
+  console.error("[db:init] failed", error);
   process.exitCode = 1;
 });

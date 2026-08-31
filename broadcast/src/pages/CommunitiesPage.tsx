@@ -30,9 +30,13 @@ export default function CommunitiesPage() {
   const { isAuthenticated, isMember } = useAuth();
   const community = exploreCommunities.find(({ id }) => id === communityId) ?? exploreCommunities[0];
   const [sortTab, setSortTab] = useState<'new' | 'top'>('new');
+  const [communityPosts, setCommunityPosts] = useState<Post[]>(mockPosts);
+  const [postsCursor, setPostsCursor] = useState<string | null>(null);
+  const [postsLoading, setPostsLoading] = useState(false);
   const [isCommunityMember, setIsCommunityMember] = useState(isMember);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isJoinPromptOpen, setIsJoinPromptOpen] = useState(false);
   const [description, setDescription] = useState(community.community_desc);
   const [guidelines, setGuidelines] = useState('Be respectful and constructive.');
   const [tags, setTags] = useState<Tag[]>(['Technology']);
@@ -48,27 +52,65 @@ export default function CommunitiesPage() {
       return;
     }
     setIsCommunityMember(true);
+    setIsJoinPromptOpen(false);
+  };
+
+  const handleCreatePost = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+    } else if (!isCommunityMember) {
+      setIsJoinPromptOpen(true);
+    } else {
+      navigate('/create');
+    }
   };
 
   const handleEdit = async () => {
-    await fetch(`/v1/communities/${community.id}`, {
+    await fetch(`/communities/${community.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ community_name: name, community_desc: description, guidelines, tags }),
+      body: JSON.stringify({ community_desc: description, community_guidelines: guidelines, tags }),
     }).catch(() => undefined);
     setIsEditOpen(false);
   };
 
   const handleDelete = async () => {
-    await fetch(`/v1/communities/${community.id}`, { method: 'DELETE' }).catch(() => undefined);
+    await fetch(`/communities/${community.id}`, { method: 'DELETE' }).catch(() => undefined);
     setIsDeleteOpen(false);
     setIsEditOpen(false);
     navigate('/communities');
   };
 
-  const displayedPosts: Post[] = sortTab === 'top'
-    ? [...mockPosts].sort((a, b) => b.favorite_count - a.favorite_count)
-    : mockPosts;
+  useEffect(() => {
+    let active = true;
+    setPostsLoading(true);
+    setPostsCursor(null);
+    fetch(`/communities/${community.id}/posts?sort=${sortTab}`)
+      .then(async (response) => response.ok ? await response.json() as { data?: Post[]; cursor?: string } : null)
+      .then((body) => {
+        if (!active) return;
+        const page = body?.data ?? [];
+        setCommunityPosts(page);
+        setPostsCursor(body?.cursor === 'null' ? null : body?.cursor ?? null);
+      })
+      .catch(() => undefined)
+      .finally(() => { if (active) setPostsLoading(false); });
+    return () => { active = false; };
+  }, [community.id, sortTab]);
+
+  const loadMorePosts = () => {
+    if (!postsCursor || postsLoading) return;
+    setPostsLoading(true);
+    fetch(`/communities/${community.id}/posts?sort=${sortTab}&cursor=${encodeURIComponent(postsCursor)}`)
+      .then(async (response) => response.ok ? await response.json() as { data?: Post[]; cursor?: string } : null)
+      .then((body) => {
+        if (!body?.data) return;
+        setCommunityPosts((current) => [...current, ...body.data!]);
+        setPostsCursor(body.cursor === 'null' ? null : body.cursor ?? null);
+      })
+      .catch(() => undefined)
+      .finally(() => setPostsLoading(false));
+  };
 
   return (
     <>
@@ -95,7 +137,8 @@ export default function CommunitiesPage() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}><GroupOutlinedIcon sx={{ color: 'text.secondary', fontSize: 18 }} /><Typography variant="body2">{community.population}</Typography></Box>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }} onClick={(event) => event.stopPropagation()}>
-                {!isAuthenticated || !isCommunityMember ? <Button variant="contained" size="small" onClick={handleJoin}>Join</Button> : <Button variant="contained" size="small" onClick={() => navigate('/create')}>Create post</Button>}
+                {(!isAuthenticated || !isCommunityMember) && <Button variant="outlined" size="small" onClick={handleJoin}>Join</Button>}
+                <Button variant="contained" size="small" onClick={handleCreatePost}>Create post</Button>
                 {isAdmin && <IconButton aria-label="Edit community" onClick={() => setIsEditOpen(true)} sx={{ color: 'primary.light', bgcolor: 'rgba(179,136,255,0.1)', borderRadius: 2 }}><EditOutlinedIcon /></IconButton>}
               </Box>
             </Box>
@@ -121,9 +164,16 @@ export default function CommunitiesPage() {
           {/* Reused Post Cards */}
           <Fade in timeout={250} key={sortTab}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 3 }}>
-              {displayedPosts.map((post) => (
+              {communityPosts.length === 0 ? (
+                <Typography sx={{ py: 8, textAlign: 'center', color: 'text.secondary' }}>
+                  Nothing to see here
+                </Typography>
+              ) : communityPosts.map((post) => (
                 <PostCard key={post.id} post={post} />
               ))}
+              {postsCursor && <Button variant="outlined" onClick={loadMorePosts} disabled={postsLoading}>
+                {postsLoading ? 'Loading…' : 'Load more posts'}
+              </Button>}
             </Box>
           </Fade>
         </Box>
@@ -219,6 +269,17 @@ export default function CommunitiesPage() {
           <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Delete community?</Typography>
           <Typography variant="body2" sx={{ mb: 3 }}>This action cannot be undone. Are you sure you want to delete this community?</Typography>
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}><Button variant="outlined" onClick={() => setIsDeleteOpen(false)}>Cancel</Button><Button color="error" variant="contained" onClick={handleDelete}>Confirm delete</Button></Box>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isJoinPromptOpen} onClose={() => setIsJoinPromptOpen(false)} maxWidth="xs" fullWidth>
+        <DialogContent sx={{ p: 4, bgcolor: '#1a1a2e' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Join this community first</Typography>
+          <Typography variant="body2" sx={{ mb: 3 }}>You need to be a member before creating a post here.</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+            <Button variant="outlined" onClick={() => setIsJoinPromptOpen(false)}>Cancel</Button>
+            <Button variant="contained" onClick={handleJoin}>Join community</Button>
+          </Box>
         </DialogContent>
       </Dialog>
     </>

@@ -39,10 +39,9 @@ export default function PostViewPage() {
         <PostCard post={post} variant="expanded" />
 
         {/* ── Comments Section ── */}
-        <CommentsSection />
+        <CommentsSection postId={postId} />
       </Box>
       <Box sx={{ width: '100%' }} />
     </Box>
   );
 }
-

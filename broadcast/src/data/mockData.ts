@@ -1,12 +1,12 @@
-// Mock data for the Broadcast application prototype.
-// All types are imported from src/types/api.ts, which mirrors the backend schema.
-// Field names match the backend exactly so that swapping fetch() responses requires
-// only removing the relevant mock export — no component changes needed.
+//  Mock data for the Broadcast application prototype.
+//  All types are imported from src/types/api.ts, which mirrors the backend schema.
+//  Field names match the backend exactly so that swapping fetch() responses requires
+//  only removing the relevant mock export — no component changes needed.
 
 import type { Post, Comment, Community, User, UserSummary } from '../types/api';
 export type { Tag } from '../types/api';
 
-// ── Current logged-in user (mock) ─────────────────────────────────────────────
+//  ── Current logged-in user (mock) ─────────────────────────────────────────────
 export const currentUser: User = {
   id: 'u0',
   username: 'alex_rivera',
@@ -31,7 +31,7 @@ export const currentUserSummary: UserSummary = {
   profile_picture: currentUser.profile_picture,
 };
 
-// ── Mock follower / following lists ───────────────────────────────────────────
+//  ── Mock follower / following lists ───────────────────────────────────────────
 export const mockFollowers: UserSummary[] = [
   { id: 'u1', username: 'alice_dev', profile_name: 'Alice Chen', profile_picture: null },
   { id: 'u2', username: 'mwebb_ui', profile_name: 'Marcus Webb', profile_picture: null },
@@ -42,12 +42,14 @@ export const mockFollowing: UserSummary[] = [
   { id: 'f1', username: 'dan_abramov', profile_name: 'Dan Abramov', profile_picture: null },
   { id: 'f2', username: 'sarah_edo', profile_name: 'Sarah Drasner', profile_picture: null },
   { id: 'f3', username: 'vercel', profile_name: 'Vercel', profile_picture: null },
+  { id: 'f4', username: 'supabase', profile_name: 'Supabase', profile_picture: null },
+
 ];
 
 export const followedUsers = mockFollowing;
 export const userSummaries: UserSummary[] = [currentUserSummary, ...mockFollowers, ...mockFollowing];
 
-// ── Posts displayed in the main feed ──────────────────────────────────────────
+//  ── Posts displayed in the main feed ──────────────────────────────────────────
 export const mockPosts: Post[] = [
   {
     id: 'p1',
@@ -112,7 +114,7 @@ export const mockPosts: Post[] = [
   },
 ];
 
-// ── Communities shown in the left sidebar (joined by current user) ────────────
+//  ── Communities shown in the left sidebar (joined by current user) ────────────
 export const userCommunities: Community[] = [
   {
     id: 'c1',
@@ -149,7 +151,7 @@ export const userCommunities: Community[] = [
   },
 ];
 
-// ── Trending / popular communities shown in search ────────────────────────────
+//  ── Trending / popular communities shown in search ────────────────────────────
 export const popularCommunities: Community[] = [
   {
     id: 'pc1',
@@ -186,8 +188,8 @@ export const popularCommunities: Community[] = [
   },
 ];
 
-// ── Top-level comments for the post view page ─────────────────────────────────
-// replies are loaded lazily; the mock pre-populates them for prototype purposes.
+//  ── Top-level comments for the post view page ─────────────────────────────────
+//  replies are loaded lazily; the mock pre-populates them for prototype purposes.
 export const mockComments: Comment[] = [
   {
     id: 'cm1',
@@ -201,18 +203,6 @@ export const mockComments: Comment[] = [
     favorite_count: 24,
     reply_count: 1,
     replies: [
-      {
-        id: 'cm1r1',
-        post_id: 'p1',
-        user_id: 'u1',
-        root: 'cm1',
-        user_summary: { id: 'u1', username: 'alice_c', profile_name: 'Alice Chen', profile_picture: null },
-        content:
-          'Primarily Wasmtime for server-side and WasmEdge for the IoT edge nodes. The ecosystem is maturing fast — highly recommend giving both a try.',
-        timestamp: '45m ago',
-        favorite_count: 18,
-        reply_count: 0,
-      },
     ],
   },
   {
@@ -255,7 +245,7 @@ export const mockComments: Comment[] = [
   },
 ];
 
-// ── Communities for the Explore page ──────────────────────────────────────────
+//  ── Communities for the Explore page ──────────────────────────────────────────
 export const exploreCommunities: Community[] = [
   {
     id: 'ec1',
@@ -334,7 +324,7 @@ export const exploreCommunities: Community[] = [
   },
 ];
 
-// ── Related communities for the community sidebar widget ──────────────────────
+//  ── Related communities for the community sidebar widget ──────────────────────
 export const relatedCommunities: Community[] = [
   {
     id: 'rc1',
@@ -371,7 +361,7 @@ export const relatedCommunities: Community[] = [
   },
 ];
 
-// ── Community guidelines per community id ─────────────────────────────────────
+//  ── Community guidelines per community id ─────────────────────────────────────
 export const communityGuidelines: Record<string, string[]> = {
   ec1: [
     'Be respectful and inclusive to all community members.',

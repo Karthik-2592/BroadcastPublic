@@ -134,6 +134,7 @@ async function seed() {
       _id: publicCommunityId,
       community_name: "Public Community",
       community_desc: "",
+      community_guidelines: "",
       population: 0,
       community_banner: null,
       admin_id: randomChoice(users)._id,
@@ -147,6 +148,7 @@ async function seed() {
           _id: new ObjectId(),
           community_name: `${randomChoice(nouns)} ${randomChoice(nouns)}`,
           community_desc: "",
+          community_guidelines: "",
           population: 0,
           community_banner: null,
           admin_id: randomChoice(users)._id,
@@ -174,6 +176,7 @@ async function seed() {
         popularity_score: new Double(0),
         comment_count: 0,
         time_created: new Date(),
+        last_edited_at: null,
         media: [],
         user_summary: {
           username: user.username,
@@ -200,6 +203,7 @@ async function seed() {
         favorite_count: 0,
         reply_count: 0,
         timestamp: new Date(),
+        last_edited_at: null,
       };
     });
     await commentsCollection.insertMany(comments);

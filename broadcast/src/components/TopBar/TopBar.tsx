@@ -8,6 +8,8 @@ import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
 import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
@@ -19,8 +21,10 @@ import PersonOutlineIcon from '@mui/icons-material/PersonOutlined';
 import NotificationsNoneOutlinedIcon from '@mui/icons-material/NotificationsNoneOutlined';
 import CellTowerRoundedIcon from '@mui/icons-material/CellTowerRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import { useNavigate } from 'react-router-dom';
 import { mockPosts, popularCommunities, userCommunities, followedUsers } from '../../data/mockData';
+import { useAuth } from '../../context/AuthContext';
 
 type SearchResultType = 'post' | 'community' | 'user';
 
@@ -62,11 +66,19 @@ const resultCountLabel = (result: SearchResult) => {
 
 export default function TopBar() {
   const navigate = useNavigate();
+  const { isAuthenticated, logout } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [accountMenuAnchor, setAccountMenuAnchor] = useState<null | HTMLElement>(null);
   const searchRequest = useRef(0);
+
+  const handleLogout = () => {
+    setAccountMenuAnchor(null);
+    logout();
+    navigate('/');
+  };
 
   const submitSearch = async (query: string) => {
     const trimmedQuery = query.trim();
@@ -78,17 +90,28 @@ export default function TopBar() {
 
     const requestId = ++searchRequest.current;
     setIsSearching(true);
-    let results = localSearch(trimmedQuery);
+    let results: SearchResult[] = [];
 
     // The endpoint is intentionally provisional until the search API is available.
     try {
-      const response = await fetch(`/v1/search?q=${encodeURIComponent(trimmedQuery)}`);
-      if (response.ok) {
-        const body = await response.json() as { data?: SearchResult[] };
-        if (Array.isArray(body.data)) results = body.data.slice(0, 10);
+      const response = await fetch(`/search?q=${encodeURIComponent(trimmedQuery)}`);
+      if (!response.ok) throw new Error('Search request failed');
+      const body = await response.json() as { data?: SearchResult[] };
+      if (body.data) {
+        const data = body.data as SearchResult[] | {
+          users?: Array<{ id: string; profile_name?: string; username: string; follower_count?: number }>;
+          posts?: Array<{ id: string; title: string; favorite_count: number }>;
+          communities?: Array<{ id: string; community_name: string; population: number }>;
+        };
+        results = Array.isArray(data) ? data.slice(0, 10) : [
+          ...(data.posts ?? []).map((post) => ({ id: post.id, type: 'post' as const, name: post.title, count: post.favorite_count })),
+          ...(data.communities ?? []).map((community) => ({ id: community.id, type: 'community' as const, name: community.community_name, count: community.population })),
+          ...(data.users ?? []).map((user) => ({ id: user.id, type: 'user' as const, name: user.profile_name ?? user.username, count: user.follower_count ?? 0 })),
+        ].slice(0, 10);
       }
     } catch {
-      // Keep the temporary local results available while the API is blank.
+      // Use local mock data only when the backend request fails.
+      results = localSearch(trimmedQuery);
     }
 
     if (requestId === searchRequest.current) {
@@ -140,6 +163,7 @@ export default function TopBar() {
           px: { xs: 2, md: 3 },
           background: 'rgba(10, 10, 10, 0.55)',
           backdropFilter: 'blur(10px)',
+          position: 'relative',
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
         }}
       >
@@ -167,8 +191,10 @@ export default function TopBar() {
             display: 'flex',
             justifyContent: 'center',
             maxWidth: 640,
-            mx: 'auto',
-            position: 'relative',
+            minWidth: 640,
+            position: 'absolute',
+            left: '50%',
+            transform: 'translateX(-50%)',
           }}
           onBlur={handleSearchBlur}
         >
@@ -179,6 +205,13 @@ export default function TopBar() {
             value={searchQuery}
             onChange={handleSearchChange}
             onKeyDown={handleKeyDown}
+            sx={{
+              '& input:-webkit-autofill': {
+                WebkitBoxShadow: '0 0 0px 1000px transparent inset',
+                WebkitTextFillColor: 'white',
+                transition: 'background-color 5000s ease-in-out 0s',
+              },
+            }}
             slotProps={{
               input: {
                 startAdornment: (
@@ -267,7 +300,7 @@ export default function TopBar() {
             variant="contained"
             size="small"
             startIcon={<AddRoundedIcon />}
-            onClick={() => navigate('/create')}
+            onClick={() => navigate(isAuthenticated ? '/create' : '/login')}
             sx={{
               background: 'linear-gradient(135deg, #b388ff 0%, #7c4dff 100%)',
               color: '#ffffff',
@@ -299,7 +332,7 @@ export default function TopBar() {
               <NotificationsNoneOutlinedIcon fontSize="small" />
             </IconButton>
 
-            <Button
+            {!isAuthenticated && <Button
               variant="outlined"
               size="small"
               onClick={() => navigate('/login')}
@@ -311,8 +344,8 @@ export default function TopBar() {
               }}
             >
               Log In
-            </Button>
-            <Button
+            </Button>}
+            {!isAuthenticated && <Button
               variant="contained"
               size="small"
               onClick={() => navigate('/register')}
@@ -324,7 +357,27 @@ export default function TopBar() {
               }}
             >
               Sign Up
-            </Button>
+            </Button>}
+            {isAuthenticated && <IconButton
+              size="small"
+              aria-label="Account menu"
+              onClick={(event) => setAccountMenuAnchor(event.currentTarget)}
+              sx={{
+                color: 'text.secondary',
+                '&:hover': { color: 'primary.main', bgcolor: 'rgba(179,136,255,0.08)' },
+              }}
+            >
+              <MoreHorizIcon />
+            </IconButton>}
+            <Menu
+              id="account-menu"
+              anchorEl={accountMenuAnchor}
+              open={Boolean(accountMenuAnchor)}
+              onClose={() => setAccountMenuAnchor(null)}
+              disableScrollLock
+            >
+              <MenuItem onClick={handleLogout}>Log out</MenuItem>
+            </Menu>
           </Box>
         </Box>
       </Toolbar>
