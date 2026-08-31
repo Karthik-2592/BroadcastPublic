@@ -1,12 +1,18 @@
 export type Id = string;
 
+export interface MediaMetadata {
+  media_id: number;
+  media_url: string;
+  mime_type: string;
+}
+
 export interface User {
   id: Id;
   username: string;
   email: string;
   interests: string[];
   profile_name?: string;
-  profile_picture?: unknown;
+  profile_picture: MediaMetadata | null;
   profile_description?: string;
   pinned_posts: Id[];
   follower_count: number;
@@ -20,7 +26,7 @@ export interface Post {
   content: string;
   user_summary: unknown;
   tags: string[];
-  media: unknown[];
+  media: MediaMetadata[];
   popularity_score: number;
   favorite_count: number;
   comment_count: number;
@@ -46,7 +52,7 @@ export interface Community {
   admin_id: Id | null;
   tags: string[];
   community_guidelines: string;
-  community_banner?: unknown;
+  community_banner: MediaMetadata | null;
   population: number;
   post_count: number;
   timestamp: string;
@@ -71,7 +77,7 @@ export interface RegisterRequest {
   password: string;
   interests?: string[];
   profile_name?: string;
-  profile_picture?: unknown;
+  profile_picture?: MediaMetadata | null;
   profile_description?: string;
 }
 export interface LoginRequest {
@@ -82,11 +88,12 @@ export interface LoginRequest {
 export interface PostCreateRequest {
   user_id: Id;
   community_id?: Id | null;
+  community_name?: string | null;
   title: string;
   content: string;
   user_summary: unknown;
   tags?: string[];
-  media?: unknown[];
+  media?: MediaMetadata[];
 }
 export interface CommentCreateRequest {
   user_id: Id;
@@ -100,7 +107,7 @@ export interface CommunityCreateRequest {
   community_desc: string;
   community_guidelines: string;
   tags?: string[];
-  community_banner?: unknown;
+  community_banner?: MediaMetadata | null;
 }
 
 // Relation request types

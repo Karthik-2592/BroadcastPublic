@@ -3,11 +3,10 @@ import Avatar from '@mui/material/Avatar';
 import Card from '@mui/material/Card';
 import Typography from '@mui/material/Typography';
 import { useNavigate } from 'react-router-dom';
-import { mockFollowing } from '../../data/mockData';
 import { displayName, userHandle } from '../../types/api';
 import type { UserSummary } from '../../types/api';
 
-export default function UserRecommendations({ users = mockFollowing }: { users?: UserSummary[] }) {
+export default function UserRecommendations({ users = [] }: { users?: UserSummary[] }) {
   const navigate = useNavigate();
   users = users.slice(0, 3)
   return (

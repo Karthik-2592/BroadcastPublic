@@ -1,27 +1,25 @@
 import React, { createContext, useContext, useState } from 'react';
-import type { UserSummary } from '../types/api';
-import { currentUserSummary } from '../data/mockData';
+import type { User } from '../types/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   isMember: boolean;
-  currentUser: UserSummary | null;
-  setCurrentUser: (user: UserSummary | null) => void;
-  login: () => void;
+  currentUser: User | null;
+  setCurrentUser: (user: User | null) => void;
+  login: (user: User) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Mock state: user is authenticated and is a member of the community
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
-  const [isMember, setIsMember] = useState(true);
-  const [currentUser, setCurrentUser] = useState<UserSummary | null>(currentUserSummary);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isMember, setIsMember] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  const login = () => {
+  const login = (user: User) => {
     setIsAuthenticated(true);
-    setCurrentUser(currentUserSummary);
+    setCurrentUser(user);
   };
   const logout = () => {
     setIsAuthenticated(false);

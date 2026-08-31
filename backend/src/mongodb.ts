@@ -16,6 +16,7 @@ import type {
   Notification,
   Post,
   User,
+  MediaMetadata,
 } from "./types.ts";
 import { env } from "./config/env.ts";
 import { decodeCursor, nextCursor } from "./cursor.ts";
@@ -78,13 +79,14 @@ const COMMUNITY_LIMIT = 50;
 const apiId = (value: ObjectId) => value.toHexString();
 const hash = (password: string, salt: string) =>
   createHash("sha256").update(`${salt}:${password}`).digest("hex");
+const defaultMedia: MediaMetadata | null = null;
 const safeUser = (user: UserDocument): User => ({
   id: apiId(user._id),
   username: user.username,
   email: user.email,
   interests: user.interests,
   profile_name: user.profile_name,
-  profile_picture: user.profile_picture,
+  profile_picture: user.profile_picture ?? defaultMedia,
   profile_description: user.profile_description,
   pinned_posts: user.pinned_posts.map(apiId),
   follower_count: user.follower_count,
@@ -176,7 +178,7 @@ export class MongoStore {
     password: string;
     interests?: string[];
     profile_name?: string;
-    profile_picture?: unknown;
+    profile_picture?: MediaMetadata | null;
     profile_description?: string;
   }) {
     return this.log("users.insertOne", async () => {
@@ -194,9 +196,9 @@ export class MongoStore {
         email: input.email,
         password: { password_hash: hash(input.password, salt), salt },
         interests: input.interests ?? [],
-        profile_name: input.profile_name,
-        profile_picture: input.profile_picture,
-        profile_description: input.profile_description,
+        profile_name: input.profile_name ?? "",
+        profile_picture: input.profile_picture ?? defaultMedia,
+        profile_description: input.profile_description ?? "",
         pinned_posts: [],
         follower_count: 0,
         following_count: 0,
@@ -246,7 +248,7 @@ export class MongoStore {
   async updateUser(id: string, changes: Partial<User>) {
     const objectId = oid(id);
     if (!objectId) return null;
-    const update = Object.fromEntries(
+    const update: Record<string, unknown> = Object.fromEntries(
       Object.entries(changes).filter(
         ([key, value]) =>
           value !== undefined &&
@@ -338,6 +340,8 @@ export class MongoStore {
   ) {
     const userId = oid(input.user_id ?? "");
     if (!userId) throw new Error("Invalid post user_id");
+    if (!input.user_summary)
+      throw new Error("Post user_summary is required.");
     const communityId = input.community_id
       ? oid(input.community_id)
       : publicCommunityObjectId;
@@ -350,7 +354,7 @@ export class MongoStore {
       content: input.content,
       user_summary: input.user_summary,
       tags: input.tags,
-      media: input.media,
+      media: input.media ?? [],
       popularity_score: new Double(input.popularity_score),
       favorite_count: 0,
       comment_count: 0,
@@ -575,6 +579,12 @@ export class MongoStore {
     const items = comments.slice(0, limit);
     return { items, nextCursor: nextCursor(page.offset, comments.length, limit, filters) };
   }
+  async isCommentFavorited(commentId: string, userId: string) {
+    const commentObjectId = oid(commentId);
+    const userObjectId = oid(userId);
+    if (!commentObjectId || !userObjectId) return false;
+    return Boolean(await (await this.collection<CommentFavoriteDocument>("comment_favorite_store")).findOne({ comment_id: commentObjectId, user_id: userObjectId }));
+  }
   async feedIds(limit = 50) {
     return this.log("posts.feedIds", () =>
       this.collection<PostDocument>("posts")
@@ -609,6 +619,8 @@ export class MongoStore {
   async createComment(
     input: Omit<Comment, "id" | "timestamp" | "last_edited_at" | "favorite_count" | "reply_count">,
   ) {
+    if (!input.user_summary)
+      throw new Error("Comment user_summary is required.");
     const comment: CommentDocument = {
       _id: new ObjectId(),
       post_id: oid(input.post_id)!,
@@ -714,9 +726,14 @@ export class MongoStore {
   ) {
     const adminId = input.admin_id ? oid(input.admin_id) : null;
     if (!adminId) throw new Error("Invalid community admin_id");
+    if (!input.community_name) throw new Error("Invalid community_name");
     const community: CommunityDocument = {
       _id: new ObjectId(),
-      ...input,
+      community_name: input.community_name,
+      community_desc: input.community_desc ?? "",
+      community_guidelines: input.community_guidelines ?? "",
+      tags: input.tags ?? [],
+      community_banner: input.community_banner ?? defaultMedia,
       admin_id: adminId,
       population: 1,
       post_count: 0,
@@ -738,6 +755,13 @@ export class MongoStore {
           .then((item) => (item ? safeCommunity(item) : null)),
       )
       : null;
+  }
+  async communityByName(name: string) {
+    return this.log("communities.findOneByName", () =>
+      this.collection<CommunityDocument>("communities")
+        .then((c) => c.findOne({ community_name: name }))
+        .then((item) => (item ? safeCommunity(item) : null)),
+    );
   }
   async updateCommunity(id: string, changes: Partial<Community>) {
     const objectId = oid(id);

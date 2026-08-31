@@ -22,9 +22,7 @@ async function generateFeed(userId: string) {
     neo4jRelations.postRecommendationsByJoinedCommunities(userId, FEED_BUFFER_CAPACITY),
     store.feedIds(FEED_BUFFER_CAPACITY),
   ]);
-  const ranked = new Map<string, number>();
-  for (const item of [...followedLikes, ...joinedCommunities]) ranked.set(item.id, (ranked.get(item.id) ?? 0) + item.score);
-  const recommended = [...ranked.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+  const recommended = [...new Set([...followedLikes, ...joinedCommunities])];
   return [...new Set([...recommended, ...chronological])].slice(0, FEED_BUFFER_CAPACITY);
 }
 
@@ -34,8 +32,7 @@ async function generateUserRecommendations(userId: string) {
     neo4jRelations.userRecommendationsByCommunities(userId, USER_RECOMMENDATION_SIZE),
     neo4jRelations.userRecommendationsByFollowNetwork(userId, USER_RECOMMENDATION_SIZE),
   ]);
-  return [...new Map(groups.flat().map((item) => [item.id, item.score])).entries()]
-    .sort((a, b) => b[1] - a[1]).slice(0, USER_RECOMMENDATION_SIZE).map(([id]) => id);
+  return [...new Set(groups.flat())].slice(0, USER_RECOMMENDATION_SIZE);
 }
 
 async function generateCommunityRecommendations(userId: string) {
@@ -44,8 +41,7 @@ async function generateCommunityRecommendations(userId: string) {
     neo4jRelations.communityRecommendationsByFollowNetwork(userId, COMMUNITY_RECOMMENDATION_SIZE),
     neo4jRelations.communityRecommendationsByLikedPosts(userId, COMMUNITY_RECOMMENDATION_SIZE),
   ]);
-  return [...new Map(groups.flat().map((item) => [item.id, item.score])).entries()]
-    .sort((a, b) => b[1] - a[1]).slice(0, COMMUNITY_RECOMMENDATION_SIZE).map(([id]) => id);
+  return [...new Set(groups.flat())].slice(0, COMMUNITY_RECOMMENDATION_SIZE);
 }
 
 async function initialize(userId: string) {
@@ -65,6 +61,9 @@ async function initialize(userId: string) {
 }
 
 export class FeedService {
+  initializeSession(userId: string) {
+    return initialize(userId);
+  }
   async getFeed(userId: string, cursor?: string, limit = FEED_RESPONSE_SIZE) {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > FEED_RESPONSE_SIZE) throw new Error("Malformed request.");
     const state = await initialize(userId);

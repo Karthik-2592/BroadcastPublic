@@ -12,9 +12,9 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
-import { userCommunities } from '../../data/mockData';
 import { useAuth } from '../../context/AuthContext';
 import { displayName, userHandle } from '../../types/api';
+import type { Community } from '../../types/api';
 
 // Navigation items corresponding to the wireframe's sidebar tabs
 const navItems = [
@@ -107,7 +107,7 @@ export default function LeftSidebar() {
         Your Communities
       </Typography>
       <List disablePadding>
-        {userCommunities.map((community) => (
+        {([] as Community[]).map((community) => (
           <ListItemButton
             key={community.id}
             sx={{ py: 0.75, px: 1.5, my: 1 }}
@@ -159,7 +159,7 @@ export default function LeftSidebar() {
           cursor: 'pointer',
           '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.5)' },
         }}
-        onClick={() => navigate(isAuthenticated ? '/profile' : '/login')}
+        onClick={() => navigate(isAuthenticated && currentUser ? `/profile/${currentUser.id}` : '/login')}
       >
         <Avatar sx={{ width: 32, height: 32, bgcolor: '#7c4dff', fontSize: '0.85rem' }}>
           {currentUser ? displayName(currentUser).charAt(0).toUpperCase() : 'G'}

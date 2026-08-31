@@ -158,7 +158,7 @@ const collections: CollectionDefinition[] = [
             bsonType: ["object", "null"],
             required: ["media_id", "media_url", "mime_type"],
             properties: {
-              media_id: { bsonType: "objectId" },
+              media_id: { bsonType: "int" },
               media_url: { bsonType: "string" },
               mime_type: { bsonType: "string" },
             },

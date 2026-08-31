@@ -23,8 +23,8 @@ import CellTowerRoundedIcon from '@mui/icons-material/CellTowerRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import { useNavigate } from 'react-router-dom';
-import { mockPosts, popularCommunities, userCommunities, followedUsers } from '../../data/mockData';
 import { useAuth } from '../../context/AuthContext';
+import { BASE_URL } from '../../config';
 
 type SearchResultType = 'post' | 'community' | 'user';
 
@@ -35,22 +35,6 @@ interface SearchResult {
   count: number;
 }
 
-const localSearch = (query: string): SearchResult[] => {
-  const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) return [];
-
-  const posts: SearchResult[] = mockPosts
-    .filter(({ title, content }) => `${title} ${content}`.toLowerCase().includes(normalizedQuery))
-    .map(({ id, title, favorite_count }) => ({ id, type: 'post', name: title, count: favorite_count }));
-  const communities: SearchResult[] = [...userCommunities, ...popularCommunities]
-    .filter(({ community_name }) => community_name.toLowerCase().includes(normalizedQuery))
-    .map(({ id, community_name, population }) => ({ id, type: 'community', name: community_name, count: population }));
-  const users: SearchResult[] = followedUsers
-    .filter(({ profile_name, username }) => `${profile_name ?? ''} ${username}`.toLowerCase().includes(normalizedQuery))
-    .map(({ id, profile_name, username }) => ({ id, type: 'user', name: profile_name ?? username, count: 0 }));
-
-  return [...posts, ...communities, ...users].slice(0, 10);
-};
 
 const resultIcon = (type: SearchResultType) => {
   if (type === 'post') return <ArticleOutlinedIcon fontSize="small" />;
@@ -94,7 +78,7 @@ export default function TopBar() {
 
     // The endpoint is intentionally provisional until the search API is available.
     try {
-      const response = await fetch(`/search?q=${encodeURIComponent(trimmedQuery)}`);
+      const response = await fetch(`${BASE_URL}/search?q=${encodeURIComponent(trimmedQuery)}`, { credentials: 'include' });
       if (!response.ok) throw new Error('Search request failed');
       const body = await response.json() as { data?: SearchResult[] };
       if (body.data) {
@@ -110,8 +94,7 @@ export default function TopBar() {
         ].slice(0, 10);
       }
     } catch {
-      // Use local mock data only when the backend request fails.
-      results = localSearch(trimmedQuery);
+      results = [];
     }
 
     if (requestId === searchRequest.current) {

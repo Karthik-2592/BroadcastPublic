@@ -1,16 +1,19 @@
 // PostViewPage — Full expanded view of a single post, with inline CommentsSection below.
 // Route: /post/:postId  (nested inside MainLayout — sidebar + topbar remain visible)
-// Uses existing MockPost data; comment data comes from CommentsSection defaults.
+// Loads the post from the backend; comments are loaded by CommentsSection.
 
 import { useParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import PostCard from '../components/PostCard/PostCard';
 import CommentsSection from '../components/CommentsSection/CommentsSection';
-import { mockPosts } from '../data/mockData';
+import { useEffect, useState } from 'react';
+import type { Post } from '../types/api';
+import { BASE_URL } from '../config';
 
 export default function PostViewPage() {
   const { postId } = useParams<{ postId: string }>();
-  const post = mockPosts.find((p) => p.id === postId) ?? mockPosts[0];
+  const [post, setPost] = useState<Post | null>(null);
+  useEffect(() => { if (postId) void fetch(`${BASE_URL}/posts/${postId}`, { credentials: 'include' }).then((response) => response.ok ? response.json() : null).then((body: { data?: Post } | null) => setPost(body?.data ?? null)); }, [postId]);
 
   return (
     <Box
@@ -36,7 +39,7 @@ export default function PostViewPage() {
         }}
       >
         {/* ── Unified Post Card (Expanded View) ── */}
-        <PostCard post={post} variant="expanded" />
+        {post && <PostCard post={post} variant="expanded" />}
 
         {/* ── Comments Section ── */}
         <CommentsSection postId={postId} />

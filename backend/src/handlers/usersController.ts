@@ -6,6 +6,7 @@ import type { FollowRelationRequest, User } from "../types.ts";
 import { Router } from "express";
 import { requireSession, sessionUserId } from "../session.ts";
 import { decodeCursor, nextCursor } from "../cursor.ts";
+import { mediaUrl, saveMedia, type UploadedFile } from "../media.ts";
 
 export async function getUser(req: Request, res: Response) {
   const user = await store.user(id(req));
@@ -21,6 +22,16 @@ export async function updateUser(req: Request, res: Response) {
   const updated = await store.updateUser(userId, req.body as Partial<User>);
   if (updated && Array.isArray(req.body.interests)) await neo4jRelations.interestIn(userId, updated.interests);
   return updated ? ok(res, updated) : fail(res, 404, "User not found.");
+}
+export async function uploadProfilePicture(req: Request, res: Response) {
+  const userId = id(req);
+  if (userId !== sessionUserId(req)) return fail(res, 403, "Only the account owner may upload a profile picture.");
+  if (!(await store.user(userId))) return fail(res, 404, "User not found.");
+  const file = (((req as unknown as { files?: UploadedFile[] }).files) ?? [])[0];
+  if (!file) return fail(res, 400, "A profile picture is required.");
+  const saved = await saveMedia(file, userId, "profile", 0);
+  const updated = await store.updateUser(userId, { profile_picture: { media_id: saved.media_id, media_url: mediaUrl(req, saved.path), mime_type: saved.mime_type } });
+  return updated ? ok(res, updated, "Profile picture uploaded successfully.", 201) : fail(res, 500, "Unable to store profile picture metadata.");
 }
 export async function deleteUser(req: Request, res: Response) {
   const userId = sessionUserId(req);
@@ -42,11 +53,7 @@ export async function recommendations(req: Request, res: Response) {
     neo4jRelations.userRecommendationsByCommunities(id(req)),
     neo4jRelations.userRecommendationsByFollowNetwork(id(req)),
   ]);
-  const ranked = groups.flat().reduce((result, item) => {
-    result.set(item.id, (result.get(item.id) ?? 0) + item.score);
-    return result;
-  }, new Map<string, number>());
-  const ids = [...ranked.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([userId]) => userId);
+  const ids = [...new Set(groups.flat())].slice(0, 4);
   return ok(res, await store.usersByIds(ids));
 }
 export async function listRelatedUsers(req: Request, res: Response) {
@@ -89,12 +96,18 @@ export async function follow(req: Request, res: Response): Promise<Response> {
     return fail(res, 409, "The follower was not following this user.");
   return ok(res, { active: enabled, changed: Boolean(changed) });
 }
+export async function followStatus(req: Request, res: Response) {
+  const userId = sessionUserId(req);
+  if (!(await store.user(id(req)))) return fail(res, 404, "User not found.");
+  return ok(res, { active: await neo4jRelations.isFollowing(userId, id(req)) });
+}
 
 const router = Router();
 router.get("/search", searchUsers);
 router.get("/:id/recommendations", recommendations);
 router.get("/:id/followers", listRelatedUsers);
 router.get("/:id/following", listRelatedUsers);
+router.get("/:id/follows/status", requireSession, followStatus);
 router.get("/:id", getUser);
 router.put("/:id", requireSession, updateUser);
 router.delete("/:id", requireSession, deleteUser);

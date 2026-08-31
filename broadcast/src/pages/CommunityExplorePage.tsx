@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import debounce from 'lodash.debounce';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
@@ -9,29 +8,28 @@ import CardContent from '@mui/material/CardContent';
 import ForumOutlinedIcon from '@mui/icons-material/ForumOutlined';
 import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
 import CircularProgress from '@mui/material/CircularProgress';
-import { exploreCommunities } from '../data/mockData';
+import type { Community } from '../types/api';
+import { BASE_URL } from '../config';
 
 export default function CommunityExplorePage() {
   const navigate = useNavigate();
-  const [communities, setCommunities] = useState(exploreCommunities);
+  const [communities, setCommunities] = useState<Community[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [joinedMap, setJoinedMap] = useState<Record<string, boolean>>(() =>
-    exploreCommunities.reduce((acc, c) => ({ ...acc, [c.id]: c.joinState === 'joined' }), {})
-  );
+  const [joinedMap, setJoinedMap] = useState<Record<string, boolean>>({});
 
   const loadCommunities = useCallback(async (nextCursor?: string | null) => {
     setLoading(true);
     try {
       const query = nextCursor ? `?cursor=${encodeURIComponent(nextCursor)}` : '';
-      const response = await fetch(`/communities/recommendations${query}`);
+      const response = await fetch(`${BASE_URL}/communities/recommendations${query}`, { credentials: 'include' });
       if (!response.ok) throw new Error('Unable to load communities');
-      const body = await response.json() as { data?: typeof exploreCommunities; cursor?: string };
+      const body = await response.json() as { data?: Community[]; cursor?: string };
       const page = Array.isArray(body.data) ? body.data : [];
       setCommunities((current) => nextCursor ? [...current, ...page] : page);
       setCursor(body.cursor === 'null' ? null : body.cursor ?? null);
     } catch {
-      // Keep the mock communities available while the backend is unavailable.
+      setCommunities((current) => nextCursor ? current : []);
     } finally {
       setLoading(false);
     }
@@ -39,20 +37,12 @@ export default function CommunityExplorePage() {
 
   useEffect(() => { void loadCommunities(); }, [loadCommunities]);
 
-  const debouncedJoinApi = useCallback(
-    debounce((communityId: string, joinState: boolean) => {
-      console.log(`[API MOCK] Community ${communityId} join status:`, joinState);
-    }, 500),
-    []
-  );
-
   const handleToggleJoin = (e: React.MouseEvent, communityId: string) => {
     e.stopPropagation();
-    setJoinedMap((prev) => {
-      const nextState = !prev[communityId];
-      debouncedJoinApi(communityId, nextState);
-      return { ...prev, [communityId]: nextState };
-    });
+    const nextState = !joinedMap[communityId];
+    void fetch(`${BASE_URL}/communities/memberships`, { method: nextState ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ community_id: communityId }), credentials: 'include' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((body: { data?: { active?: boolean } } | null) => { if (body?.data?.active !== undefined) setJoinedMap((current) => ({ ...current, [communityId]: body.data!.active! })); });
   };
   return (
     <Box

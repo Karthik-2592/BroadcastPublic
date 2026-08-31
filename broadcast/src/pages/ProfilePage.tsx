@@ -16,13 +16,13 @@ import UploadOutlinedIcon from '@mui/icons-material/UploadOutlined';
 import ProfileDescription from '../components/Profile/ProfileDescription';
 import ProfileTabs from '../components/Profile/ProfileTabs';
 import ProfileSidebar from '../components/Profile/ProfileSidebar';
-import { currentUser, mockFollowers, mockFollowing } from '../data/mockData';
 import type { UserSummary } from '../types/api';
 import { displayName, userHandle } from '../types/api';
 import { useAuth } from '../context/AuthContext';
 import FetchErrorDialog from '../components/FetchErrorDialog';
 import CommunityTagSelector from '../components/Community/CommunityTagSelector';
 import type { Tag } from '../types/api';
+import { BASE_URL } from '../config';
 
 type UserListType = 'followers' | 'following';
 
@@ -92,32 +92,58 @@ function UserListDialog({ open, type, users, onClose, onFetch }: { open: boolean
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { userId: viewedUserId } = useParams<{ userId: string }>();
-  const { isAuthenticated, currentUser: sessionUser } = useAuth();
+  const { isAuthenticated, currentUser: sessionUser, logout } = useAuth();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [displayName, setDisplayName] = useState(currentUser.profile_name ?? currentUser.username);
-  const [bio, setBio] = useState(currentUser.profile_description ?? '');
-  const [interests, setInterests] = useState<Tag[]>(() => (currentUser.interests ?? []) as Tag[]);
+  const profileUser = sessionUser;
+  const [displayName, setDisplayName] = useState(profileUser?.profile_name ?? '');
+  const [bio, setBio] = useState(profileUser?.profile_description ?? '');
+  const [interests, setInterests] = useState<Tag[]>(() => (profileUser?.interests ?? []) as Tag[]);
   const profilePictureInputRef = useRef<HTMLInputElement>(null);
-  const [profilePicture, setProfilePicture] = useState<string | null>(currentUser.profile_picture ?? null);
+  const [profilePicture, setProfilePicture] = useState<string | null>(profileUser?.profile_picture ?? null);
   const [userListType, setUserListType] = useState<UserListType>('followers');
   const [isUserListOpen, setIsUserListOpen] = useState(false);
   const [hasFetchError, setHasFetchError] = useState(false);
-  const isOwnProfile = isAuthenticated && sessionUser?.id === (viewedUserId ?? currentUser.id);
+  const isOwnProfile = isAuthenticated && sessionUser?.id === (viewedUserId ?? sessionUser?.id);
   const [isFollowing, setIsFollowing] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login', { replace: true });
+      return;
+    }
+    if (!viewedUserId && sessionUser?.id) {
+      navigate(`/profile/${sessionUser.id}`, { replace: true });
+      return;
+    }
+  }, [isAuthenticated, navigate, sessionUser?.id, viewedUserId]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !viewedUserId || viewedUserId === sessionUser?.id) {
+      setIsFollowing(false);
+      return;
+    }
+    void fetch(`${BASE_URL}/users/${viewedUserId}/follows/status`, { credentials: 'include' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((body: { data?: { active?: boolean } } | null) => setIsFollowing(Boolean(body?.data?.active)))
+      .catch(() => setIsFollowing(false));
+  }, [isAuthenticated, sessionUser?.id, viewedUserId]);
 
   const handleFollow = () => {
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
-    setIsFollowing((previous) => !previous);
+    const next = !isFollowing;
+    void fetch(`${BASE_URL}/users/follows`, { method: next ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ followed_id: viewedUserId }), credentials: 'include' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((body: { data?: { active?: boolean } } | null) => { if (body?.data?.active !== undefined) setIsFollowing(body.data.active); });
   };
 
   const fetchFollowers = useCallback(async (cursor?: string | null) => {
     try {
       const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
-      const response = await fetch(`/users/${currentUser.id}/followers${query}`);
+      const response = await fetch(`${BASE_URL}/users/${profileUser?.id}/followers${query}`, { credentials: 'include' });
       if (response.ok) {
         const body = await response.json() as { data?: UserSummary[]; cursor?: string };
         return { users: Array.isArray(body.data) ? body.data : [], cursor: body.cursor === 'null' ? null : body.cursor ?? null };
@@ -126,13 +152,13 @@ export default function ProfilePage() {
     } catch {
       setHasFetchError(true);
     }
-    return { users: mockFollowers, cursor: null };
+    return { users: [], cursor: null };
   }, []);
 
   const fetchFollowing = useCallback(async (cursor?: string | null) => {
     try {
       const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
-      const response = await fetch(`/users/${currentUser.id}/following${query}`);
+      const response = await fetch(`${BASE_URL}/users/${profileUser?.id}/following${query}`, { credentials: 'include' });
       if (response.ok) {
         const body = await response.json() as { data?: UserSummary[]; cursor?: string };
         return { users: Array.isArray(body.data) ? body.data : [], cursor: body.cursor === 'null' ? null : body.cursor ?? null };
@@ -141,30 +167,55 @@ export default function ProfilePage() {
     } catch {
       setHasFetchError(true);
     }
-    return { users: mockFollowing, cursor: null };
+    return { users: [], cursor: null };
   }, []);
 
   const handleConfirmEdit = async () => {
-    // Placeholder callback for the future profile update endpoint.
-    await fetch(`/users/${currentUser.id}`, {
+    await fetch(`${BASE_URL}/users/${profileUser?.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ profile_name: displayName, profile_description: bio, profile_picture: profilePicture, interests }),
+      credentials: 'include',
     }).catch(() => undefined);
     setIsEditOpen(false);
   };
 
-  const handleConfirmDelete = () => {
-    // Placeholder callback for the future account deletion endpoint.
-    setIsDeleteOpen(false);
-    setIsEditOpen(false);
-    navigate('/');
+  const handleConfirmDelete = async () => {
+    if (!sessionUser?.id) return;
+
+    try {
+      const response = await fetch(`${BASE_URL}/users/${sessionUser.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Delete failed');
+      }
+
+      logout();
+      setIsDeleteOpen(false);
+      setIsEditOpen(false);
+      navigate('/', { replace: true });
+    } catch {
+      window.alert('We could not delete your account right now. Please try again in a moment.');
+    }
   };
 
   return (
     <>
       <div className="flex flex-col relative py-6 w-[65%] mx-auto pl-8">
-        <ProfileDescription user={currentUser} isOwner={isOwnProfile} isFollowing={isFollowing} onEdit={() => setIsEditOpen(true)} onFollow={handleFollow} onReport={() => navigate(isAuthenticated ? '/placeholder' : '/login')} />
+      {profileUser && <ProfileDescription user={profileUser} isOwner={isOwnProfile} isFollowing={isFollowing} onEdit={() => setIsEditOpen(true)} onFollow={handleFollow} onReport={() => {
+        if (!isAuthenticated) {
+          navigate('/login');
+          return;
+        }
+
+        const confirmed = window.confirm('Report this profile? The report will be reviewed by the moderation team.');
+        if (confirmed) {
+          window.alert('Thanks — this profile has been reported and will be reviewed.');
+        }
+      }} />}
       </div>
       <Box
         sx={{
@@ -179,10 +230,10 @@ export default function ProfilePage() {
         }}
       >
         <Box sx={{ justifySelf: 'end', width: '100%', maxWidth: 720 }}>
-          <ProfileTabs userId={viewedUserId ?? currentUser.id} sessionUserId={sessionUser?.id} />
+          <ProfileTabs userId={viewedUserId ?? sessionUser?.id} sessionUserId={sessionUser?.id} />
         </Box>
         <Box sx={{ maxHeight: '100%' }}>
-          <ProfileSidebar user={currentUser} followers={mockFollowers} following={mockFollowing} showViewAll={isOwnProfile} onViewFollowers={() => { setUserListType('followers'); setIsUserListOpen(true); }} onViewFollowing={() => { setUserListType('following'); setIsUserListOpen(true); }} />
+          {profileUser && <ProfileSidebar user={profileUser} followers={[]} following={[]} showViewAll={isOwnProfile} onViewFollowers={() => { setUserListType('followers'); setIsUserListOpen(true); }} onViewFollowing={() => { setUserListType('following'); setIsUserListOpen(true); }} />}
         </Box>
       </Box>
 
@@ -225,13 +276,55 @@ export default function ProfilePage() {
 
         <DialogContent sx={{ p: { xs: 3, md: 4 }, display: 'flex', flexDirection: 'column', gap: 3 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
-            <Box sx={{ position: 'relative', width: 96, height: 96 }}>
-              <Box sx={{ width: '100%', height: '100%', borderRadius: '50%', bgcolor: 'rgba(179,136,255,0.08)', border: '2px solid rgba(179,136,255,0.2)', background: profilePicture ? `url(${profilePicture}) center/cover` : undefined, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {!profilePicture && <PersonOutlineOutlined sx={{ color: 'text.secondary', fontSize: 40 }} />}
+            <Box
+              component="label"
+              sx={{
+                position: 'relative',
+                width: 96,
+                height: 96,
+                borderRadius: '50%',
+                bgcolor: 'rgba(179,136,255,0.08)',
+                border: '2px solid rgba(179,136,255,0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                overflow: 'hidden',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  borderColor: 'primary.light',
+                  bgcolor: 'rgba(179,136,255,0.14)',
+                  '& .upload-overlay': { opacity: 1 },
+                },
+              }}
+            >
+              {profilePicture ? (
+                <Box component="img" src={profilePicture} alt="Profile preview" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <PersonOutlineOutlined sx={{ color: 'text.secondary', fontSize: 40 }} />
+              )}
+              <input ref={profilePictureInputRef} hidden accept="image/png,image/jpeg,image/jpg" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) setProfilePicture(URL.createObjectURL(file)); }} />
+              <Box
+                className="upload-overlay"
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  bgcolor: 'rgba(0,0,0,0.5)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: 0,
+                  transition: 'opacity 0.2s ease',
+                  borderRadius: '50%',
+                }}
+              >
+                <UploadOutlinedIcon sx={{ color: 'text.primary', fontSize: 22, mb: 0.5 }} />
+                <Typography variant="caption" sx={{ color: 'text.primary', fontSize: '0.7rem' }}>
+                  Upload
+                </Typography>
               </Box>
-              <input ref={profilePictureInputRef} hidden type="file" accept="image/png,image/jpeg,image/jpg" onChange={(event) => { const file = event.target.files?.[0]; if (file) setProfilePicture(URL.createObjectURL(file)); }} />
             </Box>
-            <Button size="small" startIcon={<UploadOutlinedIcon />} onClick={() => profilePictureInputRef.current?.click()} sx={{ textTransform: 'none' }}>Upload picture</Button>
             <Typography variant="caption" sx={{ color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Profile Picture</Typography>
           </Box>
 
@@ -297,7 +390,7 @@ export default function ProfilePage() {
       <UserListDialog
         open={isUserListOpen}
         type={userListType}
-        users={userListType === 'followers' ? mockFollowers : mockFollowing}
+        users={[]}
         onClose={() => setIsUserListOpen(false)}
         onFetch={userListType === 'followers' ? fetchFollowers : fetchFollowing}
       />

@@ -7,15 +7,18 @@ import type { Post, PostLikeRelationRequest, SaveRelationRequest } from "../type
 import { Router } from "express";
 import commentRouter from "./commentsController.ts";
 import { requireSession, sessionUserId } from "../session.ts";
+import { env } from "../config/env.ts";
+import { mediaUrl, saveMedia, type UploadedFile } from "../media.ts";
 
 interface PostBody {
   user_id: string;
   community_id?: string | null;
+  community_name?: string | null;
   title: string;
   content: string;
   user_summary: unknown;
   tags?: string[];
-  media?: unknown[];
+  media?: [];
 }
 export async function createPost(req: Request, res: Response) {
   const body = req.body as Partial<PostBody>;
@@ -40,13 +43,20 @@ export async function createPost(req: Request, res: Response) {
     if (!summary || typeof summary.username !== "string")
       return fail(res, 400, "user_summary must contain username.");
   }
+  if (body.user_summary === undefined)
+    return fail(res, 400, "user_summary is required.");
   if (!(await store.user(userId)))
     return fail(res, 404, "User not found.");
+  const communityName = body.community_name ?? body.community_id;
+  let communityId = env.publicCommunityId;
+  if (communityName && communityName !== "Global") {
+    const community = await store.communityByName(String(communityName));
+    if (!community) return fail(res, 404, "Community not found.");
+    communityId = community.id;
+  }
   const post = await store.createPost({
     user_id: userId,
-    community_id: body.community_id
-      ? String(body.community_id)
-      : null,
+    community_id: communityId,
     title: String(body.title),
     content: String(body.content),
     user_summary: body.user_summary,
@@ -60,6 +70,18 @@ export async function createPost(req: Request, res: Response) {
 export async function getPost(req: Request, res: Response) {
   const post = await store.post(id(req));
   return post ? ok(res, post) : fail(res, 404, "Post not found.");
+}
+export async function uploadPostMedia(req: Request, res: Response) {
+  const postId = id(req);
+  const post = await store.post(postId);
+  if (!post) return fail(res, 404, "Post not found.");
+  if (post.user_id !== sessionUserId(req)) return fail(res, 403, "Only the post owner may upload media.");
+  const files = (((req as unknown as { files?: UploadedFile[] }).files) ?? []);
+  if (!files.length) return fail(res, 400, "At least one image is required.");
+  const saved = await Promise.all(files.map((file, index) => saveMedia(file, postId, "post", index + 1)));
+  const media = saved.map((item) => ({ media_id: item.media_id, media_url: mediaUrl(req, item.path), mime_type: item.mime_type }));
+  const updated = await store.updatePost(postId, { media: [...(post.media ?? []), ...media] });
+  return updated ? ok(res, updated, "Media uploaded successfully.", 201) : fail(res, 500, "Unable to store media metadata.");
 }
 export async function updatePost(req: Request, res: Response) {
   const post = await store.post(id(req));
@@ -110,6 +132,16 @@ export async function postLike(req: Request, res: Response): Promise<Response> {
   });
   return ok(res, { favorited: enabled, queued: true });
 }
+export async function postLikeStatus(req: Request, res: Response) {
+  const userId = sessionUserId(req);
+  if (!(await store.post(id(req)))) return fail(res, 404, "Post not found.");
+  return ok(res, { active: await neo4jRelations.isPostLiked(userId, id(req)) });
+}
+export async function postSaveStatus(req: Request, res: Response) {
+  const userId = sessionUserId(req);
+  if (!(await store.post(id(req)))) return fail(res, 404, "Post not found.");
+  return ok(res, { active: await neo4jRelations.isPostSaved(userId, id(req)) });
+}
 export async function save(req: Request, res: Response): Promise<Response> {
   const body = req.body as Partial<SaveRelationRequest>;
   const userId = sessionUserId(req);
@@ -129,6 +161,8 @@ const router = Router();
 router.get("/feed", feed);
 router.post("/", requireSession, createPost);
 router.get("/:id", getPost);
+router.get("/:id/likes/status", requireSession, postLikeStatus);
+router.get("/:id/saves/status", requireSession, postSaveStatus);
 router.put("/:id", requireSession, updatePost);
 router.delete("/:id", requireSession, deletePost);
 router.use("/:id/comments", commentRouter);

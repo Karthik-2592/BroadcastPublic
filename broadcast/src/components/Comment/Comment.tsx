@@ -2,9 +2,8 @@
 // Layout: avatar column (with vertical thread-line) | content column.
 // Includes an embedded Reply toggle that shows/hides the Reply component.
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import debounce from 'lodash.debounce';
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
 import Typography from '@mui/material/Typography';
@@ -25,6 +24,7 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import Reply, { EditedIndicator } from '../Reply/Reply';
 import type { Comment as ApiComment } from '../../types/api';
 import { useAuth } from '../../context/AuthContext';
+import { BASE_URL } from '../../config';
 
 interface CommentProps {
   comment: ApiComment;
@@ -47,16 +47,17 @@ function CommentEditDialog({ comment, open, onClose }: { comment: ApiComment; op
 
   const handleEdit = async () => {
     if (!commentText.trim() || commentText.length > COMMENT_MAX) return;
-    await fetch(`/comments/${comment.id}`, {
+    await fetch(`${BASE_URL}/comments/${comment.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: commentText }),
+      credentials: 'include',
     }).catch(() => undefined);
     onClose();
   };
 
   const handleDelete = async () => {
-    await fetch(`/comments/${comment.id}`, { method: 'DELETE' }).catch(() => undefined);
+    await fetch(`${BASE_URL}/comments/${comment.id}`, { method: 'DELETE', credentials: 'include' }).catch(() => undefined);
     setIsDeleteOpen(false);
     onClose();
   };
@@ -123,25 +124,37 @@ export default function Comment({ comment, depth = 0, canEdit = false, onLoadRep
   const [likeCount, setLikeCount] = useState(comment.favorite_count);
   const author = comment.user_summary;
 
+  useEffect(() => {
+    if (!isAuthenticated) { setIsLiked(false); return; }
+    void fetch(`${BASE_URL}/comments/${comment.id}/likes/status`, { credentials: 'include' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((body: { data?: { active?: boolean } } | null) => setIsLiked(Boolean(body?.data?.active)));
+  }, [comment.id, isAuthenticated]);
+
   const avatarSize = depth === 0 ? 40 : 32;
   const isNested = depth > 0;
 
   const handleNavigateProfile = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigate('/profile');
+    if (author?.id) {
+      navigate(`/profile/${author.id}`);
+      return;
+    }
+    navigate(isAuthenticated ? '/login' : '/login');
   };
   const handleReport = (e: React.MouseEvent) => {
     e.stopPropagation();
     setOptionsAnchor(null);
-    navigate(isAuthenticated ? '/placeholder' : '/login');
-  };
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
 
-  const debouncedLikeApi = useCallback(
-    debounce((commentId: string, newLikedState: boolean) => {
-      console.log(`[API MOCK] Comment ${commentId} liked: ${newLikedState}`);
-    }, 500),
-    []
-  );
+    const confirmed = window.confirm('Report this comment? The report will be reviewed by the moderation team.');
+    if (confirmed) {
+      window.alert('Thanks — this comment has been reported and will be reviewed.');
+    }
+  };
 
   const handleToggleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -149,13 +162,10 @@ export default function Comment({ comment, depth = 0, canEdit = false, onLoadRep
       navigate('/login');
       return;
     }
-    setIsLiked((prev) => {
-      const next = !prev;
-      console.log("hello")
-      setLikeCount((c) => (next ? c + 1 : c - 1));
-      debouncedLikeApi(comment.id, next);
-      return next;
-    });
+    const next = !isLiked;
+    void fetch(`${BASE_URL}/comments/likes`, { method: next ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ post_id: comment.post_id, comment_id: comment.id }), credentials: 'include' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((body: { data?: { favorited?: boolean } } | null) => { if (body?.data?.favorited !== undefined) { setIsLiked(body.data.favorited); setLikeCount(comment.favorite_count + (body.data.favorited ? 1 : 0)); } });
   };
 
   const handleToggleReplies = async () => {

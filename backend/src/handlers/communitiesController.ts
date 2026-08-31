@@ -5,6 +5,7 @@ import { neo4jRelations, numberValue } from "../neo4j.ts";
 import type { Community, MembershipRelationRequest, ModeratorRelationRequest } from "../types.ts";
 import { Router } from "express";
 import { requireSession, sessionUserId } from "../session.ts";
+import { mediaUrl, saveMedia, type UploadedFile } from "../media.ts";
 
 export async function create(req: Request, res: Response) {
   const userId = sessionUserId(req);
@@ -39,6 +40,17 @@ export async function get(req: Request, res: Response) {
   return community
     ? ok(res, community)
     : fail(res, 404, "Community not found.");
+}
+export async function uploadBanner(req: Request, res: Response) {
+  const communityId = id(req);
+  const community = await store.community(communityId);
+  if (!community) return fail(res, 404, "Community not found.");
+  if (community.admin_id !== sessionUserId(req)) return fail(res, 403, "Only the community admin may upload a banner.");
+  const file = (((req as unknown as { files?: UploadedFile[] }).files) ?? [])[0];
+  if (!file) return fail(res, 400, "A community banner is required.");
+  const saved = await saveMedia(file, communityId, "community", 0);
+  const updated = await store.updateCommunity(communityId, { community_banner: { media_id: saved.media_id, media_url: mediaUrl(req, saved.path), mime_type: saved.mime_type } });
+  return updated ? ok(res, updated, "Community banner uploaded successfully.", 201) : fail(res, 500, "Unable to store community banner metadata.");
 }
 export async function posts(req: Request, res: Response) {
   const sort = req.query.sort === "top" ? "top" : "new";
@@ -86,11 +98,7 @@ export async function personalizedRecommendations(req: Request, res: Response) {
     neo4jRelations.communityRecommendationsByFollowNetwork(userId),
     neo4jRelations.communityRecommendationsByLikedPosts(userId),
   ]);
-  const ranked = groups.flat().reduce((result, item) => {
-    result.set(item.id, (result.get(item.id) ?? 0) + item.score);
-    return result;
-  }, new Map<string, number>());
-  const ids = [...ranked.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([communityId]) => communityId);
+  const ids = [...new Set(groups.flat())].slice(0, 8);
   return ok(res, await store.communitiesByIds(ids));
 }
 export async function moderate(req: Request, res: Response): Promise<Response> {
@@ -148,12 +156,18 @@ export async function membership(
     );
   return ok(res, { active: enabled, changed: Boolean(changed) });
 }
+export async function membershipStatus(req: Request, res: Response) {
+  const userId = sessionUserId(req);
+  if (!(await store.community(id(req)))) return fail(res, 404, "Community not found.");
+  return ok(res, { active: await neo4jRelations.isMember(userId, id(req)) });
+}
 
 const r = Router();
 r.get("/recommendations", recommendations);
 r.get("/recommendations/:userId", personalizedRecommendations);
 r.post("/", requireSession, create);
 r.get("/:id/posts", posts);
+r.get("/:id/memberships/status", requireSession, membershipStatus);
 r.get("/:id", get);
 r.put("/:id", requireSession, update);
 r.delete("/:id", requireSession, remove);

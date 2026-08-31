@@ -1,6 +1,4 @@
 // Frontend API types aligned with backend/src/types.ts.
-// These replace the legacy Mock* interfaces in mockData.ts and are
-// suitable for use with fetch() calls once real endpoints are available.
 
 export type Id = string;
 

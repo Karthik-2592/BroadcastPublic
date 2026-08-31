@@ -1,5 +1,5 @@
 // Feed — Scrollable container that renders a list of PostCard components.
-// Receives mock post data and maps each entry to a PostCard.
+// Retrieves posts from the feed endpoint and maps each entry to a PostCard.
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -7,12 +7,13 @@ import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useCallback, useEffect, useState } from 'react';
 import PostCard from '../PostCard/PostCard';
-import { mockPosts } from '../../data/mockData';
+import type { Post } from '../../types/api';
 import UserRecommendations from './UserRecommendations';
+import { BASE_URL } from '../../config';
 
 export default function Feed() {
   const [showRecommendations] = useState(true);
-  const [posts, setPosts] = useState(mockPosts);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -20,16 +21,15 @@ export default function Feed() {
     setLoading(true);
     try {
       const query = nextCursor ? `?cursor=${encodeURIComponent(nextCursor)}` : '';
-      const response = await fetch(`/feed${query}`);
+      const response = await fetch(`${BASE_URL}/feed${query}`, { credentials: 'include' });
       if (response.ok) {
-        const body = await response.json() as { data?: typeof mockPosts; cursor?: string };
+        const body = await response.json() as { data?: Post[]; cursor?: string };
         const page = Array.isArray(body.data) ? body.data : [];
         setPosts((current) => nextCursor ? [...current, ...page] : page);
         setCursor(body.cursor === 'null' ? null : body.cursor ?? null);
       } else if (!nextCursor) setPosts([]);
     } catch {
-      // Keep mock posts available only when the backend request fails.
-      if (!nextCursor) setPosts(mockPosts);
+      if (!nextCursor) setPosts([]);
     } finally {
       setLoading(false);
     }

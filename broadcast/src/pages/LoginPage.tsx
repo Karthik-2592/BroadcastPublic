@@ -19,10 +19,39 @@ import LoginIcon from '@mui/icons-material/Login';
 import PersonOutlineOutlined from '@mui/icons-material/PersonOutlineOutlined';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CellTowerRoundedIcon from '@mui/icons-material/CellTowerRounded';
+import CircularProgress from '@mui/material/CircularProgress';
+import { useAuth } from '../context/AuthContext';
+import type { User } from '../types/api';
+import { BASE_URL } from '../config';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError('');
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${BASE_URL}/auth/sessions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), credentials: 'include' });
+      const body = await response.json() as { data?: { user_id?: string }; message?: string };
+      if (!response.ok || !body.data?.user_id) throw new Error(body.message ?? 'Unable to sign in.');
+      const userResponse = await fetch(`${BASE_URL}/users/${body.data.user_id}`, { credentials: 'include' });
+      const userBody = await userResponse.json() as { data?: User; message?: string };
+      if (!userResponse.ok || !userBody.data) throw new Error(userBody.message ?? 'Unable to load user profile.');
+      login(userBody.data);
+      navigate('/');
+    } catch (submissionError) {
+      setError(submissionError instanceof Error ? submissionError.message : 'Unable to sign in.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const inputSx = {
     '& .MuiOutlinedInput-root': {
@@ -219,7 +248,7 @@ export default function LoginPage() {
             </Box>
 
             {/* Form */}
-            <Box component="form" noValidate sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <Box component="form" noValidate onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
               {/* Username */}
               <TextField
                 id="login-username"
@@ -227,6 +256,8 @@ export default function LoginPage() {
                 placeholder="Enter your username"
                 fullWidth
                 size="small"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
                 slotProps={{
                   input: {
                     startAdornment: (
@@ -247,6 +278,8 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 fullWidth
                 size="small"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
                 slotProps={{
                   input: {
                     startAdornment: (
@@ -289,6 +322,7 @@ export default function LoginPage() {
               {/* Submit */}
               <Button
                 type="submit"
+                disabled={isSubmitting}
                 fullWidth
                 variant="contained"
                 endIcon={<ArrowForwardIcon />}
@@ -312,8 +346,9 @@ export default function LoginPage() {
                   '& .MuiButton-endIcon': { transition: 'transform 0.2s ease' },
                 }}
               >
-                Sign In
+                {isSubmitting ? <CircularProgress size={20} color="inherit" /> : 'Sign In'}
               </Button>
+              {error && <Typography variant="caption" sx={{ color: 'error.main', textAlign: 'center' }}>{error}</Typography>}
             </Box>
 
             {/* Footer */}

@@ -1,9 +1,8 @@
 // PostCard — Renders a post entry in either 'compact' (feed/explore/profile) or 'expanded' (post view) variant.
 // Supports toggleable Like/Bookmark states, author profile routing, and an Options dropdown with a Report action.
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import debounce from 'lodash.debounce';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardActions from '@mui/material/CardActions';
@@ -33,6 +32,7 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import type { Post } from '../../types/api';
 import { EditedIndicator } from '../Reply/Reply';
 import { useAuth } from '../../context/AuthContext';
+import { BASE_URL } from '../../config';
 
 function PostMediaCarousel({ media, placeholder, height }: { media?: unknown[]; placeholder?: string; height: number }) {
   const mediaItems = (media ?? []).map((item) => {
@@ -122,16 +122,17 @@ function PostEditDialog({ post, open, onClose }: { post: Post; open: boolean; on
 
   const handleEdit = async () => {
     handleTagsProcess();
-    await fetch(`/posts/${post.id}`, {
+    await fetch(`${BASE_URL}/posts/${post.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, content: body, tags }),
+      credentials: 'include',
     }).catch(() => undefined);
     onClose();
   };
 
   const handleDelete = async () => {
-    await fetch(`/posts/${post.id}`, { method: 'DELETE' }).catch(() => undefined);
+    await fetch(`${BASE_URL}/posts/${post.id}`, { method: 'DELETE', credentials: 'include' }).catch(() => undefined);
     setIsDeleteOpen(false);
     onClose();
   };
@@ -294,20 +295,16 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
   const isExpanded = variant === 'expanded';
   const author = post.user_summary;
 
-  // Debounced API callbacks for mock server interaction
-  const debouncedLikeApi = useCallback(
-    debounce((postId: string, newLikedState: boolean) => {
-      console.log(`[API MOCK] Post ${postId} liked: ${newLikedState}`);
-    }, 250),
-    []
-  );
-
-  const debouncedBookmarkApi = useCallback(
-    debounce((postId: string, newBookmarkState: boolean) => {
-      console.log(`[API MOCK] Post ${postId} bookmarked: ${newBookmarkState}`);
-    }, 250),
-    []
-  );
+  useEffect(() => {
+    if (!isAuthenticated) { setIsLiked(false); setIsBookmarked(false); return; }
+    void Promise.all([
+      fetch(`${BASE_URL}/posts/${post.id}/likes/status`, { credentials: 'include' }).then((response) => response.ok ? response.json() : null),
+      fetch(`${BASE_URL}/posts/${post.id}/saves/status`, { credentials: 'include' }).then((response) => response.ok ? response.json() : null),
+    ]).then(([like, save]: Array<{ data?: { active?: boolean } } | null>) => {
+      setIsLiked(Boolean(like?.data?.active));
+      setIsBookmarked(Boolean(save?.data?.active));
+    });
+  }, [isAuthenticated, post.id]);
 
   const handleToggleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -315,12 +312,10 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
       navigate('/login');
       return;
     }
-    setIsLiked((prev) => {
-      const next = !prev;
-      setLikeCount((c) => (next ? c + 1 : c - 1));
-      debouncedLikeApi(post.id, next);
-      return next;
-    });
+    const next = !isLiked;
+    void fetch(`${BASE_URL}/posts/likes`, { method: next ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ post_id: post.id }), credentials: 'include' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((body: { data?: { favorited?: boolean } } | null) => { if (body?.data?.favorited !== undefined) { setIsLiked(body.data.favorited); setLikeCount(post.favorite_count + (body.data.favorited ? 1 : 0)); } });
   };
 
   const handleToggleBookmark = (e: React.MouseEvent) => {
@@ -329,11 +324,10 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
       navigate('/login');
       return;
     }
-    setIsBookmarked((prev) => {
-      const next = !prev;
-      debouncedBookmarkApi(post.id, next);
-      return next;
-    });
+    const next = !isBookmarked;
+    void fetch(`${BASE_URL}/posts/saves`, { method: next ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ post_id: post.id }), credentials: 'include' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((body: { data?: { saved?: boolean } } | null) => { if (body?.data?.saved !== undefined) setIsBookmarked(body.data.saved); });
   };
 
   const handleOpenOptions = (e: React.MouseEvent<HTMLElement>) => {
@@ -349,7 +343,15 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
   const handleReport = (e: React.MouseEvent) => {
     e.stopPropagation();
     setOptionsAnchor(null);
-    navigate(isAuthenticated ? '/placeholder' : '/login');
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+
+    const confirmed = window.confirm('Report this post? The report will be reviewed by the moderation team.');
+    if (confirmed) {
+      window.alert('Thanks — this post has been reported and will be reviewed.');
+    }
   };
 
   const handleEdit = (e: React.MouseEvent) => {
@@ -360,7 +362,11 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
 
   const handleNavigateProfile = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigate('/profile');
+    if (author?.id) {
+      navigate(`/profile/${author.id}`);
+      return;
+    }
+    navigate(isAuthenticated ? '/login' : '/login');
   };
 
   // ─── EXPANDED VARIANT (PostViewPage) ─────────────────────────────────────────

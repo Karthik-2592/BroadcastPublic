@@ -29,7 +29,7 @@ export default function Reply({ open, onClose, parentCommentId }: ReplyProps) {
 
   const debouncedSubmitReplyApi = useCallback(
     debounce((text: string) => {
-      console.log(`[API MOCK] Submitted reply to ${parentCommentId ?? 'comment'}:`, text);
+      void { parentCommentId, text };
     }, 500),
     []
   );

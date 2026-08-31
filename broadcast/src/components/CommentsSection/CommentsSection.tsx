@@ -9,10 +9,10 @@ import CircularProgress from '@mui/material/CircularProgress';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Comment from '../Comment/Comment';
 import type { Comment as ApiComment } from '../../types/api';
-import { mockComments } from '../../data/mockData';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import FetchErrorDialog from '../FetchErrorDialog';
+import { BASE_URL } from '../../config';
 
 interface CommentsSectionProps {
   comments?: ApiComment[];
@@ -22,7 +22,7 @@ interface CommentsSectionProps {
 const COMMENT_MAX = 200;
 const INITIAL_REPLIES_LIMIT = 5;
 
-export default function CommentsSection({ comments = mockComments, postId }: CommentsSectionProps) {
+export default function CommentsSection({ comments = [], postId }: CommentsSectionProps) {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const [commentText, setCommentText] = useState('');
@@ -40,7 +40,7 @@ export default function CommentsSection({ comments = mockComments, postId }: Com
     setLoadingComments(true);
     try {
       const query = nextCursor ? `?cursor=${encodeURIComponent(nextCursor)}` : '';
-      const response = await fetch(`/posts/${postId}/comments${query}`);
+      const response = await fetch(`${BASE_URL}/posts/${postId}/comments${query}`, { credentials: 'include' });
       if (!response.ok) throw new Error('Unable to load comments');
       const body = await response.json() as { data?: ApiComment[]; cursor?: string };
       const page = body.data ?? [];
@@ -66,7 +66,7 @@ export default function CommentsSection({ comments = mockComments, postId }: Com
 
     try {
       const query = nextCursor ? `&cursor=${encodeURIComponent(nextCursor)}` : '';
-      const response = await fetch(`/comments/${comment.id}/replies?limit=${INITIAL_REPLIES_LIMIT}${query}`);
+      const response = await fetch(`${BASE_URL}/comments/${comment.id}/replies?limit=${INITIAL_REPLIES_LIMIT}${query}`, { credentials: 'include' });
       if (!response.ok) throw new Error('Unable to load replies');
 
       const payload = await response.json() as { data?: ApiComment[]; cursor?: string } | ApiComment[];
@@ -75,11 +75,7 @@ export default function CommentsSection({ comments = mockComments, postId }: Com
       if (!Array.isArray(payload)) setReplyCursors((current) => ({ ...current, [comment.id]: payload.cursor === 'null' ? null : payload.cursor ?? null }));
     } catch {
       setHasFetchError(true);
-      // Keep the prototype usable until the replies endpoint is available.
-      setLoadedReplies((current) => ({
-        ...current,
-        [comment.id]: nextCursor ? current[comment.id] ?? [] : (comment.replies ?? []).slice(0, INITIAL_REPLIES_LIMIT),
-      }));
+      setLoadedReplies((current) => ({ ...current, [comment.id]: nextCursor ? current[comment.id] ?? [] : [] }));
       setReplyCursors((current) => ({ ...current, [comment.id]: null }));
     } finally {
       setLoadingReplies((current) => ({ ...current, [comment.id]: false }));
@@ -88,7 +84,7 @@ export default function CommentsSection({ comments = mockComments, postId }: Com
 
   const debouncedSubmitCommentApi = useCallback(
     debounce((text: string) => {
-      console.log(`[API MOCK] Submitted comment:`, text);
+      void text;
     }, 500),
     []
   );

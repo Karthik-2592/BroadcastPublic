@@ -11,7 +11,12 @@ import cors from "cors";
 import { logFailure } from "./http.ts";
 import { sessionMiddleware } from "./session.ts";
 import { search } from "./handlers/searchController.ts";
-import { imageUpload, saveMedia, mediaCategories, type MediaCategory } from "./media.ts";
+import { BUCKET_ROOT } from "./media.ts";
+import { imageUpload } from "./media.ts";
+import { uploadPostMedia } from "./handlers/postsController.ts";
+import { uploadProfilePicture } from "./handlers/usersController.ts";
+import { uploadBanner } from "./handlers/communitiesController.ts";
+import { requireSession } from "./session.ts";
 import feed from "./handlers/feedController.ts";
 
 export function createApp(): Express {
@@ -23,15 +28,10 @@ export function createApp(): Express {
   app.use(express.json({ limit: "4mb" }));
   app.get("/search", search);
   app.use("/feed", feed);
-  app.use("/feed", feed);
-  app.post("/media/:category/:documentId", imageUpload.array("media", 3), async (req, res) => {
-    const category = req.params.category as MediaCategory;
-    if (!(category in mediaCategories)) return res.status(400).json({ success: false, message: "Invalid media category." });
-    const files = (((req as unknown as { files?: import("./media.ts").UploadedFile[] }).files) ?? []);
-    if (!files.length) return res.status(400).json({ success: false, message: "At least one image is required." });
-    const saved = await Promise.all(files.map((file, index) => saveMedia(file, req.params.documentId, category, category === "post" ? index + 1 : 0)));
-    return res.status(201).json({ success: true, message: "Media uploaded successfully.", data: saved });
-  });
+  app.use("/media/files", express.static(BUCKET_ROOT));
+  app.post("/posts/:id/media", requireSession, imageUpload.array("media", 3), uploadPostMedia);
+  app.post("/users/:id/profile-picture", requireSession, imageUpload.array("media", 1), uploadProfilePicture);
+  app.post("/communities/:id/banner", requireSession, imageUpload.array("media", 1), uploadBanner);
   app.get("/health", async (_req, res) => {
     let connected = false;
     try {
@@ -66,6 +66,7 @@ export function createApp(): Express {
       res: express.Response,
       _next: express.NextFunction,
     ) => {
+      console.log(error);
       if (error instanceof SyntaxError) {
         logFailure(req, 400, "Malformed JSON request.");
         return res

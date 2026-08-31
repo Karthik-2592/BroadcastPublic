@@ -1,11 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { relatedCommunities } from '../../data/mockData';
 import { formatCount } from '../../types/api';
 import type { Community } from '../../types/api';
 
-export default function RelatedCommunitiesWidget({ communities = relatedCommunities }: { communities?: Community[] }) {
+export default function RelatedCommunitiesWidget({ communities = [] }: { communities?: Community[] }) {
     const navigate = useNavigate();
 
     return (
@@ -82,5 +81,4 @@ export default function RelatedCommunitiesWidget({ communities = relatedCommunit
         </Box>
     );
 }
-
 

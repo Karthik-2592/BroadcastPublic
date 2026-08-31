@@ -28,20 +28,25 @@ import CellTowerRoundedIcon from '@mui/icons-material/CellTowerRounded';
 import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
+import { BASE_URL } from '../config';
 
 const INTERESTS = [
-  'Web Dev',
-  'Open Source',
-  'UI/UX',
-  'Cloud Computing',
-  'AI/ML',
-  'DevOps',
-  'Cybersecurity',
-  'Mobile App Dev',
-  'Blockchain',
-  'Data Science',
-  'Game Dev',
-  'Systems Programming',
+    "Art"
+  , "Business & Finance"
+  , "Fashion & Beauty"
+  , "Travelling"
+  , "Sports"
+  , "Food"
+  , "Technology"
+  , "Books"
+  , "Health"
+  , "Games"
+  , "Films & TV"
+  , "Nature"
+  , "News & Politics"
+  , "Science"
+  , "Pop Culture"
+  , "Lifestyle"
 ];
 
 const inputSx = {
@@ -253,13 +258,10 @@ function InterestsDialog({
 }
 
 // ─── Step 1 ───────────────────────────────────────────────────────────────────
-function StepOne({ onContinue, handleBack }: { onContinue: () => void; handleBack: () => void }) {
+function StepOne({ onContinue, handleBack, values, setValues }: { onContinue: () => void; handleBack: () => void; values: { username: string; email: string; password: string; confirmPassword: string }; setValues: (values: { username: string; email: string; password: string; confirmPassword: string }) => void }) {
   const navigate = useNavigate();
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const { username, email, password, confirmPassword } = values;
 
   const validateAndContinue = () => {
     const nextErrors: Record<string, string> = {};
@@ -406,7 +408,7 @@ function StepOne({ onContinue, handleBack }: { onContinue: () => void; handleBac
             fullWidth
             size="small"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={(e) => setValues({ ...values, username: e.target.value })}
             error={Boolean(errors.username)}
             helperText={errors.username}
             slotProps={{
@@ -428,7 +430,7 @@ function StepOne({ onContinue, handleBack }: { onContinue: () => void; handleBac
             fullWidth
             size="small"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => setValues({ ...values, email: e.target.value })}
             error={Boolean(errors.email)}
             helperText={errors.email}
             slotProps={{
@@ -450,7 +452,7 @@ function StepOne({ onContinue, handleBack }: { onContinue: () => void; handleBac
             fullWidth
             size="small"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => setValues({ ...values, password: e.target.value })}
             error={Boolean(errors.password)}
             helperText={errors.password}
             slotProps={{
@@ -472,7 +474,7 @@ function StepOne({ onContinue, handleBack }: { onContinue: () => void; handleBac
             fullWidth
             size="small"
             value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            onChange={(e) => setValues({ ...values, confirmPassword: e.target.value })}
             error={Boolean(errors.confirmPassword)}
             helperText={errors.confirmPassword}
             slotProps={{
@@ -550,18 +552,23 @@ function StepOne({ onContinue, handleBack }: { onContinue: () => void; handleBac
 const DISPLAY_NAME_MAX = 64;
 const BIO_MAX = 200;
 
-function StepTwo({ handleBack }: { handleBack: () => void }) {
+function StepTwo({ handleBack, registration }: { handleBack: () => void; registration: { username: string; email: string; password: string } }) {
+  const navigate = useNavigate();
   const [selectedInterests, setSelectedInterests] = useState<Set<string>>(new Set());
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [displayNameError, setDisplayNameError] = useState('');
   const [bioError, setBioError] = useState('');
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [profileFile, setProfileFile] = useState<File | null>(null);
+  const [submissionError, setSubmissionError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) return;
+    setProfileFile(file);
     setProfileImage(URL.createObjectURL(file));
   };
 
@@ -577,7 +584,7 @@ function StepTwo({ handleBack }: { handleBack: () => void }) {
     });
   };
 
-  const handleCompleteRegistration = () => {
+  const handleCompleteRegistration = async () => {
     let valid = true;
 
     if (displayName.trim().length === 0) {
@@ -598,7 +605,36 @@ function StepTwo({ handleBack }: { handleBack: () => void }) {
     }
 
     if (!valid) return;
-    console.log('[API MOCK] Complete registration:', { displayName, bio, interests: Array.from(selectedInterests) });
+    setSubmissionError('');
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${BASE_URL}/auth/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: registration.username,
+          email: registration.email,
+          password: registration.password,
+          profile_name: displayName,
+          profile_description: bio,
+          interests: Array.from(selectedInterests),
+        }),
+        credentials: 'include',
+      });
+      const body = await response.json() as { data?: { id?: string }; message?: string };
+      if (!response.ok || !body.data?.id) throw new Error(body.message ?? 'Registration failed.');
+      if (profileFile) {
+        const form = new FormData();
+        form.append('media', profileFile);
+        const upload = await fetch(`${BASE_URL}/users/${body.data.id}/profile-picture`, { method: 'POST', body: form, credentials: 'include' });
+        if (!upload.ok) throw new Error('Profile picture upload failed.');
+      }
+      navigate('/');
+    } catch (error) {
+      setSubmissionError(error instanceof Error ? error.message : 'Registration failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -805,17 +841,7 @@ function StepTwo({ handleBack }: { handleBack: () => void }) {
                     ),
                   },
                 }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 9999,
-                    bgcolor: 'rgba(255,255,255,0.06)',
-                    color: 'text.primary',
-                    '& fieldset': { borderColor: 'transparent' },
-                    '&:hover fieldset': { borderColor: 'rgba(179,136,255,0.3)' },
-                    '&.Mui-focused fieldset': { borderColor: 'primary.main' },
-                  },
-                  '& .MuiInputBase-input': { py: 1.5, pr: '72px' },
-                }}
+                sx={inputSx}
               />
               {/* Char-count chip */}
               <Typography
@@ -924,6 +950,7 @@ function StepTwo({ handleBack }: { handleBack: () => void }) {
             variant="contained"
             endIcon={<ArrowForwardIcon />}
             onClick={handleCompleteRegistration}
+            disabled={isSubmitting}
             sx={{
               mt: 1,
               py: 1.75,
@@ -944,8 +971,9 @@ function StepTwo({ handleBack }: { handleBack: () => void }) {
               '& .MuiButton-endIcon': { transition: 'transform 0.2s ease' },
             }}
           >
-            Complete Registration
+            {isSubmitting ? 'Creating account…' : 'Complete Registration'}
           </Button>
+          {submissionError && <Typography variant="caption" sx={{ color: 'error.main', textAlign: 'center' }}>{submissionError}</Typography>}
         </Box>
       </Box>
     </Box>
@@ -956,6 +984,7 @@ function StepTwo({ handleBack }: { handleBack: () => void }) {
 export default function RegisterPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<1 | 2>(1);
+  const [registration, setRegistration] = useState({ username: '', email: '', password: '', confirmPassword: '' });
 
   const handleBack = () => {
     if (step === 2) {
@@ -1061,13 +1090,13 @@ export default function RegisterPage() {
         {step === 1 ? (
           <Fade in={step === 1} timeout={350} key="step-1">
             <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-              <StepOne onContinue={() => setStep(2)} handleBack={handleBack} />
+              <StepOne onContinue={() => setStep(2)} handleBack={handleBack} values={registration} setValues={setRegistration} />
             </Box>
           </Fade>
         ) : (
           <Fade in={step === 2} timeout={350} key="step-2">
             <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-              <StepTwo handleBack={handleBack} />
+              <StepTwo handleBack={handleBack} registration={registration} />
             </Box>
           </Fade>
         )}

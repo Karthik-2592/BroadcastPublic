@@ -12,9 +12,7 @@ export default function CommunityHero() {
   const { isAuthenticated, isMember } = useAuth();
 
   const debouncedJoinCommunityApi = useCallback(
-    debounce(() => {
-      console.log(`[API MOCK] Joined community: Web Developers`);
-    }, 500),
+    debounce(() => undefined, 500),
     []
   );
 
@@ -163,4 +161,3 @@ export default function CommunityHero() {
     </Box>
   );
 }
-

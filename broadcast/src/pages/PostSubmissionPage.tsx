@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import debounce from 'lodash.debounce';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -11,6 +12,7 @@ import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import AttachFileRoundedIcon from '@mui/icons-material/AttachFileRounded';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
+import { BASE_URL } from '../config';
 
 export default function PostSubmissionPage() {
   const [title, setTitle] = useState('');
@@ -31,15 +33,39 @@ export default function PostSubmissionPage() {
   const [attachmentError, setAttachmentError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const navigate = useNavigate();
+
   const debouncedPostSubmitApi = useCallback(
-    debounce((postData: any) => {
-      console.log(`[API MOCK] Post submitted:`, postData);
-      // Validate community mock
-      if (postData.community) {
-        console.log(`[API MOCK] Verifying community membership for ${postData.community}... verified!`);
+    debounce(async (postData: { title: string, body: string, tags: string[], community: string, attachments: string[] }) => {
+      try {
+        const response = await fetch(`${BASE_URL}/posts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: postData.title,
+            content: postData.body,
+            tags: postData.tags,
+            community_name: postData.community || null,
+          }),
+          credentials: 'include',
+        });
+        const body = await response.json() as { data?: { id?: string }; message?: string };
+        if (!response.ok || !body.data?.id) throw new Error(body.message ?? 'Failed to create post.');
+        
+        // Handle media upload if any
+        if (postData.attachments.length > 0) {
+          const form = new FormData();
+          postData.attachments.forEach(file => form.append('media', file));
+          const upload = await fetch(`${BASE_URL}/posts/${body.data.id}/media`, { method: 'POST', body: form, credentials: 'include' });
+          if (!upload.ok) console.error('Failed to upload media');
+        }
+
+        navigate(`/post/${body.data.id}`);
+      } catch (e) {
+        console.error(e);
       }
     }, 1000),
-    []
+    [navigate]
   );
 
   const handleTagsProcess = () => {

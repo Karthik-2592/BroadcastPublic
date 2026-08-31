@@ -21,51 +21,54 @@ export class Neo4jRelations {
   private session(): Session {
     return this.driver.session({ database });
   }
+  private neo4jInteger(value: number) {
+    return neo4j.int(value);
+  }
   private async rankedUsers(operation: string, query: string, userId: string, limit: number) {
     const session = this.session();
     try {
-      const result = await session.executeRead((transaction) => transaction.run(query, { userId, limit }));
-      return result.records.map((record) => ({ id: String(record.get("userId")), score: numberValue(record.get("score")) }));
+      const result = await session.executeRead((transaction) => transaction.run(query, { userId, limit: this.neo4jInteger(limit) }));
+      return result.records.map((record) => String(record.get("userId")));
     } finally { await session.close(); }
   }
   private async rankedCommunities(operation: string, query: string, userId: string, limit: number) {
     const session = this.session();
     try {
-      const result = await session.executeRead((transaction) => transaction.run(query, { userId, limit }));
-      return result.records.map((record) => ({ id: String(record.get("communityId")), score: numberValue(record.get("score")) }));
+      const result = await session.executeRead((transaction) => transaction.run(query, { userId, limit: this.neo4jInteger(limit) }));
+      return result.records.map((record) => String(record.get("communityId")));
     } finally { await session.close(); }
   }
   private async rankedPosts(query: string, userId: string, limit: number) {
     const session = this.session();
     try {
-      const result = await session.executeRead((transaction) => transaction.run(query, { userId, limit }));
-      return result.records.map((record) => ({ id: String(record.get("postId")), score: numberValue(record.get("score")) }));
+      const result = await session.executeRead((transaction) => transaction.run(query, { userId, limit: this.neo4jInteger(limit) }));
+      return result.records.map((record) => String(record.get("postId")));
     } finally { await session.close(); }
   }
 
   userRecommendationsByInterests(userId: string, limit = 4) {
-    return this.rankedUsers("recommend.users.interests", `MATCH (me:USER {user_id: $userId})-[:INTERESTED_IN]->(interest:INTEREST)<-[:INTERESTED_IN]-(candidate:USER) WHERE candidate.user_id <> $userId AND NOT (me)-[:FOLLOWS]->(candidate) RETURN candidate.user_id AS userId, count(DISTINCT interest) AS score ORDER BY score DESC, userId LIMIT $limit`, userId, limit);
+    return this.rankedUsers("recommend.users.interests", `MATCH (me:USER {user_id: $userId})-[:INTERESTED_IN]->(:INTEREST)<-[:INTERESTED_IN]-(candidate:USER) WHERE candidate.user_id <> $userId AND NOT (me)-[:FOLLOWS]->(candidate) RETURN DISTINCT candidate.user_id AS userId ORDER BY userId LIMIT $limit`, userId, limit);
   }
   userRecommendationsByCommunities(userId: string, limit = 4) {
-    return this.rankedUsers("recommend.users.communities", `MATCH (me:USER {user_id: $userId})-[:PARTICIPATES]->(community:COMMUNITY)<-[:PARTICIPATES]-(candidate:USER) WHERE candidate.user_id <> $userId AND NOT (me)-[:FOLLOWS]->(candidate) RETURN candidate.user_id AS userId, count(DISTINCT community) AS score ORDER BY score DESC, userId LIMIT $limit`, userId, limit);
+    return this.rankedUsers("recommend.users.communities", `MATCH (me:USER {user_id: $userId})-[:PARTICIPATES]->(:COMMUNITY)<-[:PARTICIPATES]-(candidate:USER) WHERE candidate.user_id <> $userId AND NOT (me)-[:FOLLOWS]->(candidate) RETURN DISTINCT candidate.user_id AS userId ORDER BY userId LIMIT $limit`, userId, limit);
   }
   userRecommendationsByFollowNetwork(userId: string, limit = 4) {
-    return this.rankedUsers("recommend.users.network", `MATCH (me:USER {user_id: $userId})-[:FOLLOWS]->(followed:USER)-[:FOLLOWS]->(candidate:USER) WHERE candidate.user_id <> $userId AND NOT (me)-[:FOLLOWS]->(candidate) RETURN candidate.user_id AS userId, count(DISTINCT followed) AS score ORDER BY score DESC, userId LIMIT $limit`, userId, limit);
+    return this.rankedUsers("recommend.users.network", `MATCH (me:USER {user_id: $userId})-[:FOLLOWS]->(:USER)-[:FOLLOWS]->(candidate:USER) WHERE candidate.user_id <> $userId AND NOT (me)-[:FOLLOWS]->(candidate) RETURN DISTINCT candidate.user_id AS userId ORDER BY userId LIMIT $limit`, userId, limit);
   }
   communityRecommendationsByInterests(userId: string, limit = 8) {
-    return this.rankedCommunities("recommend.communities.interests", `MATCH (me:USER {user_id: $userId})-[:INTERESTED_IN]->(interest:INTEREST)<-[:ASSOCIATED_WITH]-(community:COMMUNITY) WHERE NOT (me)-[:PARTICIPATES]->(community) RETURN community.community_id AS communityId, count(DISTINCT interest) AS score ORDER BY score DESC, communityId LIMIT $limit`, userId, limit);
+    return this.rankedCommunities("recommend.communities.interests", `MATCH (me:USER {user_id: $userId})-[:INTERESTED_IN]->(:INTEREST)<-[:ASSOCIATED_WITH]-(community:COMMUNITY) WHERE NOT (me)-[:PARTICIPATES]->(community) RETURN DISTINCT community.community_id AS communityId ORDER BY communityId LIMIT $limit`, userId, limit);
   }
   communityRecommendationsByFollowNetwork(userId: string, limit = 8) {
-    return this.rankedCommunities("recommend.communities.network", `MATCH (me:USER {user_id: $userId})-[:FOLLOWS]->(followed:USER)-[:PARTICIPATES]->(community:COMMUNITY) WHERE NOT (me)-[:PARTICIPATES]->(community) RETURN community.community_id AS communityId, count(DISTINCT followed) AS score ORDER BY score DESC, communityId LIMIT $limit`, userId, limit);
+    return this.rankedCommunities("recommend.communities.network", `MATCH (me:USER {user_id: $userId})-[:FOLLOWS]->(:USER)-[:PARTICIPATES]->(community:COMMUNITY) WHERE NOT (me)-[:PARTICIPATES]->(community) RETURN DISTINCT community.community_id AS communityId ORDER BY communityId LIMIT $limit`, userId, limit);
   }
   postRecommendationsByFollowedLikes(userId: string, limit = 50) {
-    return this.rankedPosts(`MATCH (me:USER {user_id: $userId})-[:FOLLOWS]->(followed:USER)-[:LIKES]->(post:POST) WHERE NOT (me)-[:LIKES]->(post) RETURN post.post_id AS postId, count(DISTINCT followed) AS score ORDER BY score DESC, postId LIMIT $limit`, userId, limit);
+    return this.rankedPosts(`MATCH (me:USER {user_id: $userId})-[:FOLLOWS]->(:USER)-[:LIKES]->(post:POST) WHERE NOT (me)-[:LIKES]->(post) RETURN DISTINCT post.post_id AS postId ORDER BY postId LIMIT $limit`, userId, limit);
   }
   postRecommendationsByJoinedCommunities(userId: string, limit = 50) {
-    return this.rankedPosts(`MATCH (me:USER {user_id: $userId})-[:PARTICIPATES]->(community:COMMUNITY)<-[:BELONGS_TO]-(post:POST) RETURN post.post_id AS postId, 1 AS score ORDER BY postId LIMIT $limit`, userId, limit);
+    return this.rankedPosts(`MATCH (me:USER {user_id: $userId})-[:PARTICIPATES]->(:COMMUNITY)<-[:BELONGS_TO]-(post:POST) RETURN DISTINCT post.post_id AS postId ORDER BY postId LIMIT $limit`, userId, limit);
   }
   communityRecommendationsByLikedPosts(_userId: string, _limit = 8) {
-    return Promise.resolve([] as { id: string; score: number }[]);
+    return Promise.resolve([] as string[]);
   }
   postRecommendations(_userId: string, _limit = 10) {
     // Ranking and recommendation reasons will be defined in a later task.
@@ -191,6 +194,29 @@ export class Neo4jRelations {
       { userId, communityId },
     );
   }
+  async isFollowing(followerId: string, followedId: string) {
+    const session = this.session();
+    try {
+      const result = await session.executeRead((transaction) => transaction.run("MATCH (follower:USER {user_id: $followerId})-[rel:FOLLOWS]->(followed:USER {user_id: $followedId}) RETURN count(rel) > 0 AS active", { followerId, followedId }));
+      return Boolean(result.records[0]?.get("active"));
+    } finally { await session.close(); }
+  }
+  async isMember(userId: string, communityId: string) {
+    const session = this.session();
+    try {
+      const result = await session.executeRead((transaction) => transaction.run("MATCH (user:USER {user_id: $userId})-[rel:PARTICIPATES]->(community:COMMUNITY {community_id: $communityId}) RETURN count(rel) > 0 AS active", { userId, communityId }));
+      return Boolean(result.records[0]?.get("active"));
+    } finally { await session.close(); }
+  }
+  async isPostLiked(userId: string, postId: string) { return this.isRelation("LIKES", "user_id", userId, "post_id", postId); }
+  async isPostSaved(userId: string, postId: string) { return this.isRelation("SAVES", "user_id", userId, "post_id", postId); }
+  private async isRelation(relation: "LIKES" | "SAVES", userProperty: string, userId: string, entityProperty: string, entityId: string) {
+    const session = this.session();
+    try {
+      const result = await session.executeRead((transaction) => transaction.run(`MATCH (user:USER {${userProperty}: $userId})-[rel:${relation}]->(entity:POST {${entityProperty}: $entityId}) RETURN count(rel) > 0 AS active`, { userId, entityId }));
+      return Boolean(result.records[0]?.get("active"));
+    } finally { await session.close(); }
+  }
   async relatedUserIds(userId: string, direction: "followers" | "following", offset = 0, limit = 11) {
     const session = this.session();
     try {
@@ -198,7 +224,11 @@ export class Neo4jRelations {
         ? "MATCH (user:USER {user_id: $userId})<-[:FOLLOWS]-(related:USER) RETURN related.user_id AS userId"
         : "MATCH (user:USER {user_id: $userId})-[:FOLLOWS]->(related:USER) RETURN related.user_id AS userId";
       const result = await session.executeRead((transaction) =>
-        transaction.run(`${query} SKIP $offset LIMIT $limit`, { userId, offset, limit }),
+        transaction.run(`${query} SKIP $offset LIMIT $limit`, {
+          userId,
+          offset: this.neo4jInteger(offset),
+          limit: this.neo4jInteger(limit),
+        }),
       );
       return result.records.map((record) => String(record.get("userId")));
     } finally {

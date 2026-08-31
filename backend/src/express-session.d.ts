@@ -11,7 +11,7 @@ declare module "express-session" {
     secret: string;
     resave: boolean;
     saveUninitialized: boolean;
-    cookie?: { httpOnly?: boolean };
+    cookie?: { httpOnly?: boolean, sameSite?: string, secure?: boolean };
   }
 
   const session: (options: SessionOptions) => import("express").RequestHandler;

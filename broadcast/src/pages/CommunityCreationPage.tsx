@@ -12,12 +12,15 @@ import {
 } from '@mui/icons-material';
 import CommunityTagSelector from '../components/Community/CommunityTagSelector';
 import type { Tag } from '../types/api';
+import { useNavigate } from 'react-router-dom';
+import { BASE_URL } from '../config';
 
 const NAME_MAX = 50;
 const DESC_MAX = 200;
 const GUIDELINES_MAX = 200;
 
 export default function CommunityCreationPage() {
+  const navigate = useNavigate();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [guidelines, setGuidelines] = useState('');
@@ -34,7 +37,7 @@ export default function CommunityCreationPage() {
     if (!file.type.startsWith('image/')) return;
     setCommunityImage(URL.createObjectURL(file));
   };
-  const handleCreate = () => {
+  const handleCreate = async () => {
     let valid = true;
 
     if (name.trim().length === 0) {
@@ -62,7 +65,25 @@ export default function CommunityCreationPage() {
     }
 
     if (!valid) return;
-    console.log('[API MOCK] Create community:', { name, description, guidelines, tags });
+    try {
+      const response = await fetch(`${BASE_URL}/communities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          community_name: name,
+          community_desc: description,
+          community_guidelines: guidelines,
+          tags,
+        }),
+        credentials: 'include',
+      });
+      const body = await response.json() as { data?: { id?: string }; message?: string };
+      if (!response.ok || !body.data?.id) throw new Error(body.message ?? 'Failed to create community.');
+      navigate(`/c/${body.data.id}`);
+    } catch (e) {
+      console.error(e);
+      // Optional: Handle error via state
+    }
   };
 
   // Reusable chip component

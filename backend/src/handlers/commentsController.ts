@@ -25,7 +25,7 @@ export async function replies(req: Request, res: Response) {
 export async function create(req: Request, res: Response) {
   console.log(`[http] POST /posts/${id(req)}/comments received`);
   const userId = sessionUserId(req);
-  const missing = required(req.body, ["content"]);
+  const missing = required(req.body, ["content", "user_summary"]);
   if (missing.length)
     return fail(res, 400, `Missing required fields: ${missing.join(", ")}`);
   if (!(await store.post(id(req)))) return fail(res, 404, "Post not found.");
@@ -99,9 +99,15 @@ export async function commentLike(
   });
   return ok(res, { favorited: enabled, queued: true });
 }
+export async function commentLikeStatus(req: Request, res: Response) {
+  const userId = sessionUserId(req);
+  if (!(await store.comment(id(req)))) return fail(res, 404, "Comment not found.");
+  return ok(res, { active: await store.isCommentFavorited(id(req), userId) });
+}
 
 const router = Router({ mergeParams: true });
 router.get("/", list);
+router.get("/:id/likes/status", requireSession, commentLikeStatus);
 router.post("/", requireSession, create);
 router.post("/likes", requireSession, commentLike);
 router.delete("/likes", requireSession, commentLike);

@@ -1,8 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import multer from "multer";
+import { env } from "./config/env.ts";
+import type { Request } from "express";
 
-const BUCKET_ROOT = process.env.MEDIA_BUCKET_PATH ?? "B:\\Databases\\MediaBucket";
+export const BUCKET_ROOT = env.bucketStorageURL;
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
 export const mediaCategories = {
@@ -10,6 +12,9 @@ export const mediaCategories = {
   profile: "ProfilePictures",
   post: "PostMedia",
 } as const;
+
+export const mediaUrl = (req: Request, path: string) =>
+  `${req.protocol}://${req.get("host")}/media/files/${path}`;
 
 export type MediaCategory = keyof typeof mediaCategories;
 
@@ -38,5 +43,6 @@ export async function saveMedia(
   const extension = file.mimetype.split("/")[1]?.replace("jpeg", "jpg") ?? "bin";
   const filename = `${documentId}_${timestamp}_${count}.${extension}`;
   await writeFile(join(directory, filename), file.buffer);
-  return { filename, category: mediaCategories[category], path: join(mediaCategories[category], filename) };
+  const path = `${mediaCategories[category]}/${filename}`;
+  return { filename, category: mediaCategories[category], path, media_id: (timestamp % 2147483000) + count, mime_type: file.mimetype };
 }

@@ -21,38 +21,49 @@ import { useAuth } from '../context/AuthContext';
 import CommunitySortTabs from '../components/Community/CommunitySortTabs';
 import CommunityRightSidebar from '../components/Community/CommunityRightSidebar';
 import PostCard from '../components/PostCard/PostCard';
-import { exploreCommunities, mockPosts } from '../data/mockData';
-import type { Post, Tag } from '../types/api';
+import type { Community, Post, Tag } from '../types/api';
+import { BASE_URL } from '../config';
 
 export default function CommunitiesPage() {
   const navigate = useNavigate();
   const { communityId = 'ec1' } = useParams<{ communityId: string }>();
   const { isAuthenticated, isMember } = useAuth();
-  const community = exploreCommunities.find(({ id }) => id === communityId) ?? exploreCommunities[0];
+  const [community, setCommunity] = useState<Community | null>(null);
   const [sortTab, setSortTab] = useState<'new' | 'top'>('new');
-  const [communityPosts, setCommunityPosts] = useState<Post[]>(mockPosts);
+  const [communityPosts, setCommunityPosts] = useState<Post[]>([]);
   const [postsCursor, setPostsCursor] = useState<string | null>(null);
   const [postsLoading, setPostsLoading] = useState(false);
   const [isCommunityMember, setIsCommunityMember] = useState(isMember);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isJoinPromptOpen, setIsJoinPromptOpen] = useState(false);
-  const [description, setDescription] = useState(community.community_desc);
-  const [guidelines, setGuidelines] = useState('Be respectful and constructive.');
-  const [tags, setTags] = useState<Tag[]>(['Technology']);
+  const [description, setDescription] = useState('');
+  const [guidelines, setGuidelines] = useState('');
+  const [tags, setTags] = useState<Tag[]>([]);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const [bannerImage, setBannerImage] = useState<string | null>(null);
   const isAdmin = isAuthenticated && isCommunityMember && (communityId === 'ec1' || communityId === 'c1');
 
-  useEffect(() => setIsCommunityMember(isMember), [isMember, communityId]);
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setIsCommunityMember(false);
+      return;
+    }
+    void fetch(`${BASE_URL}/communities/${communityId}/memberships/status`, { credentials: 'include' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((body: { data?: { active?: boolean } } | null) => setIsCommunityMember(Boolean(body?.data?.active)))
+      .catch(() => setIsCommunityMember(false));
+  }, [communityId, isAuthenticated, isMember]);
+  useEffect(() => { void fetch(`${BASE_URL}/communities/${communityId}`, { credentials: 'include' }).then((response) => response.ok ? response.json() : null).then((body: { data?: Community } | null) => { const value = body?.data ?? null; setCommunity(value); setDescription(value?.community_desc ?? ''); setGuidelines(value?.community_guidelines ?? ''); setTags((value?.tags ?? []) as Tag[]); }); }, [communityId]);
 
   const handleJoin = () => {
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
-    setIsCommunityMember(true);
-    setIsJoinPromptOpen(false);
+    void fetch(`${BASE_URL}/communities/memberships`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ community_id: communityId }), credentials: 'include' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((body: { data?: { active?: boolean } } | null) => { if (body?.data?.active !== undefined) { setIsCommunityMember(body.data.active); setIsJoinPromptOpen(false); } });
   };
 
   const handleCreatePost = () => {
@@ -66,16 +77,19 @@ export default function CommunitiesPage() {
   };
 
   const handleEdit = async () => {
-    await fetch(`/communities/${community.id}`, {
+    if (!community) return;
+    await fetch(`${BASE_URL}/communities/${community.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ community_desc: description, community_guidelines: guidelines, tags }),
+      credentials: 'include',
     }).catch(() => undefined);
     setIsEditOpen(false);
   };
 
   const handleDelete = async () => {
-    await fetch(`/communities/${community.id}`, { method: 'DELETE' }).catch(() => undefined);
+    if (!community) return;
+    await fetch(`${BASE_URL}/communities/${community.id}`, { method: 'DELETE', credentials: 'include' }).catch(() => undefined);
     setIsDeleteOpen(false);
     setIsEditOpen(false);
     navigate('/communities');
@@ -85,7 +99,8 @@ export default function CommunitiesPage() {
     let active = true;
     setPostsLoading(true);
     setPostsCursor(null);
-    fetch(`/communities/${community.id}/posts?sort=${sortTab}`)
+    if (!community) return;
+    fetch(`${BASE_URL}/communities/${community?.id}/posts?sort=${sortTab}`, { credentials: 'include' })
       .then(async (response) => response.ok ? await response.json() as { data?: Post[]; cursor?: string } : null)
       .then((body) => {
         if (!active) return;
@@ -96,12 +111,14 @@ export default function CommunitiesPage() {
       .catch(() => undefined)
       .finally(() => { if (active) setPostsLoading(false); });
     return () => { active = false; };
-  }, [community.id, sortTab]);
+  }, [community?.id, sortTab]);
+
+  if (!community) return <Typography sx={{ p: 8, textAlign: 'center' }}>Nothing to see here</Typography>;
 
   const loadMorePosts = () => {
     if (!postsCursor || postsLoading) return;
     setPostsLoading(true);
-    fetch(`/communities/${community.id}/posts?sort=${sortTab}&cursor=${encodeURIComponent(postsCursor)}`)
+    fetch(`${BASE_URL}/communities/${community?.id}/posts?sort=${sortTab}&cursor=${encodeURIComponent(postsCursor)}`, { credentials: 'include' })
       .then(async (response) => response.ok ? await response.json() as { data?: Post[]; cursor?: string } : null)
       .then((body) => {
         if (!body?.data) return;
