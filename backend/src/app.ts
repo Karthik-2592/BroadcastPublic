@@ -12,6 +12,7 @@ import { logFailure } from "./http.ts";
 import { sessionMiddleware } from "./session.ts";
 import { search } from "./handlers/searchController.ts";
 import { imageUpload, saveMedia, mediaCategories, type MediaCategory } from "./media.ts";
+import feed from "./handlers/feedController.ts";
 
 export function createApp(): Express {
   const app = express();
@@ -21,6 +22,8 @@ export function createApp(): Express {
   startAggregationWorker();
   app.use(express.json({ limit: "4mb" }));
   app.get("/search", search);
+  app.use("/feed", feed);
+  app.use("/feed", feed);
   app.post("/media/:category/:documentId", imageUpload.array("media", 3), async (req, res) => {
     const category = req.params.category as MediaCategory;
     if (!(category in mediaCategories)) return res.status(400).json({ success: false, message: "Invalid media category." });

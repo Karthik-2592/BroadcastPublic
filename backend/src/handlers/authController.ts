@@ -5,6 +5,7 @@ import { neo4jRelations } from "../neo4j.ts";
 import type { LoginRequest, RegisterRequest } from "../types.ts";
 import { Router } from "express";
 import { requireSession } from "../session.ts";
+import { feedService } from "../services/feed.ts";
 
 
 export async function register(req: Request, res: Response): Promise<Response> {
@@ -33,6 +34,8 @@ export async function login(req: Request, res: Response): Promise<Response> {
   );
 }
 export function logout(req: Request, res: Response): Response {
+  const userId = (req as Request & { session: { id?: string } }).session.id;
+  if (userId) feedService.destroy(userId);
   (req as Request & { session: { destroy: (callback: () => void) => void } }).session.destroy(() => undefined);
   return ok(res, null, "Logged out successfully.");
 }

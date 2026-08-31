@@ -20,15 +20,16 @@ export default function Feed() {
     setLoading(true);
     try {
       const query = nextCursor ? `?cursor=${encodeURIComponent(nextCursor)}` : '';
-      const response = await fetch(`/posts/feed${query}`);
+      const response = await fetch(`/feed${query}`);
       if (response.ok) {
         const body = await response.json() as { data?: typeof mockPosts; cursor?: string };
         const page = Array.isArray(body.data) ? body.data : [];
         setPosts((current) => nextCursor ? [...current, ...page] : page);
         setCursor(body.cursor === 'null' ? null : body.cursor ?? null);
-      }
+      } else if (!nextCursor) setPosts([]);
     } catch {
-      // Keep mock posts available while the backend is unavailable.
+      // Keep mock posts available only when the backend request fails.
+      if (!nextCursor) setPosts(mockPosts);
     } finally {
       setLoading(false);
     }

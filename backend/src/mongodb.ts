@@ -575,6 +575,13 @@ export class MongoStore {
     const items = comments.slice(0, limit);
     return { items, nextCursor: nextCursor(page.offset, comments.length, limit, filters) };
   }
+  async feedIds(limit = 50) {
+    return this.log("posts.feedIds", () =>
+      this.collection<PostDocument>("posts")
+        .then((c) => c.find().sort({ time_created: -1, _id: -1 }).limit(limit).project({ _id: 1 }).toArray())
+        .then((posts) => posts.map((post) => post._id.toHexString())),
+    );
+  }
   async postsForCommunity(communityId: string, cursor?: string, sort: "new" | "top" = "new") {
     const filters = { community_id: communityId, sort };
     const page = decodeCursor(cursor, filters);

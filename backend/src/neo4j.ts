@@ -35,6 +35,13 @@ export class Neo4jRelations {
       return result.records.map((record) => ({ id: String(record.get("communityId")), score: numberValue(record.get("score")) }));
     } finally { await session.close(); }
   }
+  private async rankedPosts(query: string, userId: string, limit: number) {
+    const session = this.session();
+    try {
+      const result = await session.executeRead((transaction) => transaction.run(query, { userId, limit }));
+      return result.records.map((record) => ({ id: String(record.get("postId")), score: numberValue(record.get("score")) }));
+    } finally { await session.close(); }
+  }
 
   userRecommendationsByInterests(userId: string, limit = 4) {
     return this.rankedUsers("recommend.users.interests", `MATCH (me:USER {user_id: $userId})-[:INTERESTED_IN]->(interest:INTEREST)<-[:INTERESTED_IN]-(candidate:USER) WHERE candidate.user_id <> $userId AND NOT (me)-[:FOLLOWS]->(candidate) RETURN candidate.user_id AS userId, count(DISTINCT interest) AS score ORDER BY score DESC, userId LIMIT $limit`, userId, limit);
@@ -51,9 +58,13 @@ export class Neo4jRelations {
   communityRecommendationsByFollowNetwork(userId: string, limit = 8) {
     return this.rankedCommunities("recommend.communities.network", `MATCH (me:USER {user_id: $userId})-[:FOLLOWS]->(followed:USER)-[:PARTICIPATES]->(community:COMMUNITY) WHERE NOT (me)-[:PARTICIPATES]->(community) RETURN community.community_id AS communityId, count(DISTINCT followed) AS score ORDER BY score DESC, communityId LIMIT $limit`, userId, limit);
   }
+  postRecommendationsByFollowedLikes(userId: string, limit = 50) {
+    return this.rankedPosts(`MATCH (me:USER {user_id: $userId})-[:FOLLOWS]->(followed:USER)-[:LIKES]->(post:POST) WHERE NOT (me)-[:LIKES]->(post) RETURN post.post_id AS postId, count(DISTINCT followed) AS score ORDER BY score DESC, postId LIMIT $limit`, userId, limit);
+  }
+  postRecommendationsByJoinedCommunities(userId: string, limit = 50) {
+    return this.rankedPosts(`MATCH (me:USER {user_id: $userId})-[:PARTICIPATES]->(community:COMMUNITY)<-[:BELONGS_TO]-(post:POST) RETURN post.post_id AS postId, 1 AS score ORDER BY postId LIMIT $limit`, userId, limit);
+  }
   communityRecommendationsByLikedPosts(_userId: string, _limit = 8) {
-    // Post-to-community graph edges are not yet part of the persisted model.
-    // Keep this strategy as a scaffold until that relationship is introduced.
     return Promise.resolve([] as { id: string; score: number }[]);
   }
   postRecommendations(_userId: string, _limit = 10) {
