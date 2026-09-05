@@ -25,7 +25,7 @@ export async function replies(req: Request, res: Response) {
 export async function create(req: Request, res: Response) {
   console.log(`[http] POST /posts/${id(req)}/comments received`);
   const userId = sessionUserId(req);
-  const missing = required(req.body, ["content", "user_summary"]);
+  const missing = required(req.body, ["content"]);
   if (missing.length)
     return fail(res, 400, `Missing required fields: ${missing.join(", ")}`);
   if (!(await store.post(id(req)))) return fail(res, 404, "Post not found.");
@@ -36,7 +36,6 @@ export async function create(req: Request, res: Response) {
     user_id: userId,
     root: req.body.root ?? null,
     content: String(req.body.content),
-    user_summary: req.body.user_summary,
   });
   return ok(res, comment, "Comment created successfully.", 201);
 }
@@ -50,7 +49,6 @@ export async function update(req: Request, res: Response) {
   const updated = await store.updateComment(
     id(req),
     String(req.body.content),
-    req.body.user_summary,
   );
   return updated ? ok(res, updated) : fail(res, 404, "Comment not found.");
 }

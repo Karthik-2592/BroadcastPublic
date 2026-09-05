@@ -1,8 +1,11 @@
 import Box from '@mui/material/Box';
 import Feed from '../components/Feed/Feed';
 import RightSidebar from '../components/RightSidebar/RightSidebar';
+import { useAuth } from '../context/AuthContext';
 
 export default function LandingPage() {
+  const { isAuthenticated } = useAuth();
+  const route = isAuthenticated? "/feed" : "/feed/trending"
   return (
     <Box
       sx={{
@@ -17,7 +20,7 @@ export default function LandingPage() {
       }}
     >
       <Box sx={{ justifySelf: 'end', width: '100%', maxWidth: 720 }}>
-        <Feed />
+        <Feed endpoint={route} />
       </Box>
       <Box sx={{ maxHeight: '100%' }}>
         <RightSidebar />

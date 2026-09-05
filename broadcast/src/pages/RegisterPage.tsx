@@ -5,6 +5,8 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import type { User } from '../types/api';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
@@ -554,6 +556,7 @@ const BIO_MAX = 200;
 
 function StepTwo({ handleBack, registration }: { handleBack: () => void; registration: { username: string; email: string; password: string } }) {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [selectedInterests, setSelectedInterests] = useState<Set<string>>(new Set());
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
@@ -561,13 +564,21 @@ function StepTwo({ handleBack, registration }: { handleBack: () => void; registr
   const [bioError, setBioError] = useState('');
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [profileFile, setProfileFile] = useState<File | null>(null);
+  const [profileImageError, setProfileImageError] = useState('');
   const [submissionError, setSubmissionError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const MAX_PROFILE_IMAGE_SIZE = 4 * 1024 * 1024;
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) return;
+    if (file.size > MAX_PROFILE_IMAGE_SIZE) {
+      setProfileImageError('File size exceeded');
+      event.target.value = '';
+      return;
+    }
+    setProfileImageError('');
     setProfileFile(file);
     setProfileImage(URL.createObjectURL(file));
   };
@@ -621,14 +632,15 @@ function StepTwo({ handleBack, registration }: { handleBack: () => void; registr
         }),
         credentials: 'include',
       });
-      const body = await response.json() as { data?: { id?: string }; message?: string };
-      if (!response.ok || !body.data?.id) throw new Error(body.message ?? 'Registration failed.');
+      const body = await response.json() as { data?: User; message?: string };
+      if (!response.ok || !body.data) throw new Error(body.message ?? 'Registration failed.');
       if (profileFile) {
         const form = new FormData();
         form.append('media', profileFile);
         const upload = await fetch(`${BASE_URL}/users/${body.data.id}/profile-picture`, { method: 'POST', body: form, credentials: 'include' });
         if (!upload.ok) throw new Error('Profile picture upload failed.');
       }
+      login(body.data);
       navigate('/');
     } catch (error) {
       setSubmissionError(error instanceof Error ? error.message : 'Registration failed.');
@@ -792,7 +804,7 @@ function StepTwo({ handleBack, registration }: { handleBack: () => void; registr
               ) : (
                 <PersonOutlineOutlined sx={{ color: 'text.secondary', fontSize: 40 }} />
               )}
-              <input hidden accept="image/*" type="file" onChange={handleImageChange} />
+              <input hidden accept="image/png,image/jpeg,image/jpg" type="file" onChange={handleImageChange} />
               <Box
                 className="upload-overlay"
                 sx={{
@@ -817,6 +829,11 @@ function StepTwo({ handleBack, registration }: { handleBack: () => void; registr
             <Typography variant="caption" sx={{ color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: '0.72rem' }}>
               Profile Picture
             </Typography>
+            {profileImageError && (
+              <Typography variant="caption" sx={{ color: 'error.main', fontSize: '0.75rem' }}>
+                {profileImageError}
+              </Typography>
+            )}
           </Box>
 
           {/* Display name */}

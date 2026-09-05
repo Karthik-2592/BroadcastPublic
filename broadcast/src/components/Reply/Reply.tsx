@@ -1,5 +1,4 @@
-import { useState, useCallback } from 'react';
-import debounce from 'lodash.debounce';
+import { useState } from 'react';
 import Collapse from '@mui/material/Collapse';
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
@@ -8,33 +7,36 @@ import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { BASE_URL } from '../../config';
+import type { Comment as ApiComment } from '../../types/api';
 
 const REPLY_MAX = 200;
 
 export function EditedIndicator({ edited }: { edited: boolean }) {
-  return edited ? <Typography component="span"> · edited</Typography> : null;
+  return edited ? <Typography 
+  sx = {{fontSize:'0.75rem', whiteSpace:'pre'}}
+  component="span" > 
+    &nbsp;◈ edited
+   </Typography> : null;
 }
 
 interface ReplyProps {
   open: boolean;
   onClose?: () => void;
   parentCommentId?: string;
+  postId?: string;
+  onSubmitting?: () => void;
+  onSubmissionFailed?: () => void;
+  onSubmitted?: (reply: ApiComment) => void;
 }
 
-export default function Reply({ open, onClose, parentCommentId }: ReplyProps) {
+export default function Reply({ open, onClose, parentCommentId, postId, onSubmitting, onSubmissionFailed, onSubmitted }: ReplyProps) {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, currentUser } = useAuth();
   const [replyText, setReplyText] = useState('');
   const [replyError, setReplyError] = useState('');
 
-  const debouncedSubmitReplyApi = useCallback(
-    debounce((text: string) => {
-      void { parentCommentId, text };
-    }, 500),
-    []
-  );
-
-  const handleSubmitReply = () => {
+  const handleSubmitReply = async () => {
     if (!isAuthenticated) {
       navigate('/login');
       return;
@@ -45,9 +47,24 @@ export default function Reply({ open, onClose, parentCommentId }: ReplyProps) {
       return;
     }
     setReplyError('');
-    debouncedSubmitReplyApi(replyText);
-    setReplyText('');
-    onClose?.();
+    if (!postId || !parentCommentId) return;
+    onSubmitting?.();
+    try {
+      const response = await fetch(`${BASE_URL}/posts/${postId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: replyText.trim(), root: parentCommentId }),
+        credentials: 'include',
+      });
+      const body = await response.json() as { data?: ApiComment; message?: string };
+      if (!response.ok || !body.data) throw new Error(body.message ?? 'Unable to post reply.');
+      onSubmitted?.(body.data);
+      setReplyText('');
+      onClose?.();
+    } catch (error) {
+      onSubmissionFailed?.();
+      setReplyError(error instanceof Error ? error.message : 'Unable to post reply.');
+    }
   };
 
   const isOverLimit = replyText.length > REPLY_MAX;
@@ -72,8 +89,8 @@ export default function Reply({ open, onClose, parentCommentId }: ReplyProps) {
         }}
       >
         <Box sx={{ display: 'flex', gap: 1.5 }}>
-          {/* Current user avatar placeholder */}
           <Avatar
+            src={currentUser?.profile_picture?.media_url ?? undefined}
             sx={{
               width: 32,
               height: 32,
@@ -84,7 +101,7 @@ export default function Reply({ open, onClose, parentCommentId }: ReplyProps) {
               flexShrink: 0,
             }}
           >
-            Y
+            {currentUser?.profile_name?.charAt(0) ?? currentUser?.username?.charAt(0) ?? '?'}
           </Avatar>
 
           {/* Composer area */}

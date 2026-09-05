@@ -42,9 +42,18 @@ export function logout(req: Request, res: Response): Response {
   session.session.destroy(() => undefined);
   return ok(res, null, "Logged out successfully.");
 }
+export async function currentSession(req: Request, res: Response): Promise<Response> {
+  const session = (req as SessionRequest).session;
+  const userId = session?.userId;
+  if (!userId) return fail(res, 401, "No active session.");
+  const user = await store.user(userId);
+  if (!user) return fail(res, 401, "Session user not found.");
+  return ok(res, user, "Session is valid.");
+}
 
 const router = Router();
 router.post("/users", register);
 router.post("/sessions", login);
+router.get("/sessions/current", currentSession);
 router.delete("/sessions/current", requireSession, logout);
 export default router;

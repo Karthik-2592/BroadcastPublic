@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import debounce from 'lodash.debounce';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -22,12 +22,14 @@ export default function PostSubmissionPage() {
 
   const TITLE_MAX = 75;
   const BODY_MAX = 300;
+  const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 
   const [tagsText, setTagsText] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagError, setTagError] = useState(false);
 
-  const [communityInput, setCommunityInput] = useState('Global');
+  const [searchParams] = useSearchParams();
+  const [communityInput, setCommunityInput] = useState(searchParams.get('community') ?? '');
 
   const [attachments, setAttachments] = useState<File[]>([]);
   const [attachmentError, setAttachmentError] = useState('');
@@ -36,7 +38,7 @@ export default function PostSubmissionPage() {
   const navigate = useNavigate();
 
   const debouncedPostSubmitApi = useCallback(
-    debounce(async (postData: { title: string, body: string, tags: string[], community: string, attachments: string[] }) => {
+    debounce(async (postData: { title: string, body: string, tags: string[], community: string, attachments: File[] }) => {
       try {
         const response = await fetch(`${BASE_URL}/posts`, {
           method: 'POST',
@@ -55,9 +57,12 @@ export default function PostSubmissionPage() {
         // Handle media upload if any
         if (postData.attachments.length > 0) {
           const form = new FormData();
-          postData.attachments.forEach(file => form.append('media', file));
+          postData.attachments.forEach((file) => form.append('media', file));
           const upload = await fetch(`${BASE_URL}/posts/${body.data.id}/media`, { method: 'POST', body: form, credentials: 'include' });
-          if (!upload.ok) console.error('Failed to upload media');
+          if (!upload.ok) {
+            if (upload.status === 413) setAttachmentError('Each image must be 2 MB or smaller.');
+            throw new Error('Post media upload failed.');
+          }
         }
 
         navigate(`/post/${body.data.id}`);
@@ -91,25 +96,42 @@ export default function PostSubmissionPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setAttachmentError('');
-    if (e.target.files) {
-      const selectedFiles = Array.from(e.target.files);
-      const validTypes = ['image/png', 'image/jpeg', 'image/jpg'];
-
-      const validFiles = selectedFiles.filter(f => validTypes.includes(f.type));
-      if (validFiles.length < selectedFiles.length) {
-        setAttachmentError('Only .png, .jpg, and .jpeg files are allowed.');
+    if (!e.target.files) {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
-
-      const newTotal = attachments.length + validFiles.length;
-      if (newTotal > 3) {
-        setAttachmentError('Maximum of 3 attachments allowed.');
-        const diff = 3 - attachments.length;
-        setAttachments([...attachments, ...validFiles.slice(0, diff)]);
-      } else {
-        setAttachments([...attachments, ...validFiles]);
-      }
+      return;
     }
-    // reset input
+
+    const selectedFiles = Array.from(e.target.files);
+    const oversizedFile = selectedFiles.find((file) => file.size > MAX_IMAGE_SIZE);
+    if (oversizedFile) {
+      setAttachmentError('File size exceeded');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+    const validFiles = selectedFiles.filter((file) => validTypes.includes(file.type.trim().toLowerCase()));
+    if (validFiles.length !== selectedFiles.length) {
+      setAttachmentError('Only .png, .jpg, and .jpeg files are allowed.');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    const newTotal = attachments.length + validFiles.length;
+    if (newTotal > 3) {
+      setAttachmentError('Maximum of 3 attachments allowed.');
+      const diff = 3 - attachments.length;
+      setAttachments([...attachments, ...validFiles.slice(0, diff)]);
+    } else {
+      setAttachments([...attachments, ...validFiles]);
+    }
+
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -141,13 +163,12 @@ export default function PostSubmissionPage() {
 
     if (!valid) return;
 
-    const formattedCommunity = communityInput.trim().toLowerCase().replace(/\s+/g, '_');
     debouncedPostSubmitApi({
       title,
       body,
       tags,
-      community: formattedCommunity,
-      attachments: attachments.map(a => a.name)
+      community: communityInput.trim(),
+      attachments,
     });
   };
 
@@ -450,7 +471,7 @@ export default function PostSubmissionPage() {
           <input
             type="file"
             multiple
-            accept=".png,.jpg,.jpeg"
+            accept="image/png,image/jpeg,image/jpg"
             ref={fileInputRef}
             style={{ display: 'none' }}
             onChange={handleFileChange}

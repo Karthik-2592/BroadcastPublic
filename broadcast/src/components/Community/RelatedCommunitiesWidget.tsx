@@ -7,7 +7,7 @@ import type { Community } from '../../types/api';
 export default function RelatedCommunitiesWidget({ communities = [] }: { communities?: Community[] }) {
     const navigate = useNavigate();
 
-    return (
+    return communities.length > 0 &&(
         <Box
             sx={{
                 borderRadius: 3,

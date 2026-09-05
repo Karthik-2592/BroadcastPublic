@@ -9,11 +9,28 @@ import CommentsSection from '../components/CommentsSection/CommentsSection';
 import { useEffect, useState } from 'react';
 import type { Post } from '../types/api';
 import { BASE_URL } from '../config';
+import { useAuth } from '../context/AuthContext';
 
 export default function PostViewPage() {
   const { postId } = useParams<{ postId: string }>();
+  const { currentUser, isAuthenticated } = useAuth();
   const [post, setPost] = useState<Post | null>(null);
+  const [communityAdminId, setCommunityAdminId] = useState<string | null>(null);
   useEffect(() => { if (postId) void fetch(`${BASE_URL}/posts/${postId}`, { credentials: 'include' }).then((response) => response.ok ? response.json() : null).then((body: { data?: Post } | null) => setPost(body?.data ?? null)); }, [postId]);
+
+  useEffect(() => {
+    if (!post?.community_id) {
+      setCommunityAdminId(null);
+      return;
+    }
+
+    void fetch(`${BASE_URL}/communities/${post.community_id}`, { credentials: 'include' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((body: { data?: { admin_id?: string | null } } | null) => setCommunityAdminId(body?.data?.admin_id ?? null))
+      .catch(() => setCommunityAdminId(null));
+  }, [post?.community_id]);
+
+  const canManagePost = Boolean(post && isAuthenticated && (post.user_id === currentUser?.id || communityAdminId === currentUser?.id));
 
   return (
     <Box
@@ -39,10 +56,10 @@ export default function PostViewPage() {
         }}
       >
         {/* ── Unified Post Card (Expanded View) ── */}
-        {post && <PostCard post={post} variant="expanded" />}
+        {post && <PostCard post={post} variant="expanded" canEdit={canManagePost} communityAdminId={communityAdminId} />}
 
         {/* ── Comments Section ── */}
-        <CommentsSection postId={postId} />
+        <CommentsSection postId={postId} commentCount={post?.comment_count ?? 0} communityAdminId={communityAdminId} />
       </Box>
       <Box sx={{ width: '100%' }} />
     </Box>

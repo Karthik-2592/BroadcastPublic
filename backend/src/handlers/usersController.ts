@@ -29,8 +29,8 @@ export async function uploadProfilePicture(req: Request, res: Response) {
   if (!(await store.user(userId))) return fail(res, 404, "User not found.");
   const file = (((req as unknown as { files?: UploadedFile[] }).files) ?? [])[0];
   if (!file) return fail(res, 400, "A profile picture is required.");
-  const saved = await saveMedia(file, userId, "profile", 0);
-  const updated = await store.updateUser(userId, { profile_picture: { media_id: saved.media_id, media_url: mediaUrl(req, saved.path), mime_type: saved.mime_type } });
+  const saved = await saveMedia(file, userId, "profile", 0, "PUT");
+  const updated = await store.updateUser(userId, { profile_picture: { media_id: saved.media_id, media_url: mediaUrl(saved.path), mime_type: saved.mime_type } });
   return updated ? ok(res, updated, "Profile picture uploaded successfully.", 201) : fail(res, 500, "Unable to store profile picture metadata.");
 }
 export async function deleteUser(req: Request, res: Response) {
@@ -45,6 +45,24 @@ export async function searchUsers(req: Request, res: Response) {
   const users = await store.searchUsers(String(req.query.q ?? ""));
   console.log(`[http] user search: ${users.length ? `found ${users.length}` : "not found"}`);
   return ok(res, users);
+}
+export async function listUserPosts(req: Request, res: Response) {
+  if (!(await store.user(id(req)))) return fail(res, 404, "User not found.");
+  const posts = await store.postsByUserId(id(req));
+  return ok(res, posts);
+}
+export async function listUserComments(req: Request, res: Response) {
+  if (!(await store.user(id(req)))) return fail(res, 404, "User not found.");
+  const comments = await store.commentsByUserId(id(req));
+  return ok(res, comments);
+}
+export async function listUserSavedPosts(req: Request, res: Response) {
+  const userId = id(req);
+  if (userId !== sessionUserId(req)) return fail(res, 403, "Only the owner may view saved posts.");
+  if (!(await store.user(userId))) return fail(res, 404, "User not found.");
+  const savedIds = await neo4jRelations.savedPostIds(userId);
+  const posts = await store.postsByIds(savedIds);
+  return ok(res, posts);
 }
 export async function recommendations(req: Request, res: Response) {
   if (!(await store.user(id(req)))) return fail(res, 404, "User not found.");
@@ -104,6 +122,10 @@ export async function followStatus(req: Request, res: Response) {
 
 const router = Router();
 router.get("/search", searchUsers);
+router.get("/:id/posts", listUserPosts);
+router.get("/:id/comments", listUserComments);
+router.get("/:id/saves", requireSession, listUserSavedPosts);
+router.get("/:id/saved-posts", requireSession, listUserSavedPosts);
 router.get("/:id/recommendations", recommendations);
 router.get("/:id/followers", listRelatedUsers);
 router.get("/:id/following", listRelatedUsers);

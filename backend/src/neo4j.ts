@@ -194,11 +194,32 @@ export class Neo4jRelations {
       { userId, communityId },
     );
   }
+  async memberCommunityIds(userId: string) {
+    const session = this.session();
+    try {
+      const result = await session.executeRead((transaction) =>
+        transaction.run(
+          "MATCH (user:USER {user_id: $userId})-[:PARTICIPATES]->(community:COMMUNITY) RETURN community.community_id AS communityId ORDER BY communityId DESC",
+          { userId },
+        ),
+      );
+      return result.records.map((record) => String(record.get("communityId")));
+    } finally { await session.close(); }
+  }
   async isFollowing(followerId: string, followedId: string) {
     const session = this.session();
     try {
       const result = await session.executeRead((transaction) => transaction.run("MATCH (follower:USER {user_id: $followerId})-[rel:FOLLOWS]->(followed:USER {user_id: $followedId}) RETURN count(rel) > 0 AS active", { followerId, followedId }));
       return Boolean(result.records[0]?.get("active"));
+    } finally { await session.close(); }
+  }
+  async savedPostIds(userId: string) {
+    const session = this.session();
+    try {
+      const result = await session.executeRead((transaction) =>
+        transaction.run("MATCH (user:USER {user_id: $userId})-[:SAVES]->(post:POST) RETURN DISTINCT post.post_id AS postId ORDER BY postId DESC", { userId }),
+      );
+      return result.records.map((record) => String(record.get("postId")));
     } finally { await session.close(); }
   }
   async isMember(userId: string, communityId: string) {

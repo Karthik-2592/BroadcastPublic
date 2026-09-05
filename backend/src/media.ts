@@ -1,11 +1,7 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import multer from "multer";
 import { env } from "./config/env.ts";
-import type { Request } from "express";
 
-export const BUCKET_ROOT = env.bucketStorageURL;
-const MAX_FILE_SIZE = 2 * 1024 * 1024;
+const MAX_FILE_SIZE = 4 * 1024 * 1024;
 
 export const mediaCategories = {
   community: "CommunityBanners",
@@ -13,8 +9,8 @@ export const mediaCategories = {
   post: "PostMedia",
 } as const;
 
-export const mediaUrl = (req: Request, path: string) =>
-  `${req.protocol}://${req.get("host")}/media/files/${path}`;
+export const mediaUrl = (path: string, version = Date.now()) =>
+  `${env.mediaServerURL.replace(/\/$/, "")}/objects/${path}?v=${version}`;
 
 export type MediaCategory = keyof typeof mediaCategories;
 
@@ -36,13 +32,18 @@ export async function saveMedia(
   documentId: string,
   category: MediaCategory,
   count: number,
-  timestamp = Date.now(),
+  method: "POST" | "PUT" = "POST",
 ) {
-  const directory = join(BUCKET_ROOT, mediaCategories[category]);
-  await mkdir(directory, { recursive: true });
   const extension = file.mimetype.split("/")[1]?.replace("jpeg", "jpg") ?? "bin";
-  const filename = `${documentId}_${timestamp}_${count}.${extension}`;
-  await writeFile(join(directory, filename), file.buffer);
+  const filename = `${documentId}.${count}.${extension}`;
   const path = `${mediaCategories[category]}/${filename}`;
-  return { filename, category: mediaCategories[category], path, media_id: (timestamp % 2147483000) + count, mime_type: file.mimetype };
+  const requestBody = new Uint8Array(file.buffer.byteLength)
+  requestBody.set(file.buffer)
+  const response = await fetch(mediaUrl(path), {
+    method,
+    headers: { "Content-Type": file.mimetype },
+    body: requestBody,
+  });
+  if (!response.ok) throw new Error(`Media server rejected ${method} ${path}: ${response.status}`);
+  return { filename, category: mediaCategories[category], path, media_id: count, mime_type: file.mimetype };
 }

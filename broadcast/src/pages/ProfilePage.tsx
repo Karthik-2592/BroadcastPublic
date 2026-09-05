@@ -16,7 +16,7 @@ import UploadOutlinedIcon from '@mui/icons-material/UploadOutlined';
 import ProfileDescription from '../components/Profile/ProfileDescription';
 import ProfileTabs from '../components/Profile/ProfileTabs';
 import ProfileSidebar from '../components/Profile/ProfileSidebar';
-import type { UserSummary } from '../types/api';
+import type { User, UserSummary } from '../types/api';
 import { displayName, userHandle } from '../types/api';
 import { useAuth } from '../context/AuthContext';
 import FetchErrorDialog from '../components/FetchErrorDialog';
@@ -95,31 +95,114 @@ export default function ProfilePage() {
   const { isAuthenticated, currentUser: sessionUser, logout } = useAuth();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const profileUser = sessionUser;
+  const [profileUser, setProfileUser] = useState<User | null>(null);
+  const [followers, setFollowers] = useState<UserSummary[]>([]);
+  const [following, setFollowing] = useState<UserSummary[]>([]);
   const [displayName, setDisplayName] = useState(profileUser?.profile_name ?? '');
   const [bio, setBio] = useState(profileUser?.profile_description ?? '');
   const [interests, setInterests] = useState<Tag[]>(() => (profileUser?.interests ?? []) as Tag[]);
   const profilePictureInputRef = useRef<HTMLInputElement>(null);
-  const [profilePicture, setProfilePicture] = useState<string | null>(profileUser?.profile_picture ?? null);
+  const [profilePicture, setProfilePicture] = useState<string | null>(profileUser?.profile_picture?.media_url ?? null);
+  const [profilePictureError, setProfilePictureError] = useState('');
   const [userListType, setUserListType] = useState<UserListType>('followers');
+  const MAX_PROFILE_PICTURE_SIZE = 4 * 1024 * 1024;
   const [isUserListOpen, setIsUserListOpen] = useState(false);
   const [hasFetchError, setHasFetchError] = useState(false);
-  const isOwnProfile = isAuthenticated && sessionUser?.id === (viewedUserId ?? sessionUser?.id);
+  const effectiveUserId = viewedUserId ?? sessionUser?.id;
+  const isOwnProfile = Boolean(sessionUser && effectiveUserId && sessionUser.id === effectiveUserId);
   const [isFollowing, setIsFollowing] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login', { replace: true });
+    if (!effectiveUserId) {
+      setProfileUser(null);
       return;
     }
     if (!viewedUserId && sessionUser?.id) {
       navigate(`/profile/${sessionUser.id}`, { replace: true });
       return;
     }
-  }, [isAuthenticated, navigate, sessionUser?.id, viewedUserId]);
+  }, [navigate, sessionUser?.id, viewedUserId, effectiveUserId]);
 
   useEffect(() => {
-    if (!isAuthenticated || !viewedUserId || viewedUserId === sessionUser?.id) {
+    if (!effectiveUserId) return;
+
+    let active = true;
+    void (async () => {
+      try {
+        const response = await fetch(`${BASE_URL}/users/${effectiveUserId}`, { credentials: 'include' });
+        if (!response.ok) throw new Error('Unable to load profile');
+
+        const body = await response.json() as { data?: User };
+        if (!body.data) throw new Error('Missing profile data');
+
+        if (!active) return;
+        setProfileUser((current) => {
+          const nextUser = body.data as User;
+          if (current && current.id === nextUser.id) {
+            return { ...current, ...nextUser };
+          }
+          return nextUser;
+        });
+      } catch {
+        if (active) setHasFetchError(true);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [effectiveUserId]);
+
+  useEffect(() => {
+    if (!effectiveUserId) return;
+
+    let active = true;
+    void (async () => {
+      try {
+        const [followersResponse, followingResponse] = await Promise.all([
+          fetch(`${BASE_URL}/users/${effectiveUserId}/followers`, { credentials: 'include' }),
+          fetch(`${BASE_URL}/users/${effectiveUserId}/following`, { credentials: 'include' }),
+        ]);
+
+        if (!followersResponse.ok || !followingResponse.ok) {
+          throw new Error('Unable to load connection previews');
+        }
+
+        const [followersBody, followingBody] = await Promise.all([
+          followersResponse.json() as Promise<{ data?: UserSummary[] }>,
+          followingResponse.json() as Promise<{ data?: UserSummary[] }>,
+        ]);
+
+        if (!active) return;
+
+        setFollowers(Array.isArray(followersBody.data) ? followersBody.data.slice(0, 3) : []);
+        setFollowing(Array.isArray(followingBody.data) ? followingBody.data.slice(0, 3) : []);
+      } catch {
+        if (active) {
+          setFollowers([]);
+          setFollowing([]);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [effectiveUserId]);
+
+  useEffect(() => {
+    if (!profileUser) {
+      return;
+    }
+
+    setDisplayName(profileUser.profile_name ?? '');
+    setBio(profileUser.profile_description ?? '');
+    setInterests((profileUser.interests ?? []) as Tag[]);
+    setProfilePicture(profileUser.profile_picture?.media_url ?? null);
+  }, [profileUser]);
+
+  useEffect(() => {
+    if (!viewedUserId || !sessionUser || viewedUserId === sessionUser.id) {
       setIsFollowing(false);
       return;
     }
@@ -127,23 +210,28 @@ export default function ProfilePage() {
       .then((response) => response.ok ? response.json() : null)
       .then((body: { data?: { active?: boolean } } | null) => setIsFollowing(Boolean(body?.data?.active)))
       .catch(() => setIsFollowing(false));
-  }, [isAuthenticated, sessionUser?.id, viewedUserId]);
+  }, [sessionUser?.id, viewedUserId]);
 
   const handleFollow = () => {
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
+    if (!viewedUserId) return;
     const next = !isFollowing;
+    setIsFollowing(next);
     void fetch(`${BASE_URL}/users/follows`, { method: next ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ followed_id: viewedUserId }), credentials: 'include' })
-      .then((response) => response.ok ? response.json() : null)
-      .then((body: { data?: { active?: boolean } } | null) => { if (body?.data?.active !== undefined) setIsFollowing(body.data.active); });
+      .then((response) => { if (!response.ok) throw new Error('Unable to update follow'); })
+      .catch(() => setIsFollowing(next === false));
   };
 
+  const profileUserId = profileUser?.id ?? effectiveUserId;
+
   const fetchFollowers = useCallback(async (cursor?: string | null) => {
+    if (!profileUserId) return { users: [], cursor: null };
     try {
       const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
-      const response = await fetch(`${BASE_URL}/users/${profileUser?.id}/followers${query}`, { credentials: 'include' });
+      const response = await fetch(`${BASE_URL}/users/${profileUserId}/followers${query}`, { credentials: 'include' });
       if (response.ok) {
         const body = await response.json() as { data?: UserSummary[]; cursor?: string };
         return { users: Array.isArray(body.data) ? body.data : [], cursor: body.cursor === 'null' ? null : body.cursor ?? null };
@@ -153,12 +241,13 @@ export default function ProfilePage() {
       setHasFetchError(true);
     }
     return { users: [], cursor: null };
-  }, []);
+  }, [profileUserId]);
 
   const fetchFollowing = useCallback(async (cursor?: string | null) => {
+    if (!profileUserId) return { users: [], cursor: null };
     try {
       const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
-      const response = await fetch(`${BASE_URL}/users/${profileUser?.id}/following${query}`, { credentials: 'include' });
+      const response = await fetch(`${BASE_URL}/users/${profileUserId}/following${query}`, { credentials: 'include' });
       if (response.ok) {
         const body = await response.json() as { data?: UserSummary[]; cursor?: string };
         return { users: Array.isArray(body.data) ? body.data : [], cursor: body.cursor === 'null' ? null : body.cursor ?? null };
@@ -168,9 +257,13 @@ export default function ProfilePage() {
       setHasFetchError(true);
     }
     return { users: [], cursor: null };
-  }, []);
+  }, [profileUserId]);
 
   const handleConfirmEdit = async () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
     await fetch(`${BASE_URL}/users/${profileUser?.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -205,17 +298,9 @@ export default function ProfilePage() {
   return (
     <>
       <div className="flex flex-col relative py-6 w-[65%] mx-auto pl-8">
-      {profileUser && <ProfileDescription user={profileUser} isOwner={isOwnProfile} isFollowing={isFollowing} onEdit={() => setIsEditOpen(true)} onFollow={handleFollow} onReport={() => {
-        if (!isAuthenticated) {
-          navigate('/login');
-          return;
-        }
-
-        const confirmed = window.confirm('Report this profile? The report will be reviewed by the moderation team.');
-        if (confirmed) {
-          window.alert('Thanks — this profile has been reported and will be reviewed.');
-        }
-      }} />}
+      {profileUser && <ProfileDescription user={profileUser} isOwner={isOwnProfile} isFollowing={isFollowing} onEdit={isOwnProfile ? () => setIsEditOpen(true) : undefined} onFollow={!isOwnProfile ? handleFollow : undefined} onReport={!isOwnProfile ? () => {
+        navigate('/placeholder');
+      } : undefined} />}
       </div>
       <Box
         sx={{
@@ -233,7 +318,18 @@ export default function ProfilePage() {
           <ProfileTabs userId={viewedUserId ?? sessionUser?.id} sessionUserId={sessionUser?.id} />
         </Box>
         <Box sx={{ maxHeight: '100%' }}>
-          {profileUser && <ProfileSidebar user={profileUser} followers={[]} following={[]} showViewAll={isOwnProfile} onViewFollowers={() => { setUserListType('followers'); setIsUserListOpen(true); }} onViewFollowing={() => { setUserListType('following'); setIsUserListOpen(true); }} />}
+          {profileUser && <ProfileSidebar 
+          user={profileUser as any} 
+          followers={followers} 
+          following={following}
+           showViewAll={isOwnProfile}
+            onViewFollowers={() => { 
+              setUserListType('followers'); 
+            setIsUserListOpen(true); }}
+             onViewFollowing={() => {
+               setUserListType('following');
+                setIsUserListOpen(true); }} />
+                }
         </Box>
       </Box>
 
@@ -291,11 +387,6 @@ export default function ProfilePage() {
                 cursor: 'pointer',
                 overflow: 'hidden',
                 transition: 'all 0.2s ease',
-                '&:hover': {
-                  borderColor: 'primary.light',
-                  bgcolor: 'rgba(179,136,255,0.14)',
-                  '& .upload-overlay': { opacity: 1 },
-                },
               }}
             >
               {profilePicture ? (
@@ -303,7 +394,17 @@ export default function ProfilePage() {
               ) : (
                 <PersonOutlineOutlined sx={{ color: 'text.secondary', fontSize: 40 }} />
               )}
-              <input ref={profilePictureInputRef} hidden accept="image/png,image/jpeg,image/jpg" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) setProfilePicture(URL.createObjectURL(file)); }} />
+              <input ref={profilePictureInputRef} hidden accept="image/png,image/jpeg,image/jpg" type="file" onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                if (file.size > MAX_PROFILE_PICTURE_SIZE) {
+                  setProfilePictureError('File size exceeded');
+                  event.target.value = '';
+                  return;
+                }
+                setProfilePictureError('');
+                setProfilePicture(URL.createObjectURL(file));
+              }} />
               <Box
                 className="upload-overlay"
                 sx={{
@@ -326,6 +427,11 @@ export default function ProfilePage() {
               </Box>
             </Box>
             <Typography variant="caption" sx={{ color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Profile Picture</Typography>
+            {profilePictureError && (
+              <Typography variant="caption" sx={{ color: 'error.main', fontSize: '0.75rem' }}>
+                {profilePictureError}
+              </Typography>
+            )}
           </Box>
 
           <TextField

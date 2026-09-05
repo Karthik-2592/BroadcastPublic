@@ -18,6 +18,7 @@ import { BASE_URL } from '../config';
 const NAME_MAX = 50;
 const DESC_MAX = 200;
 const GUIDELINES_MAX = 200;
+const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 
 export default function CommunityCreationPage() {
   const navigate = useNavigate();
@@ -26,15 +27,24 @@ export default function CommunityCreationPage() {
   const [guidelines, setGuidelines] = useState('');
   const [tags, setTags] = useState<Tag[]>([]);
   const [communityImage, setCommunityImage] = useState<string | null>(null);
+  const [communityBanner, setCommunityBanner] = useState<File | null>(null);
 
   const [nameError, setNameError] = useState('');
   const [descError, setDescError] = useState('');
   const [guidelinesError, setGuidelinesError] = useState('');
+  const [bannerError, setBannerError] = useState('');
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) return;
+    if (file.size > MAX_IMAGE_SIZE) {
+      setBannerError('File size exceeded');
+      event.target.value = '';
+      return;
+    }
+    setBannerError('');
+    setCommunityBanner(file);
     setCommunityImage(URL.createObjectURL(file));
   };
   const handleCreate = async () => {
@@ -78,8 +88,24 @@ export default function CommunityCreationPage() {
         credentials: 'include',
       });
       const body = await response.json() as { data?: { id?: string }; message?: string };
-      if (!response.ok || !body.data?.id) throw new Error(body.message ?? 'Failed to create community.');
-      navigate(`/c/${body.data.id}`);
+      if (!response.ok || !body.data?.id) {
+        if (response.status === 409) setNameError('A community with this name already exists.');
+        throw new Error(body.message ?? 'Failed to create community.');
+      }
+      if (communityBanner) {
+        const form = new FormData();
+        form.append('media', communityBanner);
+        const upload = await fetch(`${BASE_URL}/communities/${body.data.id}/banner`, {
+          method: 'POST',
+          body: form,
+          credentials: 'include',
+        });
+        if (!upload.ok) {
+          if (upload.status === 413) setBannerError('Banner image must be 2 MB or smaller.');
+          throw new Error('Community banner upload failed.');
+        }
+      }
+      navigate(`/community/${body.data.id}`);
     } catch (e) {
       console.error(e);
       // Optional: Handle error via state
@@ -160,11 +186,6 @@ export default function CommunityCreationPage() {
               overflow: 'hidden',
             }}
           >
-            <Box sx={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(to top, rgba(255, 0, 0, 1), transparent)'
-            }} />
 
             {/* Edit button [fixed height, fixed width, circular, align self to flex-end, justify self to flex end] */}
             <IconButton
@@ -182,8 +203,13 @@ export default function CommunityCreationPage() {
               }}
             >
               <EditIcon />
-              <input hidden accept="image/*" type="file" onChange={handleImageChange} />
+              <input hidden accept="image/png,image/jpeg,image/jpg" type="file" onChange={handleImageChange} />
             </IconButton>
+            {bannerError && (
+              <Typography variant="caption" sx={{ color: 'error.main', display: 'block', mt: 1, fontSize: '0.75rem' }}>
+                {bannerError}
+              </Typography>
+            )}
           </Box>
 
           {/* Community Details container: [ full width, variable height, flex-col] */}

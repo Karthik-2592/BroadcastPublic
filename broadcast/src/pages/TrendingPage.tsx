@@ -1,5 +1,4 @@
-// TrendingPage — Stub route for the "/trending" path.
-// Placeholder content until the trending feature is implemented.
+// TrendingPage — popularity-ranked post feed.
 
 import Box from '@mui/material/Box';
 import Feed from '../components/Feed/Feed';
@@ -19,7 +18,7 @@ export default function TrendingPage() {
       }}
     >
       <Box sx={{ justifySelf: 'end', width: '100%', maxWidth: 720 }}>
-        <Feed />
+        <Feed endpoint="/feed/trending" />
       </Box>
 
     </Box>

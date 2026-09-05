@@ -6,6 +6,16 @@ import type { Community, MembershipRelationRequest, ModeratorRelationRequest } f
 import { Router } from "express";
 import { requireSession, sessionUserId } from "../session.ts";
 import { mediaUrl, saveMedia, type UploadedFile } from "../media.ts";
+import type { SessionRequest } from "../session.ts";
+
+async function withMembership(req: Request, community: Community): Promise<Community> {
+  const userId = (req as SessionRequest).session?.userId;
+  return { ...community, isMember: userId ? await neo4jRelations.isMember(userId, community.id) : false };
+}
+
+async function withMemberships(req: Request, communities: Community[]): Promise<Community[]> {
+  return Promise.all(communities.map((community) => withMembership(req, community)));
+}
 
 export async function create(req: Request, res: Response) {
   const userId = sessionUserId(req);
@@ -23,22 +33,39 @@ export async function create(req: Request, res: Response) {
     return fail(res, 400, "community_guidelines must be a string of at most 300 characters.");
   if (!(await store.user(userId)))
     return fail(res, 404, "User not found.");
-  const community = await store.createCommunity({
-    community_name: String(req.body.community_name),
-    community_desc: String(req.body.community_desc),
-    community_guidelines: String(req.body.community_guidelines),
-    admin_id: userId,
-    tags: Array.isArray(req.body.tags) ? req.body.tags : [],
-    community_banner: req.body.community_banner,
-  });
+  let community: Community;
+  try {
+    community = await store.createCommunity({
+      community_name: String(req.body.community_name),
+      community_desc: String(req.body.community_desc),
+      community_guidelines: String(req.body.community_guidelines),
+      admin_id: userId,
+      tags: Array.isArray(req.body.tags) ? req.body.tags : [],
+      community_banner: req.body.community_banner,
+    });
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === 11000)
+      return fail(res, 409, "A community with this name already exists.");
+    throw error;
+  }
   await neo4jRelations.createCommunityNode(community.id);
+  await neo4jRelations.membership(userId, community.id, true);
+  await neo4jRelations.moderate(
+    {
+      adminId: userId,
+      userId,
+      communityId: community.id,
+      authorization: "admin",
+    },
+    true,
+  );
   await neo4jRelations.associatedWith(community.id, community.tags);
-  return ok(res, community, "Community created successfully.", 201);
+  return ok(res, { ...community, isMember: true }, "Community created successfully.", 201);
 }
 export async function get(req: Request, res: Response) {
   const community = await store.community(id(req));
   return community
-    ? ok(res, community)
+    ? ok(res, await withMembership(req, community))
     : fail(res, 404, "Community not found.");
 }
 export async function uploadBanner(req: Request, res: Response) {
@@ -48,8 +75,8 @@ export async function uploadBanner(req: Request, res: Response) {
   if (community.admin_id !== sessionUserId(req)) return fail(res, 403, "Only the community admin may upload a banner.");
   const file = (((req as unknown as { files?: UploadedFile[] }).files) ?? [])[0];
   if (!file) return fail(res, 400, "A community banner is required.");
-  const saved = await saveMedia(file, communityId, "community", 0);
-  const updated = await store.updateCommunity(communityId, { community_banner: { media_id: saved.media_id, media_url: mediaUrl(req, saved.path), mime_type: saved.mime_type } });
+  const saved = await saveMedia(file, communityId, "community", 0, "PUT");
+  const updated = await store.updateCommunity(communityId, { community_banner: { media_id: saved.media_id, media_url: mediaUrl(saved.path), mime_type: saved.mime_type } });
   return updated ? ok(res, updated, "Community banner uploaded successfully.", 201) : fail(res, 500, "Unable to store community banner metadata.");
 }
 export async function posts(req: Request, res: Response) {
@@ -71,21 +98,21 @@ export async function update(req: Request, res: Response) {
     req.body as Partial<Community>,
   );
   if (updated && Array.isArray(req.body.tags)) await neo4jRelations.associatedWith(updated.id, updated.tags);
-  return updated ? ok(res, updated) : fail(res, 404, "Community not found.");
+  return updated ? ok(res, await withMembership(req, updated)) : fail(res, 404, "Community not found.");
 }
 export async function remove(req: Request, res: Response) {
   const community = await store.community(id(req));
   if (!community) return fail(res, 404, "Community not found.");
   if (sessionUserId(req) !== community.admin_id)
     return fail(res, 403, "Only the community admin may delete it.");
-  await store.deleteCommunity(id(req));
-  await neo4jRelations.deleteCommunityNode(id(req));
+  const deleted = await store.deleteCommunity(id(req));
+  if (deleted) await neo4jRelations.deleteCommunityNode(id(req));
   return ok(res, null, "Community deleted successfully.");
 }
 export async function recommendations(_req: Request, res: Response) {
   try {
     const page = await store.communityRecommendations(typeof _req.query.cursor === "string" ? _req.query.cursor : undefined);
-    return ok(res, page.items, "Operation completed successfully.", 200, page.nextCursor);
+    return ok(res, await withMemberships(_req, page.items), "Operation completed successfully.", 200, page.nextCursor);
   } catch {
     return fail(res, 400, "Malformed cursor.");
   }
@@ -99,7 +126,7 @@ export async function personalizedRecommendations(req: Request, res: Response) {
     neo4jRelations.communityRecommendationsByLikedPosts(userId),
   ]);
   const ids = [...new Set(groups.flat())].slice(0, 8);
-  return ok(res, await store.communitiesByIds(ids));
+  return ok(res, await withMemberships(req, await store.communitiesByIds(ids)));
 }
 export async function moderate(req: Request, res: Response): Promise<Response> {
   const body = req.body as Partial<ModeratorRelationRequest>;
@@ -161,10 +188,17 @@ export async function membershipStatus(req: Request, res: Response) {
   if (!(await store.community(id(req)))) return fail(res, 404, "Community not found.");
   return ok(res, { active: await neo4jRelations.isMember(userId, id(req)) });
 }
+export async function memberships(req: Request, res: Response) {
+  const userId = sessionUserId(req);
+  if (!(await store.user(userId))) return fail(res, 404, "User not found.");
+  const communityIds = await neo4jRelations.memberCommunityIds(userId);
+  return ok(res, await withMemberships(req, await store.communitiesByIds(communityIds)));
+}
 
 const r = Router();
 r.get("/recommendations", recommendations);
 r.get("/recommendations/:userId", personalizedRecommendations);
+r.get("/memberships", requireSession, memberships);
 r.post("/", requireSession, create);
 r.get("/:id/posts", posts);
 r.get("/:id/memberships/status", requireSession, membershipStatus);

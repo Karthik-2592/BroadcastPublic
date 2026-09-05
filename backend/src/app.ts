@@ -11,7 +11,6 @@ import cors from "cors";
 import { logFailure } from "./http.ts";
 import { sessionMiddleware } from "./session.ts";
 import { search } from "./handlers/searchController.ts";
-import { BUCKET_ROOT } from "./media.ts";
 import { imageUpload } from "./media.ts";
 import { uploadPostMedia } from "./handlers/postsController.ts";
 import { uploadProfilePicture } from "./handlers/usersController.ts";
@@ -28,7 +27,6 @@ export function createApp(): Express {
   app.use(express.json({ limit: "4mb" }));
   app.get("/search", search);
   app.use("/feed", feed);
-  app.use("/media/files", express.static(BUCKET_ROOT));
   app.post("/posts/:id/media", requireSession, imageUpload.array("media", 3), uploadPostMedia);
   app.post("/users/:id/profile-picture", requireSession, imageUpload.array("media", 1), uploadProfilePicture);
   app.post("/communities/:id/banner", requireSession, imageUpload.array("media", 1), uploadBanner);
@@ -72,6 +70,10 @@ export function createApp(): Express {
         return res
           .status(400)
           .json({ success: false, message: "Malformed JSON request." });
+      }
+      if (error && typeof error === "object" && "code" in error && error.code === "LIMIT_FILE_SIZE") {
+        logFailure(req, 413, "Image must be 2 MB or smaller.");
+        return res.status(413).json({ success: false, message: "Image must be 2 MB or smaller." });
       }
       logFailure(req, 500, "Internal server error.");
       return res

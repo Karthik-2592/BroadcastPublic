@@ -6,10 +6,6 @@ import { env } from "../src/config/env.ts";
 const uri = env.mongoUri;
 const databaseName = env.mongoDatabase;
 const timeout = env.mongoServerSelectionTimeoutMs;
-const configuredPublicCommunityId = env.publicCommunityId;
-if (!ObjectId.isValid(configuredPublicCommunityId))
-  throw new Error("PUBLIC_COMMUNITY_ID must be a valid MongoDB ObjectId");
-const publicCommunityId = new ObjectId(configuredPublicCommunityId);
 const userCount = env.sampleUserCount;
 const communityCount = env.sampleCommunityCount;
 const postCount = env.samplePostCount;
@@ -130,18 +126,6 @@ async function seed() {
     );
     console.log(`[mongo:seed] users: inserted ${users.length}`);
 
-    const publicCommunity = {
-      _id: publicCommunityId,
-      community_name: "Public Community",
-      community_desc: "",
-      community_guidelines: "",
-      population: 0,
-      community_banner: null,
-      admin_id: randomChoice(users)._id,
-      tags: [],
-      post_count: 0,
-      timestamp: new Date(),
-    };
     const communities = [
       ...unique(
         () => ({
@@ -168,7 +152,7 @@ async function seed() {
       return {
         _id: new ObjectId(),
         user_id: user._id,
-        community_id: publicCommunity._id,
+        community_id: null,
         title: randomPhrase(3),
         content: "",
         tags: [],

@@ -22,6 +22,10 @@ interface ProfileSidebarProps {
 }
 
 export default function ProfileSidebar({ user, followers, following, showViewAll = false, onViewFollowers, onViewFollowing }: ProfileSidebarProps) {
+  const followerCount = Number.isFinite(user.follower_count) ? user.follower_count : 0;
+  const followingCount = Number.isFinite(user.following_count) ? user.following_count : 0;
+  const joinedDate = user.joined_at ? new Date(user.joined_at).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }) : '—';
+
   return (
     <Box sx={{ position: 'sticky', top: 96, display: 'flex', flexDirection: 'column', gap: 3, width: '280px', minWidth: '280px' }}>
       <Card
@@ -42,30 +46,19 @@ export default function ProfileSidebar({ user, followers, following, showViewAll
               <TableBody>
                 <TableRow>
                   <TableCell sx={{ pb: 5, width: '50%' }}>
-                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>{formatCount(user.follower_count)}</Typography>
+                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>{formatCount(followerCount)}</Typography>
                     <Typography variant="caption" sx={{ color: '#9e9bab', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>Followers</Typography>
                   </TableCell>
                   <TableCell sx={{ pb: 5, width: '50%' }}>
-                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>{formatCount(user.following_count)}</Typography>
+                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>{formatCount(followingCount)}</Typography>
                     <Typography variant="caption" sx={{ color: '#9e9bab', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>Following</Typography>
                   </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell sx={{ pb: 5, width: '50%' }}>
-                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>{formatCount(user.post_count ?? 0)}</Typography>
-                    <Typography variant="caption" sx={{ color: '#9e9bab', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>Posts</Typography>
-                  </TableCell>
-                  <TableCell sx={{ pb: 5, width: '50%' }}>
-                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>{user.joined_at ? new Date(user.joined_at).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }) : '—'}</Typography>
+                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>{joinedDate}</Typography>
                     <Typography variant="caption" sx={{ color: '#9e9bab', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>Joined</Typography>
                   </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell sx={{ width: '50%' }}>
-                    <Typography variant="h6" sx={{ color: '#d4bbff', fontWeight: 700, lineHeight: 1.2 }}>{formatCount(user.community_count ?? 0)}</Typography>
-                    <Typography variant="caption" sx={{ color: '#9e9bab', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>Communities</Typography>
-                  </TableCell>
-                  <TableCell sx={{ width: '50%' }} />
                 </TableRow>
               </TableBody>
             </Table>

@@ -10,11 +10,12 @@
     "path": "^0.12.7"
   },
   "scripts": {
-    "db:init": "node --experimental-strip-types scripts/initialize-mongodb.ts",
+    "db:init": "node --experimental-strip-types scripts/initialize.ts",
     "db:reset": "node --experimental-strip-types scripts/reset.ts",
     "db:seed": "node --experimental-strip-types scripts/seed-mongodb.ts",
     "neo4j:seed": "node --experimental-strip-types scripts/seed-neo4j.ts",
     "media:test": "node --experimental-strip-types scripts/test-upload.ts",
+    "media:server": "node --experimental-strip-types scripts/media-server.ts",
     "start": "node --experimental-strip-types index.ts",
     "typecheck": "tsc --noEmit"
   },

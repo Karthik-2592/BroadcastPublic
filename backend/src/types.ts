@@ -6,6 +6,13 @@ export interface MediaMetadata {
   mime_type: string;
 }
 
+export interface UserSummary {
+  id: Id;
+  username: string;
+  profile_name?: string;
+  profile_picture: string | null;
+}
+
 export interface User {
   id: Id;
   username: string;
@@ -17,6 +24,7 @@ export interface User {
   pinned_posts: Id[];
   follower_count: number;
   following_count: number;
+  joined_at?: string | Date;
 }
 export interface Post {
   id: Id;
@@ -24,7 +32,7 @@ export interface Post {
   community_id?: Id | null;
   title: string;
   content: string;
-  user_summary: unknown;
+  user_summary: UserSummary;
   tags: string[];
   media: MediaMetadata[];
   popularity_score: number;
@@ -39,7 +47,7 @@ export interface Comment {
   user_id: Id | null;
   root: Id | null;
   content: string;
-  user_summary?: unknown;
+  user_summary: UserSummary;
   favorite_count: number;
   reply_count: number;
   timestamp: string;
@@ -53,6 +61,7 @@ export interface Community {
   tags: string[];
   community_guidelines: string;
   community_banner: MediaMetadata | null;
+  isMember?: boolean;
   population: number;
   post_count: number;
   timestamp: string;
@@ -91,7 +100,6 @@ export interface PostCreateRequest {
   community_name?: string | null;
   title: string;
   content: string;
-  user_summary: unknown;
   tags?: string[];
   media?: MediaMetadata[];
 }
@@ -99,7 +107,6 @@ export interface CommentCreateRequest {
   user_id: Id;
   content: string;
   root?: Id | null;
-  user_summary?: unknown;
 }
 export interface CommunityCreateRequest {
   user_id: Id;

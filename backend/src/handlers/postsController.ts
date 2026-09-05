@@ -16,7 +16,6 @@ interface PostBody {
   community_name?: string | null;
   title: string;
   content: string;
-  user_summary: unknown;
   tags?: string[];
   media?: [];
 }
@@ -38,19 +37,14 @@ export async function createPost(req: Request, res: Response) {
     return fail(res, 400, "tags must be an array of strings.");
   if (body.media !== undefined && !Array.isArray(body.media))
     return fail(res, 400, "media must be an array.");
-  if (body.user_summary !== undefined) {
-    const summary = body.user_summary as Record<string, unknown> | null;
-    if (!summary || typeof summary.username !== "string")
-      return fail(res, 400, "user_summary must contain username.");
-  }
-  if (body.user_summary === undefined)
-    return fail(res, 400, "user_summary is required.");
   if (!(await store.user(userId)))
     return fail(res, 404, "User not found.");
-  const communityName = body.community_name ?? body.community_id;
-  let communityId = env.publicCommunityId;
-  if (communityName && communityName !== "Global") {
-    const community = await store.communityByName(String(communityName));
+  const communityName = (body.community_name ?? body.community_id)?.trim();
+  let communityId: string | null = null;
+  if (communityName && communityName.toLowerCase() !== "global") {
+    const community = /^[a-f\d]{24}$/i.test(communityName)
+      ? await store.community(communityName)
+      : await store.communityByName(communityName);
     if (!community) return fail(res, 404, "Community not found.");
     communityId = community.id;
   }
@@ -59,7 +53,6 @@ export async function createPost(req: Request, res: Response) {
     community_id: communityId,
     title: String(body.title),
     content: String(body.content),
-    user_summary: body.user_summary,
     tags: body.tags ?? [],
     media: body.media ?? [],
     popularity_score: 0,
@@ -79,7 +72,7 @@ export async function uploadPostMedia(req: Request, res: Response) {
   const files = (((req as unknown as { files?: UploadedFile[] }).files) ?? []);
   if (!files.length) return fail(res, 400, "At least one image is required.");
   const saved = await Promise.all(files.map((file, index) => saveMedia(file, postId, "post", index + 1)));
-  const media = saved.map((item) => ({ media_id: item.media_id, media_url: mediaUrl(req, item.path), mime_type: item.mime_type }));
+  const media = saved.map((item) => ({ media_id: item.media_id, media_url: mediaUrl(item.path), mime_type: item.mime_type }));
   const updated = await store.updatePost(postId, { media: [...(post.media ?? []), ...media] });
   return updated ? ok(res, updated, "Media uploaded successfully.", 201) : fail(res, 500, "Unable to store media metadata.");
 }
@@ -159,6 +152,12 @@ export async function save(req: Request, res: Response): Promise<Response> {
 
 const router = Router();
 router.get("/feed", feed);
+// Specific routes BEFORE generic /:id routes
+router.post("/likes", requireSession, postLike);
+router.delete("/likes", requireSession, postLike);
+router.post("/saves", requireSession, save);
+router.delete("/saves", requireSession, save);
+// Generic routes
 router.post("/", requireSession, createPost);
 router.get("/:id", getPost);
 router.get("/:id/likes/status", requireSession, postLikeStatus);
@@ -166,8 +165,4 @@ router.get("/:id/saves/status", requireSession, postSaveStatus);
 router.put("/:id", requireSession, updatePost);
 router.delete("/:id", requireSession, deletePost);
 router.use("/:id/comments", commentRouter);
-router.post("/likes", requireSession, postLike);
-router.delete("/likes", requireSession, postLike);
-router.post("/saves", requireSession, save);
-router.delete("/saves", requireSession, save);
 export default router;

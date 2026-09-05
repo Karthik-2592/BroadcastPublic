@@ -7,7 +7,7 @@ import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined';
 import Chip from '@mui/material/Chip';
-import type { User } from '../../types/api';
+import type { User, UserSummary } from '../../types/api';
 import { displayName, userHandle } from '../../types/api';
 
 export default function ProfileDescription({ user, onEdit, isOwner = true, onFollow, onReport, isFollowing = false }: { user: User; onEdit?: () => void; isOwner?: boolean; onFollow?: () => void; onReport?: () => void; isFollowing?: boolean }) {
@@ -36,15 +36,11 @@ export default function ProfileDescription({ user, onEdit, isOwner = true, onFol
                             overflow: 'hidden',
                             boxShadow: 3,
                             position: 'relative',
-                            '&:hover .overlay': {
-                                opacity: 1
-                            },
-                            cursor: 'pointer'
                         }}
                     >
                         <Avatar
                             alt="Profile"
-                            src={user.profile_picture ?? undefined}
+                            src={user.profile_picture?.media_url ?? undefined}
                             sx={{ width: '100%', height: '100%' }}
                         />
                         <Box
@@ -67,35 +63,43 @@ export default function ProfileDescription({ user, onEdit, isOwner = true, onFol
                     {/* Name & Handle */}
                     <Box sx={{ flex: 1, mb: 1, mt: 1 }}>
                         <Typography variant="h4" sx={{ fontWeight: 600, color: '#e8e6ef', letterSpacing: '-0.02em' }}>
-                            {displayName(user)}
+                            {displayName(user as UserSummary)}
                         </Typography>
                         <Typography variant="body1" sx={{ color: '#d4bbff', mt: 0.5 }}>
-                            {userHandle(user)}
+                            {userHandle(user as UserSummary)}
                         </Typography>
                     </Box>
 
                     {/* Action Buttons */}
                     <Box sx={{ display: 'flex', gap: 1.5, mb: 1 }}>
-                        {isOwner ? <IconButton
-                            aria-label="Edit profile"
-                            onClick={onEdit}
-                            sx={{
-                                bgcolor: '#343440', // surface-variant
-                                color: '#e3e0f1', // on-surface
-                                borderRadius: 2,
-                                width: 44,
-                                height: 44,
-                                '&:hover': {
-                                    bgcolor: '#4a4452' // roughly surface-container-highest
-                                },
-                                boxShadow: 1
-                            }}
-                        >
-                            <EditOutlinedIcon />
-                        </IconButton> : <>
-                            <Button variant={isFollowing ? 'outlined' : 'contained'} onClick={onFollow} sx={{ textTransform: 'none', borderRadius: 2 }}>{isFollowing ? 'Following' : 'Follow'}</Button>
-                            <IconButton aria-label="Report profile" onClick={onReport} sx={{ color: 'error.light' }}><FlagOutlinedIcon /></IconButton>
-                        </>}
+                        {isOwner ? (
+                            <IconButton
+                                aria-label="Edit profile"
+                                onClick={onEdit}
+                                sx={{
+                                    bgcolor: '#343440', // surface-variant
+                                    color: '#e3e0f1', // on-surface
+                                    borderRadius: 2,
+                                    width: 44,
+                                    height: 44,
+                                    '&:hover': {
+                                        bgcolor: '#4a4452' // roughly surface-container-highest
+                                    },
+                                    boxShadow: 1
+                                }}
+                            >
+                                <EditOutlinedIcon />
+                            </IconButton>
+                        ) : (
+                            <>
+                                {onFollow && (
+                                    <Button variant={isFollowing ? 'outlined' : 'contained'} onClick={onFollow} sx={{ textTransform: 'none', borderRadius: 2 }}>{isFollowing ? 'Following' : 'Follow'}</Button>
+                                )}
+                                {onReport && (
+                                    <IconButton aria-label="Report profile" onClick={onReport} sx={{ color: 'error.light' }}><FlagOutlinedIcon /></IconButton>
+                                )}
+                            </>
+                        )}
                     </Box>
                 </Box>
 

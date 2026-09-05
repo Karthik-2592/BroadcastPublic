@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from 'react';
-import debounce from 'lodash.debounce';
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
@@ -17,14 +16,17 @@ import { BASE_URL } from '../../config';
 interface CommentsSectionProps {
   comments?: ApiComment[];
   postId?: string;
+  commentCount?: number;
+  communityAdminId?: string | null;
 }
 
 const COMMENT_MAX = 200;
 const INITIAL_REPLIES_LIMIT = 5;
+const EMPTY_COMMENTS: ApiComment[] = [];
 
-export default function CommentsSection({ comments = [], postId }: CommentsSectionProps) {
+export default function CommentsSection({ comments = EMPTY_COMMENTS, postId, commentCount, communityAdminId = null }: CommentsSectionProps) {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, currentUser } = useAuth();
   const [commentText, setCommentText] = useState('');
   const [commentError, setCommentError] = useState('');
   const [loadedReplies, setLoadedReplies] = useState<Record<string, ApiComment[]>>({});
@@ -82,22 +84,28 @@ export default function CommentsSection({ comments = [], postId }: CommentsSecti
     }
   }, [loadedReplies, loadingReplies]);
 
-  const debouncedSubmitCommentApi = useCallback(
-    debounce((text: string) => {
-      void text;
-    }, 500),
-    []
-  );
-
-  const handleSubmitComment = () => {
+  const handleSubmitComment = async () => {
     if (!commentText.trim()) return;
     if (commentText.length > COMMENT_MAX) {
       setCommentError(`Comment must be ${COMMENT_MAX} characters or fewer.`);
       return;
     }
     setCommentError('');
-    debouncedSubmitCommentApi(commentText);
-    setCommentText('');
+    if (!postId) return;
+    try {
+      const response = await fetch(`${BASE_URL}/posts/${postId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: commentText.trim() }),
+        credentials: 'include',
+      });
+      const body = await response.json() as { data?: ApiComment; message?: string };
+      if (!response.ok || !body.data) throw new Error(body.message ?? 'Unable to post comment.');
+      setVisibleComments((current) => [...current, body.data!]);
+      setCommentText('');
+    } catch (error) {
+      setCommentError(error instanceof Error ? error.message : 'Unable to post comment.');
+    }
   };
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
@@ -116,6 +124,7 @@ export default function CommentsSection({ comments = [], postId }: CommentsSecti
       >
         {/* Current-user avatar */}
         <Avatar
+          src={currentUser?.profile_picture?.media_url ?? undefined}
           sx={{
             width: 40,
             height: 40,
@@ -127,7 +136,7 @@ export default function CommentsSection({ comments = [], postId }: CommentsSecti
             border: '1px solid rgba(179, 136, 255, 0.3)',
           }}
         >
-          Y
+          {currentUser?.profile_name?.charAt(0) ?? currentUser?.username?.charAt(0) ?? '?'}
         </Avatar>
 
         {/* Input area */}
@@ -242,7 +251,7 @@ export default function CommentsSection({ comments = [], postId }: CommentsSecti
             fontSize: '0.75rem',
           }}
         >
-          {comments.length + comments.reduce((acc, c) => acc + (c.replies?.length ?? 0), 0)}
+          {typeof commentCount === 'number' ? commentCount : comments.length + comments.reduce((acc, c) => acc + (c.replies?.length ?? 0), 0)}
         </Typography>
       </Box>
 
@@ -258,9 +267,20 @@ export default function CommentsSection({ comments = [], postId }: CommentsSecti
           <Comment
             key={comment.id}
             comment={{ ...comment, replies: loadedReplies[comment.id] }}
+            canEdit={Boolean(currentUser && comment.user_id === currentUser.id)}
+            communityAdminId={communityAdminId}
             onLoadReplies={(nextCursor) => loadReplies(comment, nextCursor)}
             repliesCursor={replyCursors[comment.id] ?? null}
             repliesLoading={loadingReplies[comment.id] ?? false}
+            onReplySubmitting={() => setVisibleComments((current) => current.map((item) => item.id === comment.id
+              ? { ...item, reply_count: item.reply_count + 1 }
+              : item))}
+            onReplySubmissionFailed={() => setVisibleComments((current) => current.map((item) => item.id === comment.id
+              ? { ...item, reply_count: Math.max(0, item.reply_count - 1) }
+              : item))}
+            onReplyCreated={(reply) => {
+              setLoadedReplies((current) => ({ ...current, [comment.id]: [...(current[comment.id] ?? []), reply] }));
+            }}
           />
         ))}
       </Box>

@@ -16,7 +16,6 @@ export default function CommunityExplorePage() {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [joinedMap, setJoinedMap] = useState<Record<string, boolean>>({});
 
   const loadCommunities = useCallback(async (nextCursor?: string | null) => {
     setLoading(true);
@@ -39,10 +38,12 @@ export default function CommunityExplorePage() {
 
   const handleToggleJoin = (e: React.MouseEvent, communityId: string) => {
     e.stopPropagation();
-    const nextState = !joinedMap[communityId];
+    const community = communities.find((item) => item.id === communityId);
+    const nextState = !community?.isMember;
+    setCommunities((current) => current.map((item) => item.id === communityId ? { ...item, isMember: nextState } : item));
     void fetch(`${BASE_URL}/communities/memberships`, { method: nextState ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ community_id: communityId }), credentials: 'include' })
-      .then((response) => response.ok ? response.json() : null)
-      .then((body: { data?: { active?: boolean } } | null) => { if (body?.data?.active !== undefined) setJoinedMap((current) => ({ ...current, [communityId]: body.data!.active! })); });
+      .then((response) => { if (!response.ok) throw new Error('Unable to update membership'); })
+      .catch(() => setCommunities((current) => current.map((item) => item.id === communityId ? { ...item, isMember: !nextState } : item)));
   };
   return (
     <Box
@@ -97,7 +98,7 @@ export default function CommunityExplorePage() {
                 Nothing to see here
               </Typography>
             ) : communities.map((community) => {
-              const isJoined = joinedMap[community.id] ?? (community.joinState === 'joined');
+              const isJoined = community.isMember;
               return (
                 <Card
                   key={community.id}
@@ -124,6 +125,11 @@ export default function CommunityExplorePage() {
                       width: '100%',
                       position: 'relative',
                       background: community.bannerGradient,
+                      backgroundImage: community.community_banner?.media_url
+                        ? `url(${community.community_banner.media_url})`
+                        : undefined,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
                       display: 'flex',
                       alignItems: 'flex-start',
                     }}

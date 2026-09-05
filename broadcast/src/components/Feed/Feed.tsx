@@ -11,7 +11,7 @@ import type { Post } from '../../types/api';
 import UserRecommendations from './UserRecommendations';
 import { BASE_URL } from '../../config';
 
-export default function Feed() {
+export default function Feed({ endpoint = '/feed' }: { endpoint?: string }) {
   const [showRecommendations] = useState(true);
   const [posts, setPosts] = useState<Post[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -21,7 +21,7 @@ export default function Feed() {
     setLoading(true);
     try {
       const query = nextCursor ? `?cursor=${encodeURIComponent(nextCursor)}` : '';
-      const response = await fetch(`${BASE_URL}/feed${query}`, { credentials: 'include' });
+      const response = await fetch(`${BASE_URL}${endpoint}${query}`, { credentials: 'include' });
       if (response.ok) {
         const body = await response.json() as { data?: Post[]; cursor?: string };
         const page = Array.isArray(body.data) ? body.data : [];
@@ -33,7 +33,7 @@ export default function Feed() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [endpoint]);
 
   useEffect(() => { void loadPosts(); }, [loadPosts]);
 

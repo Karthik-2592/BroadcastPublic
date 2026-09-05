@@ -26,14 +26,13 @@ import { BASE_URL } from '../config';
 
 export default function CommunitiesPage() {
   const navigate = useNavigate();
-  const { communityId = 'ec1' } = useParams<{ communityId: string }>();
-  const { isAuthenticated, isMember } = useAuth();
+  const { communityId  } = useParams<{ communityId: string }>();
+  const { isAuthenticated, currentUser } = useAuth();
   const [community, setCommunity] = useState<Community | null>(null);
   const [sortTab, setSortTab] = useState<'new' | 'top'>('new');
   const [communityPosts, setCommunityPosts] = useState<Post[]>([]);
   const [postsCursor, setPostsCursor] = useState<string | null>(null);
   const [postsLoading, setPostsLoading] = useState(false);
-  const [isCommunityMember, setIsCommunityMember] = useState(isMember);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isJoinPromptOpen, setIsJoinPromptOpen] = useState(false);
@@ -42,48 +41,57 @@ export default function CommunitiesPage() {
   const [tags, setTags] = useState<Tag[]>([]);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const [bannerImage, setBannerImage] = useState<string | null>(null);
-  const isAdmin = isAuthenticated && isCommunityMember && (communityId === 'ec1' || communityId === 'c1');
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerError, setBannerError] = useState('');
+  const MAX_BANNER_SIZE = 4 * 1024 * 1024;
+  const isAdmin = isAuthenticated && community?.admin_id === currentUser?.id;
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setIsCommunityMember(false);
-      return;
-    }
-    void fetch(`${BASE_URL}/communities/${communityId}/memberships/status`, { credentials: 'include' })
-      .then((response) => response.ok ? response.json() : null)
-      .then((body: { data?: { active?: boolean } } | null) => setIsCommunityMember(Boolean(body?.data?.active)))
-      .catch(() => setIsCommunityMember(false));
-  }, [communityId, isAuthenticated, isMember]);
-  useEffect(() => { void fetch(`${BASE_URL}/communities/${communityId}`, { credentials: 'include' }).then((response) => response.ok ? response.json() : null).then((body: { data?: Community } | null) => { const value = body?.data ?? null; setCommunity(value); setDescription(value?.community_desc ?? ''); setGuidelines(value?.community_guidelines ?? ''); setTags((value?.tags ?? []) as Tag[]); }); }, [communityId]);
+  useEffect(() => { void fetch(`${BASE_URL}/communities/${communityId}`, { credentials: 'include' }).then((response) => response.ok ? response.json() : null).then((body: { data?: Community } | null) => { const value = body?.data ?? null; setCommunity(value); setDescription(value?.community_desc ?? ''); setGuidelines(value?.community_guidelines ?? ''); setTags((value?.tags ?? []) as Tag[]); setBannerImage(value?.community_banner?.media_url ?? null); }); }, [communityId]);
 
   const handleJoin = () => {
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
-    void fetch(`${BASE_URL}/communities/memberships`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ community_id: communityId }), credentials: 'include' })
-      .then((response) => response.ok ? response.json() : null)
-      .then((body: { data?: { active?: boolean } } | null) => { if (body?.data?.active !== undefined) { setIsCommunityMember(body.data.active); setIsJoinPromptOpen(false); } });
+    const nextState = !community?.isMember;
+    setCommunity((current) => current ? { ...current, isMember: nextState } : current);
+    void fetch(`${BASE_URL}/communities/memberships`, { method: nextState ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ community_id: communityId }), credentials: 'include' })
+      .then((response) => { if (!response.ok) throw new Error('Unable to join community'); setIsJoinPromptOpen(false); })
+      .catch(() => setCommunity((current) => current ? { ...current, isMember: !nextState } : current));
   };
 
   const handleCreatePost = () => {
     if (!isAuthenticated) {
       navigate('/login');
-    } else if (!isCommunityMember) {
+    } else if (!community?.isMember) {
       setIsJoinPromptOpen(true);
     } else {
-      navigate('/create');
+      navigate(`/create?community=${encodeURIComponent(community.community_name)}`);
     }
   };
 
   const handleEdit = async () => {
     if (!community) return;
-    await fetch(`${BASE_URL}/communities/${community.id}`, {
+    const response = await fetch(`${BASE_URL}/communities/${community.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ community_desc: description, community_guidelines: guidelines, tags }),
       credentials: 'include',
     }).catch(() => undefined);
+    if (!response?.ok) return;
+    if (bannerFile) {
+      const form = new FormData();
+      form.append('media', bannerFile);
+      const upload = await fetch(`${BASE_URL}/communities/${community.id}/banner`, {
+        method: 'POST',
+        body: form,
+        credentials: 'include',
+      });
+      if (!upload.ok) return;
+      const body = await upload.json() as { data?: Community };
+      if (body.data) setCommunity(body.data);
+      setBannerFile(null);
+    }
     setIsEditOpen(false);
   };
 
@@ -142,7 +150,7 @@ export default function CommunitiesPage() {
         maxWidth: '1080px'
       }}>
         <Card sx={{ bgcolor: 'background.paper', borderRadius: 2, overflow: 'hidden' }}>
-          <Box sx={{ height: 260, width: '100%', position: 'relative', background: community.bannerGradient }}>
+          <Box sx={{ height: 260, width: '100%', position: 'relative', background: community.bannerGradient, backgroundImage: community.community_banner?.media_url ? `url(${community.community_banner.media_url})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}>
             <Box sx={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, #1a1a2e, transparent)', opacity: 0.8 }} />
             <Typography variant="h4" component="h1" sx={{ position: 'absolute', bottom: 20, left: 24, color: 'text.primary', fontWeight: 600, zIndex: 1 }}>{community.community_name}</Typography>
           </Box>
@@ -154,7 +162,7 @@ export default function CommunitiesPage() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}><GroupOutlinedIcon sx={{ color: 'text.secondary', fontSize: 18 }} /><Typography variant="body2">{community.population}</Typography></Box>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }} onClick={(event) => event.stopPropagation()}>
-                {(!isAuthenticated || !isCommunityMember) && <Button variant="outlined" size="small" onClick={handleJoin}>Join</Button>}
+                {!community.isMember && <Button variant="outlined" size="small" onClick={handleJoin}>Join</Button>}
                 <Button variant="contained" size="small" onClick={handleCreatePost}>Create post</Button>
                 {isAdmin && <IconButton aria-label="Edit community" onClick={() => setIsEditOpen(true)} sx={{ color: 'primary.light', bgcolor: 'rgba(179,136,255,0.1)', borderRadius: 2 }}><EditOutlinedIcon /></IconButton>}
               </Box>
@@ -186,7 +194,7 @@ export default function CommunitiesPage() {
                   Nothing to see here
                 </Typography>
               ) : communityPosts.map((post) => (
-                <PostCard key={post.id} post={post} />
+                <PostCard key={post.id} post={post} canEdit={Boolean(isAuthenticated && (post.user_id === currentUser?.id || community?.admin_id === currentUser?.id))} communityAdminId={community?.admin_id ?? null} />
               ))}
               {postsCursor && <Button variant="outlined" onClick={loadMorePosts} disabled={postsLoading}>
                 {postsLoading ? 'Loading…' : 'Load more posts'}
@@ -213,9 +221,25 @@ export default function CommunitiesPage() {
           </Box>
           <Box sx={{ p: { xs: 3, md: 4 }, display: 'flex', flexDirection: 'column', gap: 3 }}>
             <Box sx={{ height: 160, borderRadius: 2, background: bannerImage ? `url(${bannerImage}) center/cover` : community.bannerGradient, display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', p: 2 }}>
-              <input ref={bannerInputRef} hidden type="file" accept="image/png,image/jpeg,image/jpg" onChange={(event) => { const file = event.target.files?.[0]; if (file) setBannerImage(URL.createObjectURL(file)); }} />
+              <input ref={bannerInputRef} hidden type="file" accept="image/png,image/jpeg,image/jpg" onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                if (file.size > MAX_BANNER_SIZE) {
+                  setBannerError('File size exceeded');
+                  event.target.value = '';
+                  return;
+                }
+                setBannerError('');
+                setBannerFile(file);
+                setBannerImage(URL.createObjectURL(file));
+              }} />
               <Button variant="contained" startIcon={<UploadOutlinedIcon />} onClick={() => bannerInputRef.current?.click()}>Upload banner</Button>
             </Box>
+            {bannerError && (
+              <Typography variant="caption" sx={{ color: 'error.main', fontSize: '0.75rem' }}>
+                {bannerError}
+              </Typography>
+            )}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 60, py: 1 }}>
               <TextField
                 fullWidth

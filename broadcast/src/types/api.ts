@@ -2,6 +2,12 @@
 
 export type Id = string;
 
+export interface MediaMetadata {
+  media_id: number;
+  media_url: string;
+  mime_type: string;
+}
+
 // ── Inlined author/commenter summary embedded in Post and Comment responses ──
 export interface UserSummary {
   id: Id;
@@ -23,7 +29,7 @@ export interface User {
   email: string;
   interests: string[];
   profile_name?: string;
-  profile_picture?: string | null;
+  profile_picture?: MediaMetadata | null;
   profile_description?: string;
   pinned_posts: Id[];
   follower_count: number;
@@ -43,8 +49,8 @@ export interface Post {
   /** Resolved author summary embedded by the backend in list/detail responses. */
   user_summary: UserSummary | null;
   tags: string[];
-  /** Array of media URLs. Empty array means no media attached. */
-  media: string[];
+  /** Array of media metadata objects. Empty array means no media attached. */
+  media: MediaMetadata[];
   popularity_score: number;
   favorite_count: number;
   comment_count: number;
@@ -82,7 +88,8 @@ export interface Community {
   tags: string[];
   community_guidelines?: string;
   /** URL to the community banner image; null / undefined means no banner uploaded. */
-  community_banner?: string | null;
+  community_banner?: MediaMetadata | null;
+  isMember: boolean;
   /**
    * UI-only: CSS gradient string shown as a fallback when community_banner is absent.
    * Communities keep this field since branded gradients are part of their visual identity.
@@ -124,7 +131,7 @@ export interface RegisterRequest {
   password: string;
   interests?: string[];
   profile_name?: string;
-  profile_picture?: unknown;
+  profile_picture?: MediaMetadata | null;
   profile_description?: string;
 }
 
@@ -141,16 +148,14 @@ export interface PostCreateRequest {
   community_id?: Id | null;
   title: string;
   content: string;
-  user_summary: UserSummary;
   tags?: string[];
-  media?: string[];
+  media?: MediaMetadata[];
 }
 
 export interface CommentCreateRequest {
   user_id: Id;
   content: string;
   root?: Id | null;
-  user_summary?: UserSummary;
 }
 
 export interface CommunityCreateRequest {
@@ -159,7 +164,7 @@ export interface CommunityCreateRequest {
   community_desc: string;
   community_guidelines: string;
   tags?: string[];
-  community_banner?: string;
+  community_banner?: MediaMetadata | null;
 }
 
 // ── Relation request types ────────────────────────────────────────────────────

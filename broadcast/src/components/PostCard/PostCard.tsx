@@ -39,11 +39,12 @@ function PostMediaCarousel({ media, placeholder, height }: { media?: unknown[]; 
     if (typeof item === 'string') return item;
     if (item && typeof item === 'object') {
       const value = item as Record<string, unknown>;
-      return typeof value.url === 'string' ? value.url : typeof value.path === 'string' ? value.path : null;
+      return typeof value.media_url === 'string' ? value.media_url : typeof value.url === 'string' ? value.url : typeof value.path === 'string' ? value.path : null;
     }
     return null;
   }).filter((item): item is string => Boolean(item));
   const [activeIndex, setActiveIndex] = useState(0);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const activeMedia = mediaItems[activeIndex];
 
   useEffect(() => {
@@ -53,45 +54,111 @@ function PostMediaCarousel({ media, placeholder, height }: { media?: unknown[]; 
   if (!activeMedia && !placeholder) return null;
 
   return (
-    <Box sx={{ position: 'relative', width: '100%', height, borderRadius: 2, overflow: 'hidden', mb: 1.5, border: '1px solid rgba(255,255,255,0.06)' }}>
+    <>
       <Box
-        component={activeMedia ? 'img' : 'div'}
-        src={activeMedia}
-        alt="Post media"
-        sx={{ width: '100%', height: '100%', objectFit: 'cover', background: activeMedia ? undefined : placeholder }}
-      />
-      {mediaItems.length > 1 && (
-        <Box sx={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 0.75, px: 1, py: 0.75, borderRadius: 9999, bgcolor: 'rgba(0,0,0,0.45)' }}>
-          {mediaItems.map((item, index) => (
+        sx={{
+          position: 'relative',
+          width: '100%',
+          height,
+          borderRadius: 2,
+          overflow: 'hidden',
+          mb: 1.5,
+          border: '1px solid rgba(255,255,255,0.06)',
+          cursor: activeMedia ? 'pointer' : 'default',
+        }}
+      >
+        <Box
+          component={activeMedia ? 'img' : 'div'}
+          src={activeMedia}
+          alt="Post media"
+          onClick={(event: React.MouseEvent) => {
+            if (!activeMedia) return;
+            event.stopPropagation();
+            setIsPreviewOpen(true);
+          }}
+          sx={{ width: '100%', height: '100%', objectFit: 'cover', background: activeMedia ? undefined : placeholder, display: 'block' }}
+        />
+        {mediaItems.length > 1 && (
+          <Box sx={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 0.75, px: 1, py: 0.75, borderRadius: 9999, bgcolor: 'rgba(0,0,0,0.45)' }}>
+            {mediaItems.map((item, index) => (
+              <Box
+                key={`${item}-${index}`}
+                component="button"
+                type="button"
+                aria-label={`Show media ${index + 1}`}
+                aria-current={index === activeIndex ? 'true' : undefined}
+                onClick={(event) => { event.stopPropagation(); setActiveIndex(index); }}
+                sx={{ width: 8, height: 8, p: 0, minWidth: 0, border: 0, borderRadius: '50%', cursor: 'pointer', bgcolor: index === activeIndex ? 'primary.light' : 'rgba(255,255,255,0.55)', transition: 'transform 0.15s, background-color 0.15s', '&:hover': { transform: 'scale(1.25)' } }}
+              />
+            ))}
+          </Box>
+        )}
+      </Box>
+
+      <Dialog
+        open={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        maxWidth="lg"
+        fullWidth
+        disableScrollLock={true}
+        slotProps={{
+          backdrop: { sx: { backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(5px)' } },
+          paper: { sx: { m: 2, bgcolor: '#0f1117', borderRadius: 3, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' } },
+        }}
+      >
+        <IconButton
+          aria-label="Close media preview"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsPreviewOpen(false);
+          }}
+          sx={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            zIndex: 1,
+            color: 'white',
+            bgcolor: 'rgba(0,0,0,0.35)',
+            '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
+          }}
+        >
+          <CloseRoundedIcon />
+        </IconButton>
+
+        <DialogContent sx={{ p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#0f1117' }}>
+          {activeMedia && (
             <Box
-              key={`${item}-${index}`}
-              component="button"
-              type="button"
-              aria-label={`Show media ${index + 1}`}
-              aria-current={index === activeIndex ? 'true' : undefined}
-              onClick={(event) => { event.stopPropagation(); setActiveIndex(index); }}
-              sx={{ width: 8, height: 8, p: 0, minWidth: 0, border: 0, borderRadius: '50%', cursor: 'pointer', bgcolor: index === activeIndex ? 'primary.light' : 'rgba(255,255,255,0.55)', transition: 'transform 0.15s, background-color 0.15s', '&:hover': { transform: 'scale(1.25)' } }}
+              component="img"
+              src={activeMedia}
+              alt="Expanded post media"
+              sx={{
+                display: 'block',
+                width: '100%',
+                maxHeight: '80vh',
+                objectFit: 'contain',
+                backgroundColor: '#0f1117',
+              }}
             />
-          ))}
-        </Box>
-      )}
-    </Box>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
 function PostEditDialog({ post, open, onClose }: { post: Post; open: boolean; onClose: () => void }) {
   const [title, setTitle] = useState(post.title);
   const [body, setBody] = useState(post.content);
-  const [tagsText, setTagsText] = useState(post.tags.map((tag) => tag.startsWith('#') ? tag : `#${tag}`).join(' '));
-  const [tags, setTags] = useState<string[]>(post.tags.map((tag) => tag.startsWith('#') ? tag : `#${tag}`));
+  const [tagsText, setTagsText] = useState(post.tags.join(' '));
+  const [tags, setTags] = useState<string[]>(post.tags);
   const [tagError, setTagError] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
   const handleOpen = () => {
     setTitle(post.title);
     setBody(post.content);
-    setTagsText(post.tags.map((tag) => tag.startsWith('#') ? tag : `#${tag}`).join(' '));
-    setTags(post.tags.map((tag) => tag.startsWith('#') ? tag : `#${tag}`));
+    setTagsText(post.tags.filter((tag) => tag.startsWith('#')).join(' '));
+    setTags(post.tags.filter((tag) => tag.startsWith('#')));
     setTagError(false);
   };
 
@@ -281,11 +348,12 @@ interface PostCardProps {
   post: Post;
   variant?: 'compact' | 'expanded';
   canEdit?: boolean;
+  communityAdminId?: string | null;
 }
 
-export default function PostCard({ post, variant = 'compact', canEdit = false }: PostCardProps) {
+export default function PostCard({ post, variant = 'compact', canEdit = false, communityAdminId = null }: PostCardProps) {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, currentUser } = useAuth();
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post.favorite_count);
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -294,6 +362,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
 
   const isExpanded = variant === 'expanded';
   const author = post.user_summary;
+  const canManagePost = Boolean(canEdit || (communityAdminId && currentUser?.id && communityAdminId === currentUser.id));
 
   useEffect(() => {
     if (!isAuthenticated) { setIsLiked(false); setIsBookmarked(false); return; }
@@ -313,9 +382,14 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
       return;
     }
     const next = !isLiked;
+    setIsLiked(next);
+    setLikeCount((current) => current + (next ? 1 : -1));
     void fetch(`${BASE_URL}/posts/likes`, { method: next ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ post_id: post.id }), credentials: 'include' })
-      .then((response) => response.ok ? response.json() : null)
-      .then((body: { data?: { favorited?: boolean } } | null) => { if (body?.data?.favorited !== undefined) { setIsLiked(body.data.favorited); setLikeCount(post.favorite_count + (body.data.favorited ? 1 : 0)); } });
+      .then((response) => { if (!response.ok) throw new Error('Unable to update like') })
+      .catch(() => {
+        setIsLiked(next === false);
+        setLikeCount((current) => current - (next ? 1 : -1));
+      });
   };
 
   const handleToggleBookmark = (e: React.MouseEvent) => {
@@ -325,9 +399,10 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
       return;
     }
     const next = !isBookmarked;
+    setIsBookmarked(next);
     void fetch(`${BASE_URL}/posts/saves`, { method: next ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ post_id: post.id }), credentials: 'include' })
-      .then((response) => response.ok ? response.json() : null)
-      .then((body: { data?: { saved?: boolean } } | null) => { if (body?.data?.saved !== undefined) setIsBookmarked(body.data.saved); });
+      .then((response) => { if (!response.ok) throw new Error('Unable to update bookmark'); })
+      .catch(() => setIsBookmarked(next === false));
   };
 
   const handleOpenOptions = (e: React.MouseEvent<HTMLElement>) => {
@@ -347,11 +422,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
       navigate('/login');
       return;
     }
-
-    const confirmed = window.confirm('Report this post? The report will be reviewed by the moderation team.');
-    if (confirmed) {
-      window.alert('Thanks — this post has been reported and will be reviewed.');
-    }
+    navigate('/placeholder');
   };
 
   const handleEdit = (e: React.MouseEvent) => {
@@ -366,7 +437,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
       navigate(`/profile/${author.id}`);
       return;
     }
-    navigate(isAuthenticated ? '/login' : '/login');
+    navigate(isAuthenticated ? '/login' : '/placeholder');
   };
 
   // ─── EXPANDED VARIANT (PostViewPage) ─────────────────────────────────────────
@@ -408,6 +479,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
             >
               <Box>
                 <Avatar
+                  src={author?.profile_picture ?? undefined}
                   sx={{
                     width: 48,
                     height: 48,
@@ -436,7 +508,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
                   {author?.profile_name ?? author?.username ?? 'Unknown'}
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.78rem' }}>
-                  @{author?.username ?? 'unknown'} · {post.time_created}
+                  @{author?.username ?? 'unknown'} ◈ {post.time_created}
                   <EditedIndicator edited={Boolean(post.last_edited_at)} />
                 </Typography>
               </Box>
@@ -619,7 +691,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
             <FlagOutlinedIcon fontSize="small" />
             Report
           </MenuItem>
-          {canEdit && (
+          {canManagePost && (
             <MenuItem onClick={handleEdit} sx={{
               fontSize: '0.84rem',
               display: 'flex',
@@ -653,6 +725,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
           >
             <Box onClick={handleNavigateProfile} sx={{ display: 'flex', alignItems: 'flex-start', cursor: 'pointer' }}>
               <Avatar
+                src={author?.profile_picture ?? undefined}
                 sx={{
                   width: 38,
                   height: 38,
@@ -678,7 +751,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
                   {author?.profile_name ?? author?.username ?? 'Unknown'}
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  @{author?.username ?? 'unknown'} · {post.time_created}
+                  @{author?.username ?? 'unknown'} ◈ {post.time_created}
                   <EditedIndicator edited={Boolean(post.last_edited_at)} />
                 </Typography>
               </Box>
@@ -725,7 +798,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
             {post.tags.map((tag) => (
               <Chip
                 key={tag}
-                label={`#${tag}`}
+                label={`${tag}`}
                 size="small"
                 variant="outlined"
                 sx={{
@@ -869,7 +942,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false }:
           <FlagOutlinedIcon fontSize="small" />
           Report
         </MenuItem>
-        {canEdit && (
+        {canManagePost && (
           <MenuItem onClick={handleEdit} sx={{
             fontSize: '0.84rem',
             display: 'flex',

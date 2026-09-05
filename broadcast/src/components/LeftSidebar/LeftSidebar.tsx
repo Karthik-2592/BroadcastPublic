@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import List from '@mui/material/List';
@@ -14,7 +15,8 @@ import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import { useAuth } from '../../context/AuthContext';
 import { displayName, userHandle } from '../../types/api';
-import type { Community } from '../../types/api';
+import type { Community, UserSummary } from '../../types/api';
+import { BASE_URL } from '../../config';
 
 // Navigation items corresponding to the wireframe's sidebar tabs
 const navItems = [
@@ -27,6 +29,27 @@ export default function LeftSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser, isAuthenticated } = useAuth();
+  const [communities, setCommunities] = useState<Community[]>([]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setCommunities([]);
+      return;
+    }
+
+    let active = true;
+    void fetch(`${BASE_URL}/communities/memberships`, { credentials: 'include' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((body: { data?: Community[] } | null) => {
+        if (!active) return;
+        setCommunities(Array.isArray(body?.data) ? body.data : []);
+      })
+      .catch(() => {
+        if (active) setCommunities([]);
+      });
+
+    return () => { active = false; };
+  }, [isAuthenticated, currentUser?.id]);
 
   return (
     <Box
@@ -107,33 +130,22 @@ export default function LeftSidebar() {
         Your Communities
       </Typography>
       <List disablePadding>
-        {([] as Community[]).map((community) => (
+        {communities.map((community) => (
           <ListItemButton
             key={community.id}
-            sx={{ py: 0.75, px: 1.5, my: 1 }}
+            sx={{ py: 0.8, 
+              px: 2.2, 
+              my: 1,
+              bgcolor: '#1a1a2e' }}
             onClick={() => navigate('/community/' + community.id)}
           >
-            <ListItemIcon sx={{ minWidth: 36 }}>
-              <Avatar
-                sx={{
-                  width: 26,
-                  height: 26,
-                  bgcolor: community.bannerGradient ? 'primary.main' : 'primary.main',
-                  background: community.bannerGradient,
-                  fontSize: '0.7rem',
-                  fontWeight: 600,
-                  border: 'none',
-                }}
-              >
-                {community.community_name.charAt(0)}
-              </Avatar>
-            </ListItemIcon>
             <ListItemText
               primary={community.community_name}
               slotProps={{
                 primary: {
                   sx: {
-                    fontSize: '0.85rem',
+                    fontSize: '0.9rem',
+                    fontWeight: 500
                   }
                 }
               }}
@@ -162,14 +174,14 @@ export default function LeftSidebar() {
         onClick={() => navigate(isAuthenticated && currentUser ? `/profile/${currentUser.id}` : '/login')}
       >
         <Avatar sx={{ width: 32, height: 32, bgcolor: '#7c4dff', fontSize: '0.85rem' }}>
-          {currentUser ? displayName(currentUser).charAt(0).toUpperCase() : 'G'}
+          {currentUser ? displayName(currentUser as UserSummary).charAt(0).toUpperCase() : 'G'}
         </Avatar>
         <Box>
           <Typography variant="subtitle2" sx={{ color: 'text.primary', fontSize: '0.85rem', fontWeight: 500 }}>
-            {isAuthenticated && currentUser ? displayName(currentUser) : 'Join Broadcast'}
+            {isAuthenticated && currentUser ? displayName(currentUser as UserSummary) : 'Join Broadcast'}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            {isAuthenticated && currentUser ? userHandle(currentUser) : 'Sign in to get started'}
+            {isAuthenticated && currentUser ? userHandle(currentUser as UserSummary) : 'Sign in to get started'}
           </Typography>
         </Box>
       </Box>

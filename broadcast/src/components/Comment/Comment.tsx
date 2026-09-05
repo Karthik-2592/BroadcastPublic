@@ -31,12 +31,18 @@ interface CommentProps {
   /** Indent level — 0 for top-level, 1 for nested replies */
   depth?: number;
   canEdit?: boolean;
+  communityAdminId?: string | null;
+  inPost?: boolean;
   onLoadReplies?: (cursor?: string | null) => Promise<void>;
   repliesLoading?: boolean;
   repliesCursor?: string | null;
+  onReplySubmitting?: () => void;
+  onReplySubmissionFailed?: () => void;
+  onReplyCreated?: (reply: ApiComment) => void;
 }
 
 function CommentEditDialog({ comment, open, onClose }: { comment: ApiComment; open: boolean; onClose: () => void }) {
+  const { currentUser } = useAuth();
   const [commentText, setCommentText] = useState(comment.content);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const COMMENT_MAX = 200;
@@ -72,7 +78,7 @@ function CommentEditDialog({ comment, open, onClose }: { comment: ApiComment; op
             <IconButton aria-label="Close edit comment" onClick={onClose} sx={{ color: 'text.secondary' }}><CloseRoundedIcon /></IconButton>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, p: 3 }}>
-            <Avatar sx={{ width: 40, height: 40, bgcolor: 'primary.main', color: '#0f0f1a', fontWeight: 700 }}>Y</Avatar>
+            <Avatar src={currentUser?.profile_picture?.media_url ?? undefined} sx={{ width: 40, height: 40, bgcolor: 'primary.main', color: '#0f0f1a', fontWeight: 700 }}>{currentUser?.profile_name?.charAt(0) ?? currentUser?.username?.charAt(0) ?? '?'}</Avatar>
             <Box sx={{ flex: 1 }}>
               <Box sx={{ position: 'relative' }}>
                 <Box
@@ -112,9 +118,9 @@ function CommentEditDialog({ comment, open, onClose }: { comment: ApiComment; op
   );
 }
 
-export default function Comment({ comment, depth = 0, canEdit = false, onLoadReplies, repliesLoading = false, repliesCursor = null }: CommentProps) {
+export default function Comment({ comment, depth = 0, canEdit = false, communityAdminId = null, onLoadReplies, repliesLoading = false, repliesCursor = null, inPost = true, onReplySubmitting, onReplySubmissionFailed, onReplyCreated }: CommentProps) {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, currentUser } = useAuth();
   const [replyOpen, setReplyOpen] = useState(false);
   const [repliesOpen, setRepliesOpen] = useState(false);
   const [optionsAnchor, setOptionsAnchor] = useState<null | HTMLElement>(null);
@@ -123,10 +129,11 @@ export default function Comment({ comment, depth = 0, canEdit = false, onLoadRep
   const [isLiked, setIsLiked] = useState(comment.isLiked ?? false);
   const [likeCount, setLikeCount] = useState(comment.favorite_count);
   const author = comment.user_summary;
+  const canManageComment = Boolean(canEdit || (communityAdminId && currentUser?.id && communityAdminId === currentUser.id));
 
   useEffect(() => {
     if (!isAuthenticated) { setIsLiked(false); return; }
-    void fetch(`${BASE_URL}/comments/${comment.id}/likes/status`, { credentials: 'include' })
+    void fetch(`${BASE_URL}/posts/${comment.post_id}/comments/${comment.id}/likes/status`, { credentials: 'include' })
       .then((response) => response.ok ? response.json() : null)
       .then((body: { data?: { active?: boolean } } | null) => setIsLiked(Boolean(body?.data?.active)));
   }, [comment.id, isAuthenticated]);
@@ -149,11 +156,7 @@ export default function Comment({ comment, depth = 0, canEdit = false, onLoadRep
       navigate('/login');
       return;
     }
-
-    const confirmed = window.confirm('Report this comment? The report will be reviewed by the moderation team.');
-    if (confirmed) {
-      window.alert('Thanks — this comment has been reported and will be reviewed.');
-    }
+    navigate('/placeholder');
   };
 
   const handleToggleLike = (e: React.MouseEvent) => {
@@ -163,9 +166,14 @@ export default function Comment({ comment, depth = 0, canEdit = false, onLoadRep
       return;
     }
     const next = !isLiked;
-    void fetch(`${BASE_URL}/comments/likes`, { method: next ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ post_id: comment.post_id, comment_id: comment.id }), credentials: 'include' })
-      .then((response) => response.ok ? response.json() : null)
-      .then((body: { data?: { favorited?: boolean } } | null) => { if (body?.data?.favorited !== undefined) { setIsLiked(body.data.favorited); setLikeCount(comment.favorite_count + (body.data.favorited ? 1 : 0)); } });
+    setIsLiked(next);
+    setLikeCount((current) => current + (next ? 1 : -1));
+    void fetch(`${BASE_URL}/posts/${comment.post_id}/comments/likes`, { method: next ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ post_id: comment.post_id, comment_id: comment.id }), credentials: 'include' })
+      .then((response) => { if (!response.ok) throw new Error('Unable to update like'); })
+      .catch(() => {
+        setIsLiked(next === false);
+        setLikeCount((current) => current - (next ? 1 : -1));
+      });
   };
 
   const handleToggleReplies = async () => {
@@ -185,6 +193,7 @@ export default function Comment({ comment, depth = 0, canEdit = false, onLoadRep
         {/* Avatar column with vertical thread-line */}
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
           <Avatar
+            src={author?.profile_picture ?? undefined}
             onClick={handleNavigateProfile}
             sx={{
               width: avatarSize,
@@ -266,7 +275,7 @@ export default function Comment({ comment, depth = 0, canEdit = false, onLoadRep
               }}>
               <FlagOutlinedIcon fontSize="small" /> Report
             </MenuItem>
-            {canEdit && (
+            {canManageComment && (
               <MenuItem onClick={() => { setOptionsAnchor(null); setIsEditOpen(true); }} sx={{
                 fontSize: '0.84rem',
                 display: 'flex',
@@ -319,7 +328,7 @@ export default function Comment({ comment, depth = 0, canEdit = false, onLoadRep
             >
               {likeCount}
             </Button>
-            {!isNested && (
+            {!isNested && inPost &&  (
               <Button
                 size="small"
                 startIcon={<ReplyIcon sx={{ fontSize: 15 }} />}
@@ -338,12 +347,12 @@ export default function Comment({ comment, depth = 0, canEdit = false, onLoadRep
                 Reply
               </Button>
             )}
-            {!isNested && repliesOpen && repliesCursor && (
+            {!isNested && inPost && repliesOpen && repliesCursor && (
               <Button size="small" onClick={() => void onLoadReplies?.(repliesCursor)} disabled={repliesLoading} sx={{ color: 'text.secondary', textTransform: 'none', fontSize: '0.78rem', minWidth: 0 }}>
                 {repliesLoading ? 'Loading replies…' : 'Load more replies'}
               </Button>
             )}
-            {!isNested && (
+            {!isNested && inPost && (
               <Button
                 size="small"
                 onClick={handleToggleReplies}
@@ -360,7 +369,7 @@ export default function Comment({ comment, depth = 0, canEdit = false, onLoadRep
       {/* Inline reply composer — toggled by Reply button (only for top-level comments) */}
       {!isNested && (
         <Box sx={{ ml: 7 }}>
-          <Reply open={replyOpen} onClose={() => setReplyOpen(false)} parentCommentId={comment.id} />
+          <Reply open={replyOpen} onClose={() => setReplyOpen(false)} parentCommentId={comment.id} postId={comment.post_id} onSubmitting={onReplySubmitting} onSubmissionFailed={onReplySubmissionFailed} onSubmitted={onReplyCreated} />
         </Box>
       )}
 

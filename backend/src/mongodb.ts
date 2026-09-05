@@ -17,6 +17,7 @@ import type {
   Post,
   User,
   MediaMetadata,
+  UserSummary,
 } from "./types.ts";
 import { env } from "./config/env.ts";
 import { decodeCursor, nextCursor } from "./cursor.ts";
@@ -25,6 +26,7 @@ type UserDocument = Omit<User, "id" | "pinned_posts"> & {
   _id: ObjectId;
   pinned_posts: ObjectId[];
   password: { password_hash: string; salt: string };
+  joined_at?: Date;
 };
 type PostDocument = Omit<
   Post,
@@ -71,15 +73,18 @@ const uri = env.mongoUri;
 const databaseName = env.mongoDatabase;
 const oid = (value: string) =>
   ObjectId.isValid(value) ? new ObjectId(value) : null;
-const publicCommunityObjectId = oid(env.publicCommunityId);
-if (!publicCommunityObjectId)
-  throw new Error("PUBLIC_COMMUNITY_ID must be a valid MongoDB ObjectId");
 const FEED_LIMIT = 50;
 const COMMUNITY_LIMIT = 50;
 const apiId = (value: ObjectId) => value.toHexString();
 const hash = (password: string, salt: string) =>
   createHash("sha256").update(`${salt}:${password}`).digest("hex");
 const defaultMedia: MediaMetadata | null = null;
+const userSummary = (user: User): UserSummary => ({
+  id: user.id,
+  username: user.username,
+  profile_name: user.profile_name,
+  profile_picture: user.profile_picture?.media_url ?? null,
+});
 const safeUser = (user: UserDocument): User => ({
   id: apiId(user._id),
   username: user.username,
@@ -91,6 +96,7 @@ const safeUser = (user: UserDocument): User => ({
   pinned_posts: user.pinned_posts.map(apiId),
   follower_count: user.follower_count,
   following_count: user.following_count,
+  joined_at: user.joined_at ? user.joined_at.toISOString() : undefined,
 });
 const safePost = (post: PostDocument): Post => {
   const { _id, ...value } = post;
@@ -202,6 +208,7 @@ export class MongoStore {
         pinned_posts: [],
         follower_count: 0,
         following_count: 0,
+        joined_at: new Date(),
       };
       await users.insertOne(user);
       await this.log("passwords.insertOne", () =>
@@ -332,27 +339,35 @@ export class MongoStore {
         .then((users) => users.map((item) => safeUser(item as UserDocument))),
     );
   }
+  async incrementCommunityPostCount(communityId: string, delta: 1 | -1) {
+    const objectId = oid(communityId);
+    if (!objectId) return false;
+    const result = await this.log("communities.post_count.update", () =>
+      this.collection<CommunityDocument>("communities").then((c) =>
+        c.updateOne({ _id: objectId }, { $inc: { post_count: delta } }),
+      ),
+    );
+    return result.matchedCount > 0;
+  }
   async createPost(
     input: Omit<
       Post,
-      "id" | "time_created" | "favorite_count" | "comment_count"
+      "id" | "time_created" | "favorite_count" | "comment_count" | "user_summary"
     >,
   ) {
     const userId = oid(input.user_id ?? "");
     if (!userId) throw new Error("Invalid post user_id");
-    if (!input.user_summary)
-      throw new Error("Post user_summary is required.");
-    const communityId = input.community_id
-      ? oid(input.community_id)
-      : publicCommunityObjectId;
-    if (!communityId) throw new Error("Invalid post community_id");
+    const user = await this.user(input.user_id!);
+    if (!user) throw new Error("Post user not found");
+    const communityId = input.community_id ? oid(input.community_id) : null;
+    if (input.community_id && !communityId) throw new Error("Invalid post community_id");
     const post: PostDocument = {
       _id: new ObjectId(),
       user_id: userId,
       community_id: communityId,
       title: input.title,
       content: input.content,
-      user_summary: input.user_summary,
+      user_summary: userSummary(user),
       tags: input.tags,
       media: input.media ?? [],
       popularity_score: new Double(input.popularity_score),
@@ -363,6 +378,7 @@ export class MongoStore {
     };
     return this.log("posts.insertOne", async () => {
       await (await this.collection<PostDocument>("posts")).insertOne(post);
+      if (communityId) await this.incrementCommunityPostCount(communityId.toHexString(), 1);
       return safePost(post);
     });
   }
@@ -394,6 +410,15 @@ export class MongoStore {
         .then((posts) => posts.map((post) => safePost(post))),
     );
   }
+  async postsByUserId(userId: string) {
+    const objectId = oid(userId);
+    if (!objectId) return [];
+    return this.log("posts.findByUserId", () =>
+      this.collection<PostDocument>("posts")
+        .then((c) => c.find({ user_id: objectId }).sort({ time_created: -1, _id: -1 }).toArray())
+        .then((posts) => posts.map((post) => safePost(post))),
+    );
+  }
   async postsByCommunityIds(communityIds: string[]) {
     const objectIds = communityIds.map(oid).filter((value): value is ObjectId => value !== null);
     if (!objectIds.length) return [];
@@ -406,6 +431,7 @@ export class MongoStore {
   async updatePost(id: string, changes: Partial<Post>) {
     const objectId = oid(id);
     if (!objectId) return null;
+    const existing = await this.post(id);
     const update = Object.fromEntries(
       Object.entries(changes).filter(
         ([key, value]) =>
@@ -423,6 +449,8 @@ export class MongoStore {
     );
     return this.log("posts.updateOne", async () => {
       const posts = await this.collection<PostDocument>("posts");
+      const before = await posts.findOne({ _id: objectId }, { projection: { community_id: 1 } });
+      const previousCommunityId = before?.community_id?.toHexString();
       await posts.updateOne(
         { _id: objectId },
         { $set: { ...update, last_edited_at: new Date() } },
@@ -435,13 +463,20 @@ export class MongoStore {
     const objectId = oid(id);
     if (!objectId) return false;
     return this.log("posts.deleteOne", async () => {
+      const post = await this.collection<PostDocument>("posts").then((c) =>
+        c.findOne({ _id: objectId }, { projection: { community_id: 1 } }),
+      );
       const result = await (
         await this.collection<PostDocument>("posts")
       ).deleteOne({ _id: objectId });
-      if (result.deletedCount)
+      if (result.deletedCount) {
+        if (post?.community_id) {
+          await this.incrementCommunityPostCount(post.community_id.toHexString(), -1);
+        }
         await (
           await this.collection<CommentDocument>("comments")
         ).deleteMany({ post_id: objectId });
+      }
       return Boolean(result.deletedCount);
     });
   }
@@ -455,6 +490,18 @@ export class MongoStore {
     );
     const items = posts.slice(0, limit);
     return { items, nextCursor: nextCursor(page.offset, posts.length, limit, { sort: "time_created" }) };
+  }
+  async trending(cursor?: string) {
+    const filters = { sort: "popularity_score" };
+    const page = decodeCursor(cursor, filters);
+    const limit = 10;
+    const posts = await this.log("posts.trending.find", () =>
+      this.collection<PostDocument>("posts")
+        .then((c) => c.find().sort({ popularity_score: -1, _id: -1 }).skip(page.offset).limit(limit + 1).toArray())
+        .then((items) => items.map(safePost)),
+    );
+    const items = posts.slice(0, limit);
+    return { items, nextCursor: nextCursor(page.offset, posts.length, limit, filters) };
   }
   async incrementPostFavoriteCount(postId: string, delta: number) {
     const objectId = oid(postId);
@@ -617,17 +664,17 @@ export class MongoStore {
     return { items, nextCursor: nextCursor(page.offset, replies.length, limit, filters) };
   }
   async createComment(
-    input: Omit<Comment, "id" | "timestamp" | "last_edited_at" | "favorite_count" | "reply_count">,
+    input: Omit<Comment, "id" | "timestamp" | "last_edited_at" | "favorite_count" | "reply_count" | "user_summary">,
   ) {
-    if (!input.user_summary)
-      throw new Error("Comment user_summary is required.");
+    const user = input.user_id ? await this.user(input.user_id) : null;
+    if (!user) throw new Error("Comment user not found");
     const comment: CommentDocument = {
       _id: new ObjectId(),
       post_id: oid(input.post_id)!,
       user_id: input.user_id ? oid(input.user_id) : null,
       root: input.root ? oid(input.root) : null,
       content: input.content,
-      user_summary: input.user_summary,
+      user_summary: userSummary(user),
       favorite_count: 0,
       reply_count: 0,
       timestamp: new Date(),
@@ -640,6 +687,9 @@ export class MongoStore {
       await (
         await this.collection<PostDocument>("posts")
       ).updateOne({ _id: oid(input.post_id)! }, { $inc: { comment_count: 1 } });
+      if(comment.root) await (
+        await this.collection<CommentDocument>("comments")
+      ).updateOne({_id: comment.root!}, {$inc: {reply_count: 1}})
       return safeComment(comment);
     });
   }
@@ -671,7 +721,16 @@ export class MongoStore {
         .then((comments) => comments.map((comment) => safeComment(comment))),
     );
   }
-  async updateComment(id: string, content: string, userSummary?: unknown) {
+  async commentsByUserId(userId: string) {
+    const objectId = oid(userId);
+    if (!objectId) return [];
+    return this.log("comments.findByUserId", () =>
+      this.collection<CommentDocument>("comments")
+        .then((c) => c.find({ user_id: objectId }).sort({ timestamp: -1, _id: -1 }).toArray())
+        .then((comments) => comments.map((comment) => safeComment(comment))),
+    );
+  }
+  async updateComment(id: string, content: string) {
     const objectId = oid(id);
     if (!objectId) return null;
     return this.log("comments.updateOne", async () => {
@@ -682,7 +741,6 @@ export class MongoStore {
           $set: {
             content,
             last_edited_at: new Date(),
-            ...(userSummary === undefined ? {} : { user_summary: userSummary }),
           },
         },
       );
