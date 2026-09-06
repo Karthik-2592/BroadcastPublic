@@ -5,8 +5,9 @@ import { neo4jRelations, numberValue } from "../neo4j.ts"
 import type { FollowRelationRequest, User } from "../types.ts";
 import { Router } from "express";
 import { requireSession, sessionUserId } from "../session.ts";
-import { decodeCursor, nextCursor } from "../cursor.ts";
+import { decodeCursor, createNextCursor } from "../cursor.ts";
 import { mediaUrl, saveMedia, type UploadedFile } from "../media.ts";
+import { sendEvent } from "../services/events.ts";
 
 export async function getUser(req: Request, res: Response) {
   const user = await store.user(id(req));
@@ -17,10 +18,19 @@ export async function updateUser(req: Request, res: Response) {
   if (id(req) !== userId) return fail(res, 403, "Only the account owner may edit it.");
   const user = await store.user(userId);
   if (!user) return fail(res, 404, "User not found.");
-  if (req.body.pinned_posts && req.body.pinned_posts.length > 4)
-    return fail(res, 400, "A user may pin at most four posts.");
+
   const updated = await store.updateUser(userId, req.body as Partial<User>);
   if (updated && Array.isArray(req.body.interests)) await neo4jRelations.interestIn(userId, updated.interests);
+  if (updated) {
+    sendEvent({
+      content_id: userId,
+      content_type: "user",
+      action: "post",
+      target_id: null,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   return updated ? ok(res, updated) : fail(res, 404, "User not found.");
 }
 export async function uploadProfilePicture(req: Request, res: Response) {
@@ -31,6 +41,15 @@ export async function uploadProfilePicture(req: Request, res: Response) {
   if (!file) return fail(res, 400, "A profile picture is required.");
   const saved = await saveMedia(file, userId, "profile", 0, "PUT");
   const updated = await store.updateUser(userId, { profile_picture: { media_id: saved.media_id, media_url: mediaUrl(saved.path), mime_type: saved.mime_type } });
+  if (updated) {
+    sendEvent({
+      content_id: userId,
+      content_type: "user",
+      action: "post",
+      target_id: null,
+      timestamp: new Date().toISOString(),
+    });
+  }
   return updated ? ok(res, updated, "Profile picture uploaded successfully.", 201) : fail(res, 500, "Unable to store profile picture metadata.");
 }
 export async function deleteUser(req: Request, res: Response) {
@@ -38,7 +57,13 @@ export async function deleteUser(req: Request, res: Response) {
   if (id(req) !== userId) return fail(res, 403, "Only the account owner may delete it.");
   if (!(await store.deleteUser(userId)))
     return fail(res, 404, "User not found.");
-  await neo4jRelations.deleteUserNode(userId);
+  sendEvent({
+    content_id: userId,
+    content_type: "user",
+    action: "delete",
+    target_id: null,
+    timestamp: new Date().toISOString(),
+  });
   return ok(res, null, "User deleted successfully.");
 }
 export async function searchUsers(req: Request, res: Response) {
@@ -48,29 +73,52 @@ export async function searchUsers(req: Request, res: Response) {
 }
 export async function listUserPosts(req: Request, res: Response) {
   if (!(await store.user(id(req)))) return fail(res, 404, "User not found.");
-  const posts = await store.postsByUserId(id(req));
-  return ok(res, posts);
+  try {
+    const page = await store.postsByUserId(
+      id(req),
+      typeof req.query.cursor === "string" ? req.query.cursor : undefined,
+    );
+    return ok(res, page.items, "Operation completed successfully.", 200, page.nextCursor);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Malformed cursor.";
+    return fail(res, 400, message);
+  }
 }
 export async function listUserComments(req: Request, res: Response) {
   if (!(await store.user(id(req)))) return fail(res, 404, "User not found.");
-  const comments = await store.commentsByUserId(id(req));
-  return ok(res, comments);
+  try {
+    const page = await store.commentsByUserId(
+      id(req),
+      typeof req.query.cursor === "string" ? req.query.cursor : undefined,
+    );
+    return ok(res, page.items, "Operation completed successfully.", 200, page.nextCursor);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Malformed cursor.";
+    return fail(res, 400, message);
+  }
 }
 export async function listUserSavedPosts(req: Request, res: Response) {
   const userId = id(req);
   if (userId !== sessionUserId(req)) return fail(res, 403, "Only the owner may view saved posts.");
   if (!(await store.user(userId))) return fail(res, 404, "User not found.");
-  const savedIds = await neo4jRelations.savedPostIds(userId);
-  const posts = await store.postsByIds(savedIds);
-  return ok(res, posts);
+  try {
+    const filters = { user_id: userId, type: "saved" };
+    const page = decodeCursor(typeof req.query.cursor === "string" ? req.query.cursor : undefined, filters);
+    const lastPostId = page.values?.id as string | undefined;
+    const postIds = await neo4jRelations.savedPostIds(userId, lastPostId, 11);
+    const posts = await store.postsByIds(postIds.slice(0, 10));
+    const byId = new Map(posts.map((p) => [p.id, p]));
+    const ordered = postIds.slice(0, 10).flatMap((pid) => byId.has(pid) ? [byId.get(pid)!] : []);
+    const lastItem = postIds.length > 10 && ordered.length > 0 ? ordered[ordered.length - 1] : null;
+    return ok(res, ordered, "Operation completed successfully.", 200, createNextCursor(lastItem as Record<string, unknown> | null, "id", filters));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Malformed cursor.";
+    return fail(res, 400, message);
+  }
 }
 export async function recommendations(req: Request, res: Response) {
   if (!(await store.user(id(req)))) return fail(res, 404, "User not found.");
-  const groups = await Promise.all([
-    neo4jRelations.userRecommendationsByInterests(id(req)),
-    neo4jRelations.userRecommendationsByCommunities(id(req)),
-    neo4jRelations.userRecommendationsByFollowNetwork(id(req)),
-  ]);
+  const groups = await neo4jRelations.userRecommendationsGrouped(id(req));
   const ids = [...new Set(groups.flat())].slice(0, 4);
   return ok(res, await store.usersByIds(ids));
 }
@@ -81,9 +129,11 @@ export async function listRelatedUsers(req: Request, res: Response) {
   try {
     const filters = { user_id: id(req), relation: direction };
     const page = decodeCursor(typeof req.query.cursor === "string" ? req.query.cursor : undefined, filters);
-    const userIds = await neo4jRelations.relatedUserIds(id(req), direction, page.offset, 11);
+    const lastUserId = page.values?.id as string | undefined;
+    const userIds = await neo4jRelations.relatedUserIds(id(req), direction, lastUserId, 11);
     const users = await store.usersByIds(userIds.slice(0, 10));
-    return ok(res, users, "Operation completed successfully.", 200, nextCursor(page.offset, userIds.length, 10, filters));
+    const lastItem = userIds.length > 10 && users.length > 0 ? users[users.length - 1] : null;
+    return ok(res, users, "Operation completed successfully.", 200, createNextCursor(lastItem as Record<string, unknown> | null, "id", filters));
   } catch {
     return fail(res, 400, "Malformed cursor.");
   }

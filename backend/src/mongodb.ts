@@ -7,7 +7,6 @@ import {
   type Db,
   type Document,
   type Filter,
-  type UpdateFilter,
 } from "mongodb";
 import type {
   Comment,
@@ -20,11 +19,10 @@ import type {
   UserSummary,
 } from "./types.ts";
 import { env } from "./config/env.ts";
-import { decodeCursor, nextCursor } from "./cursor.ts";
+import { decodeCursor, createNextCursor } from "./cursor.ts";
 
-type UserDocument = Omit<User, "id" | "pinned_posts"> & {
+type UserDocument = Omit<User, "id"> & {
   _id: ObjectId;
-  pinned_posts: ObjectId[];
   password: { password_hash: string; salt: string };
   joined_at?: Date;
 };
@@ -69,9 +67,10 @@ type CommentFavoriteDocument = {
   user_id: ObjectId;
 };
 
+
 const uri = env.mongoUri;
 const databaseName = env.mongoDatabase;
-const oid = (value: string) =>
+export const oid = (value: string) =>
   ObjectId.isValid(value) ? new ObjectId(value) : null;
 const FEED_LIMIT = 50;
 const COMMUNITY_LIMIT = 50;
@@ -93,7 +92,6 @@ const safeUser = (user: UserDocument): User => ({
   profile_name: user.profile_name,
   profile_picture: user.profile_picture ?? defaultMedia,
   profile_description: user.profile_description,
-  pinned_posts: user.pinned_posts.map(apiId),
   follower_count: user.follower_count,
   following_count: user.following_count,
   joined_at: user.joined_at ? user.joined_at.toISOString() : undefined,
@@ -205,7 +203,6 @@ export class MongoStore {
         profile_name: input.profile_name ?? "",
         profile_picture: input.profile_picture ?? defaultMedia,
         profile_description: input.profile_description ?? "",
-        pinned_posts: [],
         follower_count: 0,
         following_count: 0,
         joined_at: new Date(),
@@ -264,11 +261,6 @@ export class MongoStore {
           ),
       ),
     );
-    if (Array.isArray(changes.pinned_posts)) {
-      const pinnedPosts = changes.pinned_posts.map((postId) => oid(postId));
-      if (pinnedPosts.some((postId) => !postId)) return null;
-      update.pinned_posts = pinnedPosts;
-    }
     return this.log("users.updateOne", async () => {
       const users = await this.collection<UserDocument>("users");
       await users.updateOne({ _id: objectId }, { $set: update });
@@ -284,16 +276,6 @@ export class MongoStore {
         await this.collection<UserDocument>("users")
       ).deleteOne({ _id: objectId });
       if (!result.deletedCount) return false;
-      await (
-        await this.collection<PostDocument>("posts")
-      ).updateMany({ user_id: objectId }, {
-        $set: { user_id: null },
-      } as UpdateFilter<PostDocument>);
-      await (
-        await this.collection<CommentDocument>("comments")
-      ).updateMany({ user_id: objectId }, {
-        $set: { user_id: null },
-      } as UpdateFilter<CommentDocument>);
       return true;
     });
   }
@@ -410,14 +392,24 @@ export class MongoStore {
         .then((posts) => posts.map((post) => safePost(post))),
     );
   }
-  async postsByUserId(userId: string) {
+  async postsByUserId(userId: string, cursor?: string) {
     const objectId = oid(userId);
-    if (!objectId) return [];
-    return this.log("posts.findByUserId", () =>
+    if (!objectId) return { items: [], nextCursor: "null" };
+    const filters = { user_id: userId };
+    const page = decodeCursor(cursor, filters, ["time_created"]);
+    const limit = 10;
+    const filter: Filter<PostDocument> = { user_id: objectId };
+    if (page.values?.time_created !== undefined) {
+      filter.time_created = { $lt: new Date(page.values.time_created as string) };
+    }
+    const posts = await this.log("posts.findByUserId", () =>
       this.collection<PostDocument>("posts")
-        .then((c) => c.find({ user_id: objectId }).sort({ time_created: -1, _id: -1 }).toArray())
-        .then((posts) => posts.map((post) => safePost(post))),
+        .then((c) => c.find(filter).sort({ time_created: -1, _id: -1 }).limit(limit + 1).toArray())
+        .then((items) => items.map(safePost)),
     );
+    const items = posts.slice(0, limit);
+    const lastItem = posts.length > limit ? posts[limit - 1] : null;
+    return { items, nextCursor: createNextCursor(lastItem as Record<string, unknown> | null, "time_created", filters, "desc") };
   }
   async postsByCommunityIds(communityIds: string[]) {
     const objectIds = communityIds.map(oid).filter((value): value is ObjectId => value !== null);
@@ -431,7 +423,6 @@ export class MongoStore {
   async updatePost(id: string, changes: Partial<Post>) {
     const objectId = oid(id);
     if (!objectId) return null;
-    const existing = await this.post(id);
     const update = Object.fromEntries(
       Object.entries(changes).filter(
         ([key, value]) =>
@@ -439,6 +430,7 @@ export class MongoStore {
           ![
             "id",
             "user_id",
+            "community_id",
             "time_created",
             "last_edited_at",
             "favorite_count",
@@ -449,8 +441,6 @@ export class MongoStore {
     );
     return this.log("posts.updateOne", async () => {
       const posts = await this.collection<PostDocument>("posts");
-      const before = await posts.findOne({ _id: objectId }, { projection: { community_id: 1 } });
-      const previousCommunityId = before?.community_id?.toHexString();
       await posts.updateOne(
         { _id: objectId },
         { $set: { ...update, last_edited_at: new Date() } },
@@ -469,39 +459,50 @@ export class MongoStore {
       const result = await (
         await this.collection<PostDocument>("posts")
       ).deleteOne({ _id: objectId });
-      if (result.deletedCount) {
-        if (post?.community_id) {
-          await this.incrementCommunityPostCount(post.community_id.toHexString(), -1);
-        }
-        await (
-          await this.collection<CommentDocument>("comments")
-        ).deleteMany({ post_id: objectId });
+      if (!result.deletedCount) return false;
+      if (post?.community_id) {
+        await this.log("communities.post_count.update", () =>
+          this.collection<CommunityDocument>("communities").then((c) =>
+            c.updateOne(
+              { _id: post.community_id! },
+              { $inc: { post_count: -1 } },
+            ),
+          ),
+        );
       }
-      return Boolean(result.deletedCount);
+
+      return true;
     });
   }
   async feed(cursor?: string) {
-    const page = decodeCursor(cursor, { sort: "time_created" });
+    const page = decodeCursor(cursor, {}, ["time_created"]);
     const limit = 10;
+    const filter = page.values?.time_created
+      ? { time_created: { $lt: new Date(page.values?.time_created as string) } }
+      : {};
     const posts = await this.log("posts.find", () =>
       this.collection<PostDocument>("posts")
-        .then((c) => c.find().sort({ time_created: -1, _id: -1 }).skip(page.offset).limit(limit + 1).toArray())
+        .then((c) => c.find(filter).sort({ time_created: -1 }).limit(limit + 1).toArray())
         .then((items) => items.map(safePost)),
     );
     const items = posts.slice(0, limit);
-    return { items, nextCursor: nextCursor(page.offset, posts.length, limit, { sort: "time_created" }) };
+    const lastItem = posts.length > limit ? posts[limit - 1] : null;
+    return { items, nextCursor: createNextCursor(lastItem as Record<string, unknown> | null, "time_created", {}, "desc") };
   }
   async trending(cursor?: string) {
-    const filters = { sort: "popularity_score" };
-    const page = decodeCursor(cursor, filters);
+    const page = decodeCursor(cursor, {}, ["popularity_score"]);
     const limit = 10;
+    const filter = page.values?.popularity_score !== undefined
+      ? { popularity_score: { $lt: page.values.popularity_score } }
+      : {};
     const posts = await this.log("posts.trending.find", () =>
       this.collection<PostDocument>("posts")
-        .then((c) => c.find().sort({ popularity_score: -1, _id: -1 }).skip(page.offset).limit(limit + 1).toArray())
+        .then((c) => c.find(filter as Filter<PostDocument>).sort({ popularity_score: -1 }).limit(limit + 1).toArray())
         .then((items) => items.map(safePost)),
     );
     const items = posts.slice(0, limit);
-    return { items, nextCursor: nextCursor(page.offset, posts.length, limit, filters) };
+    const lastItem = posts.length > limit ? posts[limit - 1] : null;
+    return { items, nextCursor: createNextCursor(lastItem as Record<string, unknown> | null, "popularity_score", {}, "desc") };
   }
   async incrementPostFavoriteCount(postId: string, delta: number) {
     const objectId = oid(postId);
@@ -616,21 +617,46 @@ export class MongoStore {
   }
   async commentsForPost(postId: string, root: string | null = null, cursor?: string) {
     const filters = { post_id: postId, root: root ?? "null" };
-    const page = decodeCursor(cursor, filters);
+    const page = decodeCursor(cursor, filters, ["timestamp"]);
     const limit = 10;
-    const comments = await this.log("comments.find", () =>
-      this.collection<CommentDocument>("comments")
-        .then((c) => c.find({ post_id: oid(postId)!, root: root ? oid(root) : null }).sort({ timestamp: 1, _id: 1 }).skip(page.offset).limit(limit + 1).toArray())
-        .then((items) => items.map(safeComment)),
-    );
+    const comments = await this.log("comments.find", async () => {
+      const collection = await this.collection<CommentDocument>("comments");
+      let query = collection.find({ post_id: oid(postId)!, root: root ? oid(root) : null });
+      if (page.values?.timestamp !== undefined) {
+        query = query.filter({ timestamp: { $gt: new Date(page.values.timestamp as string) } });
+      }
+      return query.sort({ timestamp: 1 }).limit(limit + 1).toArray();
+    }).then((items) => items.map(safeComment));
     const items = comments.slice(0, limit);
-    return { items, nextCursor: nextCursor(page.offset, comments.length, limit, filters) };
+    const lastItem = comments.length > limit ? comments[limit - 1] : null;
+    return { items, nextCursor: createNextCursor(lastItem as Record<string, unknown> | null, "timestamp", filters, "asc") };
   }
   async isCommentFavorited(commentId: string, userId: string) {
     const commentObjectId = oid(commentId);
     const userObjectId = oid(userId);
     if (!commentObjectId || !userObjectId) return false;
     return Boolean(await (await this.collection<CommentFavoriteDocument>("comment_favorite_store")).findOne({ comment_id: commentObjectId, user_id: userObjectId }));
+  }
+  async isCommentFavoritedBatch(userId: string, commentIds: string[]) {
+    const userObjectId = oid(userId);
+    if (!userObjectId) return {};
+    const commentObjectIds = commentIds.map(oid).filter((value): value is ObjectId => value !== null);
+    if (!commentObjectIds.length) return {};
+
+    const favorites = await this.log("comment_favorite_store.findBatch", async () => {
+      const collection = await this.collection<CommentFavoriteDocument>("comment_favorite_store");
+      return collection.find({
+        user_id: userObjectId,
+        comment_id: { $in: commentObjectIds }
+      }).toArray();
+    });
+
+    const favoritedSet = new Set(favorites.map((fav) => apiId(fav.comment_id)));
+    const map: Record<string, boolean> = {};
+    for (const id of commentIds) {
+      map[id] = favoritedSet.has(id);
+    }
+    return map;
   }
   async feedIds(limit = 50) {
     return this.log("posts.feedIds", () =>
@@ -641,27 +667,41 @@ export class MongoStore {
   }
   async postsForCommunity(communityId: string, cursor?: string, sort: "new" | "top" = "new") {
     const filters = { community_id: communityId, sort };
-    const page = decodeCursor(cursor, filters);
+    const page = decodeCursor(cursor, filters, sort === "top" ? ["favorite_count"] : ["time_created"]);
     const limit = 10;
-    const posts = await this.log("posts.findByCommunity", () =>
-      this.collection<PostDocument>("posts")
-        .then((c) => c.find({ community_id: oid(communityId)! }).sort(sort === "top" ? { favorite_count: -1, _id: -1 } : { time_created: -1, _id: -1 }).skip(page.offset).limit(limit + 1).toArray())
-        .then((items) => items.map(safePost)),
-    );
+    const sortField = sort === "top" ? "favorite_count" : "time_created";
+    const communityIdOid = oid(communityId)!;
+    const posts = await this.log("posts.findByCommunity", async () => {
+      const collection = await this.collection<PostDocument>("posts");
+      let query = collection.find({ community_id: communityIdOid });
+      if (page.values?.[sortField] !== undefined) {
+        if (sort === "top") {
+          query = query.filter({ favorite_count: { $lt: page.values.favorite_count } });
+        } else {
+          query = query.filter({ time_created: { $lt: new Date(page.values.time_created as string) } });
+        }
+      }
+      return query.sort(sort === "top" ? { favorite_count: -1 } : { time_created: -1 }).limit(limit + 1).toArray();
+    }).then((items) => items.map(safePost));
     const items = posts.slice(0, limit);
-    return { items, nextCursor: nextCursor(page.offset, posts.length, limit, filters) };
+    const lastItem = posts.length > limit ? posts[limit - 1] : null;
+    return { items, nextCursor: createNextCursor(lastItem as Record<string, unknown> | null, sortField, filters, "desc") };
   }
   async repliesForComment(commentId: string, cursor?: string) {
     const filters = { root: commentId };
-    const page = decodeCursor(cursor, filters);
+    const page = decodeCursor(cursor, filters, ["timestamp"]);
     const limit = 5;
-    const replies = await this.log("comments.replies.find", () =>
-      this.collection<CommentDocument>("comments")
-        .then((c) => c.find({ root: oid(commentId)! }).sort({ timestamp: 1, _id: 1 }).skip(page.offset).limit(limit + 1).toArray())
-        .then((items) => items.map(safeComment)),
-    );
+    const replies = await this.log("comments.replies.find", async () => {
+      const collection = await this.collection<CommentDocument>("comments");
+      let query = collection.find({ root: oid(commentId)! });
+      if (page.values?.timestamp !== undefined) {
+        query = query.filter({ timestamp: { $gt: new Date(page.values.timestamp as string) } });
+      }
+      return query.sort({ timestamp: 1 }).limit(limit + 1).toArray();
+    }).then((items) => items.map(safeComment));
     const items = replies.slice(0, limit);
-    return { items, nextCursor: nextCursor(page.offset, replies.length, limit, filters) };
+    const lastItem = replies.length > limit ? replies[limit - 1] : null;
+    return { items, nextCursor: createNextCursor(lastItem as Record<string, unknown> | null, "timestamp", filters, "asc") };
   }
   async createComment(
     input: Omit<Comment, "id" | "timestamp" | "last_edited_at" | "favorite_count" | "reply_count" | "user_summary">,
@@ -684,12 +724,18 @@ export class MongoStore {
       await (
         await this.collection<CommentDocument>("comments")
       ).insertOne(comment);
-      await (
-        await this.collection<PostDocument>("posts")
-      ).updateOne({ _id: oid(input.post_id)! }, { $inc: { comment_count: 1 } });
-      if(comment.root) await (
-        await this.collection<CommentDocument>("comments")
-      ).updateOne({_id: comment.root!}, {$inc: {reply_count: 1}})
+      await this.log("posts.comment_count.update", () =>
+        this.collection<PostDocument>("posts").then((c) =>
+          c.updateOne({ _id: oid(input.post_id)! }, { $inc: { comment_count: 1 } }),
+        ),
+      );
+      if (comment.root) {
+        await this.log("comments.reply_count.update", () =>
+          this.collection<CommentDocument>("comments").then((c) =>
+            c.updateOne({ _id: comment.root! }, { $inc: { reply_count: 1 } }),
+          ),
+        );
+      }
       return safeComment(comment);
     });
   }
@@ -721,14 +767,24 @@ export class MongoStore {
         .then((comments) => comments.map((comment) => safeComment(comment))),
     );
   }
-  async commentsByUserId(userId: string) {
+  async commentsByUserId(userId: string, cursor?: string) {
     const objectId = oid(userId);
-    if (!objectId) return [];
-    return this.log("comments.findByUserId", () =>
+    if (!objectId) return { items: [], nextCursor: "null" };
+    const filters = { user_id: userId };
+    const page = decodeCursor(cursor, filters, ["timestamp"]);
+    const limit = 10;
+    const filter: Filter<CommentDocument> = { user_id: objectId };
+    if (page.values?.timestamp !== undefined) {
+      filter.timestamp = { $lt: new Date(page.values.timestamp as string) };
+    }
+    const comments = await this.log("comments.findByUserId", () =>
       this.collection<CommentDocument>("comments")
-        .then((c) => c.find({ user_id: objectId }).sort({ timestamp: -1, _id: -1 }).toArray())
-        .then((comments) => comments.map((comment) => safeComment(comment))),
+        .then((c) => c.find(filter).sort({ timestamp: -1, _id: -1 }).limit(limit + 1).toArray())
+        .then((items) => items.map(safeComment)),
     );
+    const items = comments.slice(0, limit);
+    const lastItem = comments.length > limit ? comments[limit - 1] : null;
+    return { items, nextCursor: createNextCursor(lastItem as Record<string, unknown> | null, "timestamp", filters, "desc") };
   }
   async updateComment(id: string, content: string) {
     const objectId = oid(id);
@@ -749,35 +805,46 @@ export class MongoStore {
     });
   }
   async deleteComment(id: string) {
-    const comment = await this.comment(id);
-    if (!comment) return false;
-    const ids = [
-      id,
-      ...(!comment.root
-        ? (
-          await (
-            await this.collection<CommentDocument>("comments")
-          )
-            .find({ root: oid(id)! })
-            .project({ _id: 1 })
-            .toArray()
-        ).map((item) => apiId(item._id))
-        : []),
-    ];
-    await this.log("comments.deleteMany", () =>
-      this.collection<CommentDocument>("comments").then((c) =>
-        c.deleteMany({ _id: { $in: ids.map((item) => oid(item)!) } }),
-      ),
-    );
-    await this.log("posts.comment_count.update", () =>
-      this.collection<PostDocument>("posts").then((c) =>
-        c.updateOne(
-          { _id: oid(comment.post_id)! },
-          { $inc: { comment_count: -ids.length } },
-        ),
-      ),
-    );
-    return true;
+    const objectId = oid(id);
+    if (!objectId) return false;
+    return this.log("comments.deleteOne", async () => {
+      const comments = await this.collection<CommentDocument>("comments");
+      const comment = await comments.findOne({ _id: objectId });
+      if (!comment) return false;
+      const result = await comments.deleteOne({ _id: objectId });
+      if (!result.deletedCount) return false;
+
+      if (comment.root) {
+        // Reply deleted: decrement parent comment's reply_count immediately and post comment_count by 1
+        await this.log("comments.reply_count.update", () =>
+          comments.updateOne(
+            { _id: comment.root! },
+            { $inc: { reply_count: -1 } },
+          ),
+        );
+        await this.log("posts.comment_count.update", () =>
+          this.collection<PostDocument>("posts").then((c) =>
+            c.updateOne(
+              { _id: comment.post_id },
+              { $inc: { comment_count: -1 } },
+            ),
+          ),
+        );
+      } else {
+        // Root comment deleted: decrement post comment_count immediately by (1 + reply_count)
+        const decrementAmount = 1 + (comment.reply_count ?? 0);
+        await this.log("posts.comment_count.update", () =>
+          this.collection<PostDocument>("posts").then((c) =>
+            c.updateOne(
+              { _id: comment.post_id },
+              { $inc: { comment_count: -decrementAmount } },
+            ),
+          ),
+        );
+      }
+
+      return true;
+    });
   }
   async createCommunity(
     input: Omit<Community, "id" | "timestamp" | "population" | "post_count">,
@@ -843,23 +910,29 @@ export class MongoStore {
   async deleteCommunity(id: string) {
     const objectId = oid(id);
     if (!objectId) return false;
-    const result = await this.log("communities.deleteOne", () =>
-      this.collection<CommunityDocument>("communities").then((c) =>
-        c.deleteOne({ _id: objectId }),
-      ),
-    );
-    return Boolean(result.deletedCount);
+    return this.log("communities.deleteOne", async () => {
+      const result = await (
+        await this.collection<CommunityDocument>("communities")
+      ).deleteOne({ _id: objectId });
+      if (!result.deletedCount) return false;
+      return true;
+    });
   }
   async communityRecommendations(cursor?: string) {
-    const page = decodeCursor(cursor, { sort: "population" });
+    const filters = { sort: "population" };
+    const page = decodeCursor(cursor, filters, ["population"]);
     const limit = 10;
-    const communities = await this.log("communities.find", () =>
-      this.collection<CommunityDocument>("communities")
-        .then((c) => c.find().sort({ population: -1, _id: -1 }).skip(page.offset).limit(limit + 1).toArray())
-        .then((items) => items.map(safeCommunity)),
-    );
+    const communities = await this.log("communities.find", async () => {
+      const collection = await this.collection<CommunityDocument>("communities");
+      let query = collection.find();
+      if (page.values?.population !== undefined) {
+        query = query.filter({ population: { $lt: page.values.population } });
+      }
+      return query.sort({ population: -1 }).limit(limit + 1).toArray();
+    }).then((items) => items.map(safeCommunity));
     const items = communities.slice(0, limit);
-    return { items, nextCursor: nextCursor(page.offset, communities.length, limit, { sort: "population" }) };
+    const lastItem = communities.length > limit ? communities[limit - 1] : null;
+    return { items, nextCursor: createNextCursor(lastItem as Record<string, unknown> | null, "population", filters, "desc") };
   }
   async communitiesByIds(ids: string[]) {
     const objectIds = ids.map(oid).filter((value): value is ObjectId => value !== null);
@@ -900,6 +973,113 @@ export class MongoStore {
           .then((result) => Boolean(result.deletedCount)),
       )
       : false;
+  }
+  async decrementFollowingCounts(userIds: string[]) {
+    const objectIds = userIds.map(oid).filter((id): id is ObjectId => id !== null);
+    if (!objectIds.length) return;
+    await this.log("users.decrementFollowingCounts", async () => {
+      const collection = await this.collection<UserDocument>("users");
+      await collection.updateMany(
+        { _id: { $in: objectIds } },
+        { $inc: { following_count: -1 } },
+      );
+    });
+  }
+  async decrementFollowerCounts(userIds: string[]) {
+    const objectIds = userIds.map(oid).filter((id): id is ObjectId => id !== null);
+    if (!objectIds.length) return;
+    await this.log("users.decrementFollowerCounts", async () => {
+      const collection = await this.collection<UserDocument>("users");
+      await collection.updateMany(
+        { _id: { $in: objectIds } },
+        { $inc: { follower_count: -1 } },
+      );
+    });
+  }
+  async decrementPostFavoriteCounts(postIds: string[]) {
+    const objectIds = postIds.map(oid).filter((id): id is ObjectId => id !== null);
+    if (!objectIds.length) return;
+    await this.log("posts.decrementFavoriteCounts", async () => {
+      const collection = await this.collection<PostDocument>("posts");
+      await collection.updateMany(
+        { _id: { $in: objectIds } },
+        { $inc: { favorite_count: -1 } },
+      );
+    });
+  }
+  async deleteUserCommentFavorites(userId: string): Promise<string[]> {
+    const userObjectId = oid(userId);
+    if (!userObjectId) return [];
+    return this.log("comment_favorite_store.deleteByUser", async () => {
+      const collection = await this.collection<CommentFavoriteDocument>("comment_favorite_store");
+      const docs = await collection.find({ user_id: userObjectId }, { projection: { comment_id: 1 } }).toArray();
+      if (!docs.length) return [];
+      await collection.deleteMany({ user_id: userObjectId });
+      return docs.map((d) => apiId(d.comment_id));
+    });
+  }
+  async decrementCommunityPopulations(communityIds: string[]) {
+    const objectIds = communityIds.map(oid).filter((id): id is ObjectId => id !== null);
+    if (!objectIds.length) return;
+    await this.log("communities.decrementPopulations", async () => {
+      const collection = await this.collection<CommunityDocument>("communities");
+      await collection.updateMany(
+        { _id: { $in: objectIds } },
+        { $inc: { population: -1 } },
+      );
+    });
+  }
+  async updateUserSummaryOnPostsAndComments(userId: string, summary: UserSummary) {
+    const userObjectId = oid(userId);
+    if (!userObjectId) return;
+    await this.log("user_summary.propagate", async () => {
+      const [posts, comments] = await Promise.all([
+        this.collection<PostDocument>("posts"),
+        this.collection<CommentDocument>("comments"),
+      ]);
+      await Promise.all([
+        posts.updateMany({ user_id: userObjectId }, { $set: { user_summary: summary } }),
+        comments.updateMany({ user_id: userObjectId }, { $set: { user_summary: summary } }),
+      ]);
+    });
+  }
+  async decrementCommentFavoriteCounts(commentIds: string[]) {
+    const objectIds = commentIds.map(oid).filter((id): id is ObjectId => id !== null);
+    if (!objectIds.length) return;
+    await this.log("comments.decrementFavoriteCounts", async () => {
+      const collection = await this.collection<CommentDocument>("comments");
+      await collection.updateMany(
+        { _id: { $in: objectIds } },
+        { $inc: { favorite_count: -1 } },
+      );
+    });
+  }
+  async deleteCommentsByPostId(postId: string) {
+    const postObjectId = oid(postId);
+    if (!postObjectId) return;
+    await this.log("comments.deleteManyByPostId", async () => {
+      const collection = await this.collection<CommentDocument>("comments");
+      await collection.deleteMany({ post_id: postObjectId });
+    });
+  }
+  async deleteRepliesByCommentId(commentId: string) {
+    const commentObjectId = oid(commentId);
+    if (!commentObjectId) return;
+    await this.log("comments.deleteManyReplies", async () => {
+      const collection = await this.collection<CommentDocument>("comments");
+      await collection.deleteMany({ root: commentObjectId });
+    });
+  }
+  async nullifyCommunityIdOnPosts(communityId: string) {
+    const communityObjectId = oid(communityId);
+    if (!communityObjectId) return;
+    await this.log("posts.nullifyCommunityId", async () => {
+      const collection = await this.collection<PostDocument>("posts");
+      await collection.updateMany(
+        { community_id: communityObjectId },
+        { $set: { community_id: null } },
+      );
+    });
   }
   async ping() {
     return this.log("ping", () =>

@@ -24,55 +24,120 @@ export class Neo4jRelations {
   private neo4jInteger(value: number) {
     return neo4j.int(value);
   }
-  private async rankedUsers(operation: string, query: string, userId: string, limit: number) {
+
+  private readonly queries = {
+    userByInterests: `MATCH (me:USER {user_id: $userId})-[:INTERESTED_IN]->(:INTEREST)<-[:INTERESTED_IN]-(candidate:USER) WHERE candidate.user_id <> $userId AND NOT (me)-[:FOLLOWS]->(candidate) RETURN DISTINCT candidate.user_id AS userId ORDER BY userId LIMIT $limit`,
+    userByCommunities: `MATCH (me:USER {user_id: $userId})-[:PARTICIPATES]->(:COMMUNITY)<-[:PARTICIPATES]-(candidate:USER) WHERE candidate.user_id <> $userId AND NOT (me)-[:FOLLOWS]->(candidate) RETURN DISTINCT candidate.user_id AS userId ORDER BY userId LIMIT $limit`,
+    userByFollowNetwork: `MATCH (me:USER {user_id: $userId})-[:FOLLOWS]->(:USER)-[:FOLLOWS]->(candidate:USER) WHERE candidate.user_id <> $userId AND NOT (me)-[:FOLLOWS]->(candidate) RETURN DISTINCT candidate.user_id AS userId ORDER BY userId LIMIT $limit`,
+    communityByInterests: `MATCH (me:USER {user_id: $userId})-[:INTERESTED_IN]->(:INTEREST)<-[:ASSOCIATED_WITH]-(community:COMMUNITY) WHERE NOT (me)-[:PARTICIPATES]->(community) RETURN DISTINCT community.community_id AS communityId ORDER BY communityId LIMIT $limit`,
+    communityByFollowNetwork: `MATCH (me:USER {user_id: $userId})-[:FOLLOWS]->(:USER)-[:PARTICIPATES]->(community:COMMUNITY) WHERE NOT (me)-[:PARTICIPATES]->(community) RETURN DISTINCT community.community_id AS communityId ORDER BY communityId LIMIT $limit`,
+    postByFollowedLikes: `MATCH (me:USER {user_id: $userId})-[:FOLLOWS]->(:USER)-[:LIKES]->(post:POST) WHERE NOT (me)-[:LIKES]->(post) RETURN DISTINCT post.post_id AS postId ORDER BY postId LIMIT $limit`,
+    postByJoinedCommunities: `MATCH (me:USER {user_id: $userId})-[:PARTICIPATES]->(:COMMUNITY)<-[:BELONGS_TO]-(post:POST) RETURN DISTINCT post.post_id AS postId ORDER BY postId LIMIT $limit`,
+  };
+
+  async userRecommendationsGrouped(userId: string, limit = 4): Promise<[string[], string[], string[]]> {
     const session = this.session();
     try {
-      const result = await session.executeRead((transaction) => transaction.run(query, { userId, limit: this.neo4jInteger(limit) }));
-      return result.records.map((record) => String(record.get("userId")));
-    } finally { await session.close(); }
-  }
-  private async rankedCommunities(operation: string, query: string, userId: string, limit: number) {
-    const session = this.session();
-    try {
-      const result = await session.executeRead((transaction) => transaction.run(query, { userId, limit: this.neo4jInteger(limit) }));
-      return result.records.map((record) => String(record.get("communityId")));
-    } finally { await session.close(); }
-  }
-  private async rankedPosts(query: string, userId: string, limit: number) {
-    const session = this.session();
-    try {
-      const result = await session.executeRead((transaction) => transaction.run(query, { userId, limit: this.neo4jInteger(limit) }));
-      return result.records.map((record) => String(record.get("postId")));
-    } finally { await session.close(); }
+      return await session.executeRead(async (transaction) => {
+        const params = { userId, limit: this.neo4jInteger(limit) };
+        const resInterests = await transaction.run(this.queries.userByInterests, params);
+        const resCommunities = await transaction.run(this.queries.userByCommunities, params);
+        const resNetwork = await transaction.run(this.queries.userByFollowNetwork, params);
+        return [
+          resInterests.records.map((r) => String(r.get("userId"))),
+          resCommunities.records.map((r) => String(r.get("userId"))),
+          resNetwork.records.map((r) => String(r.get("userId"))),
+        ];
+      });
+    } finally {
+      await session.close();
+    }
   }
 
-  userRecommendationsByInterests(userId: string, limit = 4) {
-    return this.rankedUsers("recommend.users.interests", `MATCH (me:USER {user_id: $userId})-[:INTERESTED_IN]->(:INTEREST)<-[:INTERESTED_IN]-(candidate:USER) WHERE candidate.user_id <> $userId AND NOT (me)-[:FOLLOWS]->(candidate) RETURN DISTINCT candidate.user_id AS userId ORDER BY userId LIMIT $limit`, userId, limit);
+  async communityRecommendationsGrouped(userId: string, limit = 8): Promise<[string[], string[], string[]]> {
+    const session = this.session();
+    try {
+      return await session.executeRead(async (transaction) => {
+        const params = { userId, limit: this.neo4jInteger(limit) };
+        const resInterests = await transaction.run(this.queries.communityByInterests, params);
+        const resNetwork = await transaction.run(this.queries.communityByFollowNetwork, params);
+        return [
+          resInterests.records.map((r) => String(r.get("communityId"))),
+          resNetwork.records.map((r) => String(r.get("communityId"))),
+          [] as string[],
+        ];
+      });
+    } finally {
+      await session.close();
+    }
   }
-  userRecommendationsByCommunities(userId: string, limit = 4) {
-    return this.rankedUsers("recommend.users.communities", `MATCH (me:USER {user_id: $userId})-[:PARTICIPATES]->(:COMMUNITY)<-[:PARTICIPATES]-(candidate:USER) WHERE candidate.user_id <> $userId AND NOT (me)-[:FOLLOWS]->(candidate) RETURN DISTINCT candidate.user_id AS userId ORDER BY userId LIMIT $limit`, userId, limit);
+
+  async postRecommendationsGrouped(userId: string, limit = 50): Promise<[string[], string[]]> {
+    const session = this.session();
+    try {
+      return await session.executeRead(async (transaction) => {
+        const params = { userId, limit: this.neo4jInteger(limit) };
+        const resFollowedLikes = await transaction.run(this.queries.postByFollowedLikes, params);
+        const resJoinedCommunities = await transaction.run(this.queries.postByJoinedCommunities, params);
+        return [
+          resFollowedLikes.records.map((r) => String(r.get("postId"))),
+          resJoinedCommunities.records.map((r) => String(r.get("postId"))),
+        ];
+      });
+    } finally {
+      await session.close();
+    }
   }
-  userRecommendationsByFollowNetwork(userId: string, limit = 4) {
-    return this.rankedUsers("recommend.users.network", `MATCH (me:USER {user_id: $userId})-[:FOLLOWS]->(:USER)-[:FOLLOWS]->(candidate:USER) WHERE candidate.user_id <> $userId AND NOT (me)-[:FOLLOWS]->(candidate) RETURN DISTINCT candidate.user_id AS userId ORDER BY userId LIMIT $limit`, userId, limit);
-  }
-  communityRecommendationsByInterests(userId: string, limit = 8) {
-    return this.rankedCommunities("recommend.communities.interests", `MATCH (me:USER {user_id: $userId})-[:INTERESTED_IN]->(:INTEREST)<-[:ASSOCIATED_WITH]-(community:COMMUNITY) WHERE NOT (me)-[:PARTICIPATES]->(community) RETURN DISTINCT community.community_id AS communityId ORDER BY communityId LIMIT $limit`, userId, limit);
-  }
-  communityRecommendationsByFollowNetwork(userId: string, limit = 8) {
-    return this.rankedCommunities("recommend.communities.network", `MATCH (me:USER {user_id: $userId})-[:FOLLOWS]->(:USER)-[:PARTICIPATES]->(community:COMMUNITY) WHERE NOT (me)-[:PARTICIPATES]->(community) RETURN DISTINCT community.community_id AS communityId ORDER BY communityId LIMIT $limit`, userId, limit);
-  }
-  postRecommendationsByFollowedLikes(userId: string, limit = 50) {
-    return this.rankedPosts(`MATCH (me:USER {user_id: $userId})-[:FOLLOWS]->(:USER)-[:LIKES]->(post:POST) WHERE NOT (me)-[:LIKES]->(post) RETURN DISTINCT post.post_id AS postId ORDER BY postId LIMIT $limit`, userId, limit);
-  }
-  postRecommendationsByJoinedCommunities(userId: string, limit = 50) {
-    return this.rankedPosts(`MATCH (me:USER {user_id: $userId})-[:PARTICIPATES]->(:COMMUNITY)<-[:BELONGS_TO]-(post:POST) RETURN DISTINCT post.post_id AS postId ORDER BY postId LIMIT $limit`, userId, limit);
-  }
-  communityRecommendationsByLikedPosts(_userId: string, _limit = 8) {
-    return Promise.resolve([] as string[]);
-  }
-  postRecommendations(_userId: string, _limit = 10) {
-    // Ranking and recommendation reasons will be defined in a later task.
-    return Promise.resolve([] as { id: string; score: number; reason?: string }[]);
+
+  async feedRecommendationsGrouped(
+    userId: string,
+    options: { postLimit?: number; userLimit?: number; communityLimit?: number } = {},
+  ): Promise<{
+    posts: [string[], string[]];
+    users: [string[], string[], string[]];
+    communities: [string[], string[], string[]];
+  }> {
+    const postLimit = this.neo4jInteger(options.postLimit ?? 50);
+    const userLimit = this.neo4jInteger(options.userLimit ?? 4);
+    const communityLimit = this.neo4jInteger(options.communityLimit ?? 8);
+
+    const session = this.session();
+    try {
+      return await session.executeRead(async (transaction) => {
+        const postParams = { userId, limit: postLimit };
+        const userParams = { userId, limit: userLimit };
+        const communityParams = { userId, limit: communityLimit };
+
+        const resFollowedLikes = await transaction.run(this.queries.postByFollowedLikes, postParams);
+        const resJoinedCommunities = await transaction.run(this.queries.postByJoinedCommunities, postParams);
+
+        const resUserInterests = await transaction.run(this.queries.userByInterests, userParams);
+        const resUserCommunities = await transaction.run(this.queries.userByCommunities, userParams);
+        const resUserNetwork = await transaction.run(this.queries.userByFollowNetwork, userParams);
+
+        const resCommInterests = await transaction.run(this.queries.communityByInterests, communityParams);
+        const resCommNetwork = await transaction.run(this.queries.communityByFollowNetwork, communityParams);
+
+        return {
+          posts: [
+            resFollowedLikes.records.map((r) => String(r.get("postId"))),
+            resJoinedCommunities.records.map((r) => String(r.get("postId"))),
+          ],
+          users: [
+            resUserInterests.records.map((r) => String(r.get("userId"))),
+            resUserCommunities.records.map((r) => String(r.get("userId"))),
+            resUserNetwork.records.map((r) => String(r.get("userId"))),
+          ],
+          communities: [
+            resCommInterests.records.map((r) => String(r.get("communityId"))),
+            resCommNetwork.records.map((r) => String(r.get("communityId"))),
+            [] as string[],
+          ],
+        };
+      });
+    } finally {
+      await session.close();
+    }
   }
   private async write<T>(
     operation: string,
@@ -213,11 +278,18 @@ export class Neo4jRelations {
       return Boolean(result.records[0]?.get("active"));
     } finally { await session.close(); }
   }
-  async savedPostIds(userId: string) {
+  async savedPostIds(userId: string, lastPostId?: string, limit?: number) {
     const session = this.session();
     try {
+      const whereClause = lastPostId ? "WHERE post.post_id < $lastPostId" : "";
+      const limitClause = limit ? "LIMIT $limit" : "";
+      const query = `MATCH (user:USER {user_id: $userId})-[:SAVES]->(post:POST) ${whereClause} RETURN DISTINCT post.post_id AS postId ORDER BY postId DESC ${limitClause}`;
       const result = await session.executeRead((transaction) =>
-        transaction.run("MATCH (user:USER {user_id: $userId})-[:SAVES]->(post:POST) RETURN DISTINCT post.post_id AS postId ORDER BY postId DESC", { userId }),
+        transaction.run(query, {
+          userId,
+          lastPostId: lastPostId ?? null,
+          limit: limit ? this.neo4jInteger(limit) : null,
+        }),
       );
       return result.records.map((record) => String(record.get("postId")));
     } finally { await session.close(); }
@@ -230,6 +302,25 @@ export class Neo4jRelations {
     } finally { await session.close(); }
   }
   async isPostLiked(userId: string, postId: string) { return this.isRelation("LIKES", "user_id", userId, "post_id", postId); }
+  async postLikeStatusBatch(userId: string, postIds: string[]) {
+    const session = this.session();
+    try {
+      const result = await session.executeRead((transaction) =>
+        transaction.run(
+          `MATCH (user:USER {user_id: $userId})-[rel:LIKES]->(post:POST) WHERE post.post_id IN $postIds RETURN post.post_id AS postId`,
+          { userId, postIds },
+        ),
+      );
+      const likedSet = new Set(result.records.map((r) => String(r.get("postId"))));
+      const map: Record<string, boolean> = {};
+      for (const id of postIds) {
+        map[id] = likedSet.has(id);
+      }
+      return map;
+    } finally {
+      await session.close();
+    }
+  }
   async isPostSaved(userId: string, postId: string) { return this.isRelation("SAVES", "user_id", userId, "post_id", postId); }
   private async isRelation(relation: "LIKES" | "SAVES", userProperty: string, userId: string, entityProperty: string, entityId: string) {
     const session = this.session();
@@ -238,20 +329,51 @@ export class Neo4jRelations {
       return Boolean(result.records[0]?.get("active"));
     } finally { await session.close(); }
   }
-  async relatedUserIds(userId: string, direction: "followers" | "following", offset = 0, limit = 11) {
+  async relatedUserIds(userId: string, direction: "followers" | "following", lastUserId?: string, limit = 11) {
     const session = this.session();
     try {
-      const query = direction === "followers"
-        ? "MATCH (user:USER {user_id: $userId})<-[:FOLLOWS]-(related:USER) RETURN related.user_id AS userId"
-        : "MATCH (user:USER {user_id: $userId})-[:FOLLOWS]->(related:USER) RETURN related.user_id AS userId";
+      const matchClause = direction === "followers"
+        ? "MATCH (user:USER {user_id: $userId})<-[:FOLLOWS]-(related:USER)"
+        : "MATCH (user:USER {user_id: $userId})-[:FOLLOWS]->(related:USER)";
+      const whereClause = lastUserId ? "WHERE related.user_id < $lastUserId" : "";
+      const query = `${matchClause} ${whereClause} RETURN related.user_id AS userId ORDER BY related.user_id DESC LIMIT $limit`;
       const result = await session.executeRead((transaction) =>
-        transaction.run(`${query} SKIP $offset LIMIT $limit`, {
+        transaction.run(query, {
           userId,
-          offset: this.neo4jInteger(offset),
+          lastUserId: lastUserId ?? null,
           limit: this.neo4jInteger(limit),
         }),
       );
       return result.records.map((record) => String(record.get("userId")));
+    } finally {
+      await session.close();
+    }
+  }
+  async allRelatedUserIds(userId: string, direction: "followers" | "following"): Promise<string[]> {
+    const session = this.session();
+    try {
+      const matchClause = direction === "followers"
+        ? "MATCH (user:USER {user_id: $userId})<-[:FOLLOWS]-(related:USER)"
+        : "MATCH (user:USER {user_id: $userId})-[:FOLLOWS]->(related:USER)";
+      const query = `${matchClause} RETURN DISTINCT related.user_id AS userId`;
+      const result = await session.executeRead((transaction) =>
+        transaction.run(query, { userId }),
+      );
+      return result.records.map((record) => String(record.get("userId")));
+    } finally {
+      await session.close();
+    }
+  }
+  async likedPostIds(userId: string): Promise<string[]> {
+    const session = this.session();
+    try {
+      const result = await session.executeRead((transaction) =>
+        transaction.run(
+          "MATCH (user:USER {user_id: $userId})-[:LIKES]->(post:POST) RETURN DISTINCT post.post_id AS postId",
+          { userId },
+        ),
+      );
+      return result.records.map((record) => String(record.get("postId")));
     } finally {
       await session.close();
     }

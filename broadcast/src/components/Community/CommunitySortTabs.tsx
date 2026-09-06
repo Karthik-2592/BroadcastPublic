@@ -26,11 +26,39 @@ export default function CommunitySortTabs({
         justifyContent: 'space-between',
         p: 1.5,
         borderRadius: 3,
-        bgcolor: 'background.paper',
+        position: 'relative',
+        bgcolor: '#1a1a2e',
         border: '1px solid rgba(255, 255, 255, 0.06)',
         boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
+        overflow: 'hidden'
       }}
     >
+      <Box
+        sx={{
+          position: 'absolute',
+          top: -48,
+          right: -24,
+          width: 96,
+          height: 96,
+          bgcolor: 'rgba(180, 136, 255, 0.14)',
+          borderRadius: '50%',
+          filter: 'blur(24px)',
+          pointerEvents: 'none',
+        }}
+      />
+      <Box
+        sx={{
+          position: 'absolute',
+          bottom: -48,
+          left: -24,
+          width: 96,
+          height: 96,
+          bgcolor: 'rgba(180, 136, 255, 0.14)',
+          borderRadius: '50%',
+          filter: 'blur(24px)',
+          pointerEvents: 'none',
+        }}
+      />
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Button
           onClick={() => handleSelect('new')}

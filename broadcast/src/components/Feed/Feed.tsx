@@ -7,15 +7,34 @@ import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useCallback, useEffect, useState } from 'react';
 import PostCard from '../PostCard/PostCard';
-import type { Post } from '../../types/api';
+import type { Post, RelationStatusMap } from '../../types/api';
 import UserRecommendations from './UserRecommendations';
 import { BASE_URL } from '../../config';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Feed({ endpoint = '/feed' }: { endpoint?: string }) {
+  const { isAuthenticated } = useAuth();
   const [showRecommendations] = useState(true);
   const [posts, setPosts] = useState<Post[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [likeStatuses, setLikeStatuses] = useState<RelationStatusMap>({});
+
+  const fetchLikeStatuses = useCallback(async (ids: string[]) => {
+    if (!isAuthenticated || !ids.length) return;
+    try {
+      const response = await fetch(`${BASE_URL}/posts/likes/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const body = await response.json() as { data?: RelationStatusMap };
+        if (body.data) setLikeStatuses((current) => ({ ...current, ...body.data }));
+      }
+    } catch { /* non-critical, falls back to false */ }
+  }, [isAuthenticated]);
 
   const loadPosts = useCallback(async (nextCursor?: string | null) => {
     setLoading(true);
@@ -27,13 +46,14 @@ export default function Feed({ endpoint = '/feed' }: { endpoint?: string }) {
         const page = Array.isArray(body.data) ? body.data : [];
         setPosts((current) => nextCursor ? [...current, ...page] : page);
         setCursor(body.cursor === 'null' ? null : body.cursor ?? null);
+        void fetchLikeStatuses(page.map((p) => p.id));
       } else if (!nextCursor) setPosts([]);
     } catch {
       if (!nextCursor) setPosts([]);
     } finally {
       setLoading(false);
     }
-  }, [endpoint]);
+  }, [endpoint, fetchLikeStatuses]);
 
   useEffect(() => { void loadPosts(); }, [loadPosts]);
 
@@ -59,11 +79,11 @@ export default function Feed({ endpoint = '/feed' }: { endpoint?: string }) {
       ) : (
         <>
           {firstPosts.map((post) => (
-            <PostCard key={post.id} post={post} />
+            <PostCard key={post.id} post={post} initialLiked={likeStatuses[post.id]} />
           ))}
           {showRecommendations && <UserRecommendations />}
           {remainingPosts.map((post) => (
-            <PostCard key={post.id} post={post} />
+            <PostCard key={post.id} post={post} initialLiked={likeStatuses[post.id]} />
           ))}
           {cursor && <Button variant="outlined" onClick={() => void loadPosts(cursor)} disabled={loading}>
             {loading ? <CircularProgress size={18} /> : 'Load more posts'}

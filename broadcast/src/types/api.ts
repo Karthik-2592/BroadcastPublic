@@ -21,6 +21,7 @@ export interface UserSummary {
   joined_at?: string;
 }
 
+
 // ── Core entity types ─────────────────────────────────────────────────────────
 
 export interface User {
@@ -31,7 +32,6 @@ export interface User {
   profile_name?: string;
   profile_picture?: MediaMetadata | null;
   profile_description?: string;
-  pinned_posts: Id[];
   follower_count: number;
   following_count: number;
   avatarColor?: string;
@@ -59,6 +59,7 @@ export interface Post {
   mediaPlaceholder?: string;
   recommendationReason?: string;
 }
+
 
 export interface Comment {
   id: Id;
@@ -122,6 +123,8 @@ export interface ApiResult<T> {
   message: string;
   data?: T;
 }
+
+export type RelationStatusMap = Record<string, boolean>;
 
 // ── Auth request types ────────────────────────────────────────────────────────
 

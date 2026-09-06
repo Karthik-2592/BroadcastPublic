@@ -10,8 +10,9 @@ export async function getFeed(req: Request, res: Response) {
     const limit = req.query.limit === undefined ? 10 : Number(req.query.limit);
     const page = await feedService.getFeed(sessionUserId(req), typeof req.query.cursor === "string" ? req.query.cursor : undefined, limit);
     return ok(res, page.posts, "Operation completed successfully.", 200, page.cursor);
-  } catch {
-    return fail(res, 400, "Malformed request.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Malformed request.";
+    return fail(res, 400, message);
   }
 }
 
@@ -19,8 +20,9 @@ export async function getTrending(req: Request, res: Response) {
   try {
     const page = await store.trending(typeof req.query.cursor === "string" ? req.query.cursor : undefined);
     return ok(res, page.items, "Operation completed successfully.", 200, page.nextCursor);
-  } catch {
-    return fail(res, 400, "Malformed cursor.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Malformed cursor.";
+    return fail(res, 400, message);
   }
 }
 

@@ -7,6 +7,7 @@ import communities from "./handlers/communitiesController.ts";
 import notifications from "./handlers/notificationsController.ts";
 import { store } from "./mongodb.ts";
 import { startAggregationWorker } from "./services/favorites.ts";
+import { startEventWorker } from "./services/events.ts";
 import cors from "cors";
 import { logFailure } from "./http.ts";
 import { sessionMiddleware } from "./session.ts";
@@ -24,6 +25,7 @@ export function createApp(): Express {
   app.use(sessionMiddleware);
 
   startAggregationWorker();
+  startEventWorker();
   app.use(express.json({ limit: "4mb" }));
   app.get("/search", search);
   app.use("/feed", feed);

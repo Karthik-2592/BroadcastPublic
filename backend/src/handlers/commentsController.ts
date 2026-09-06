@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { fail, id, ok, required } from "../http.ts";
 import { store } from "../mongodb.ts";
 import { queueFavoriteEvent } from "../services/favorites.ts";
+import { sendEvent } from "../services/events.ts";
 import type { Comment, CommentLikeRelationRequest } from "../types.ts";
 import { Router } from "express";
 import { requireSession, sessionUserId } from "../session.ts";
@@ -10,16 +11,18 @@ export async function list(req: Request, res: Response) {
   try {
     const page = await store.commentsForPost(id(req), null, typeof req.query.cursor === "string" ? req.query.cursor : undefined);
     return ok(res, page.items, "Operation completed successfully.", 200, page.nextCursor);
-  } catch {
-    return fail(res, 400, "Malformed cursor.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Malformed cursor.";
+    return fail(res, 400, message);
   }
 }
 export async function replies(req: Request, res: Response) {
   try {
     const page = await store.repliesForComment(id(req), typeof req.query.cursor === "string" ? req.query.cursor : undefined);
     return ok(res, page.items, "Operation completed successfully.", 200, page.nextCursor);
-  } catch {
-    return fail(res, 400, "Malformed cursor.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Malformed cursor.";
+    return fail(res, 400, message);
   }
 }
 export async function create(req: Request, res: Response) {
@@ -68,7 +71,16 @@ export async function remove(req: Request, res: Response) {
       403,
       "Only the comment owner or community admin may delete it.",
     );
-  await store.deleteComment(id(req));
+  const deleted = await store.deleteComment(id(req));
+  if (deleted) {
+    sendEvent({
+      content_id: id(req),
+      content_type: "comment",
+      action: "delete",
+      target_id: null,
+      timestamp: new Date().toISOString(),
+    });
+  }
   return ok(res, null, "Comment deleted successfully.");
 }
 export async function commentLike(
@@ -103,6 +115,16 @@ export async function commentLikeStatus(req: Request, res: Response) {
   return ok(res, { active: await store.isCommentFavorited(id(req), userId) });
 }
 
+export async function commentLikeStatusBatch(req: Request, res: Response) {
+  const userId = sessionUserId(req);
+  const body = req.body as { ids?: string[] };
+  if (!body.ids || !Array.isArray(body.ids)) {
+    return fail(res, 400, "ids array is required.");
+  }
+  const statusMap = await store.isCommentFavoritedBatch(userId, body.ids);
+  return ok(res, statusMap);
+}
+
 const router = Router({ mergeParams: true });
 router.get("/", list);
 router.get("/:id/likes/status", requireSession, commentLikeStatus);
@@ -111,6 +133,7 @@ router.post("/likes", requireSession, commentLike);
 router.delete("/likes", requireSession, commentLike);
 export default router;
 export const standalone = Router();
+standalone.post("/likes/status", requireSession, commentLikeStatusBatch);
 standalone.get("/:id/replies", replies);
 standalone.put("/:id", requireSession, update);
 standalone.delete("/:id", requireSession, remove);

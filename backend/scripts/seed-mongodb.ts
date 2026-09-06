@@ -109,7 +109,6 @@ async function seed() {
           profile_name: username,
           profile_picture: null,
           profile_description: "",
-          pinned_posts: [],
           follower_count: 0,
           following_count: 0,
         };

@@ -1,5 +1,14 @@
 export type Id = string;
 
+export interface EventQueue {
+  id?: Id;
+  content_id: Id;
+  content_type: string;
+  timestamp: string;
+  action: "edit" | "delete" | "post" | "put" | string;
+  target_id: Id | null;
+}
+
 export interface MediaMetadata {
   media_id: number;
   media_url: string;
@@ -21,7 +30,6 @@ export interface User {
   profile_name?: string;
   profile_picture: MediaMetadata | null;
   profile_description?: string;
-  pinned_posts: Id[];
   follower_count: number;
   following_count: number;
   joined_at?: string | Date;

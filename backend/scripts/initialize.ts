@@ -43,7 +43,6 @@ const collections: CollectionDefinition[] = [
           profile_description: { bsonType: "string", maxLength: 300 },
           follower_count: { bsonType: "int" },
           following_count: { bsonType: "int" },
-          pinned_posts: { bsonType: "array", items: { bsonType: "objectId" } },
         },
       },
     },
@@ -234,17 +233,24 @@ async function initialize() {
         { key: { community_id: 1, popularity_score: -1 } },
         { key: { tags: 1, popularity_score: -1 } },
         { key: { popularity_score: -1 } },
+        { key: { time_created: -1 } },
+        { key: { community_id: 1, time_created: -1 } },
+        { key: { community_id: 1, favorite_count: -1 } },
       ]);
     await database
       .collection("comments")
       .createIndexes([
         { key: { post_id: 1, root: 1 } },
-        { key: { post_id: 1, root: 1, popularity_score: -1 } },
         { key: { user_id: 1, timestamp: -1 } },
+        { key: { post_id: 1, root: 1, timestamp: 1 } },
+        { key: { root: 1, timestamp: 1 } },
       ]);
     await database
       .collection("comment_favorite_store")
-      .createIndex({ comment_id: 1, user_id: 1 }, { unique: true });
+      .createIndexes([
+        { key: { comment_id: 1, user_id: 1 }, unique: true },
+        { key: { user_id: 1 } },
+      ]);
     await database
       .collection("communities")
       .createIndexes([

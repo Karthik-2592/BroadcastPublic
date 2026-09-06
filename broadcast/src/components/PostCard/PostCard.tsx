@@ -146,7 +146,7 @@ function PostMediaCarousel({ media, placeholder, height }: { media?: unknown[]; 
   );
 }
 
-function PostEditDialog({ post, open, onClose }: { post: Post; open: boolean; onClose: () => void }) {
+function PostEditDialog({ post, open, onClose, communityName = 'Personal' }: { post: Post; open: boolean; onClose: () => void; communityName?: string }) {
   const [title, setTitle] = useState(post.title);
   const [body, setBody] = useState(post.content);
   const [tagsText, setTagsText] = useState(post.tags.join(' '));
@@ -248,7 +248,7 @@ function PostEditDialog({ post, open, onClose }: { post: Post; open: boolean; on
             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Community</Typography>
             <Box sx={{ width: '1px', height: 16, bgcolor: 'rgba(31,19,36,0.53)', borderRadius: '60px', border: '1px solid rgba(255, 255, 255, 0.45)' }} />
             <TextField
-              value="Global"
+              value={communityName}
               disabled
               variant="standard"
               fullWidth
@@ -349,16 +349,23 @@ interface PostCardProps {
   variant?: 'compact' | 'expanded';
   canEdit?: boolean;
   communityAdminId?: string | null;
+  initialLiked?: boolean;
+  initialSaved?: boolean;
 }
 
-export default function PostCard({ post, variant = 'compact', canEdit = false, communityAdminId = null }: PostCardProps) {
+export default function PostCard({ post, variant = 'compact', canEdit = false, communityAdminId = null, initialLiked, initialSaved }: PostCardProps) {
   const navigate = useNavigate();
   const { isAuthenticated, currentUser } = useAuth();
-  const [isLiked, setIsLiked] = useState(false);
+  const [isLiked, setIsLiked] = useState(initialLiked ?? false);
   const [likeCount, setLikeCount] = useState(post.favorite_count);
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(initialSaved ?? false);
   const [optionsAnchor, setOptionsAnchor] = useState<null | HTMLElement>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [communityName, setCommunityName] = useState<string>(() => {
+    return (post as unknown as { community_name?: string; community_summary?: { community_name?: string } }).community_name ??
+      (post as unknown as { community_summary?: { community_name?: string } }).community_summary?.community_name ??
+      'Personal';
+  });
 
   const isExpanded = variant === 'expanded';
   const author = post.user_summary;
@@ -366,14 +373,34 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
 
   useEffect(() => {
     if (!isAuthenticated) { setIsLiked(false); setIsBookmarked(false); return; }
-    void Promise.all([
-      fetch(`${BASE_URL}/posts/${post.id}/likes/status`, { credentials: 'include' }).then((response) => response.ok ? response.json() : null),
-      fetch(`${BASE_URL}/posts/${post.id}/saves/status`, { credentials: 'include' }).then((response) => response.ok ? response.json() : null),
-    ]).then(([like, save]: Array<{ data?: { active?: boolean } } | null>) => {
-      setIsLiked(Boolean(like?.data?.active));
-      setIsBookmarked(Boolean(save?.data?.active));
-    });
-  }, [isAuthenticated, post.id]);
+    if (initialLiked !== undefined) setIsLiked(initialLiked);
+    if (initialSaved !== undefined) setIsBookmarked(initialSaved);
+  }, [isAuthenticated, initialLiked, initialSaved]);
+
+  useEffect(() => {
+    if (!post.community_id) {
+      setCommunityName('Personal');
+      return;
+    }
+
+    let isMounted = true;
+    void fetch(`${BASE_URL}/communities/${post.community_id}`, { credentials: 'include' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body: { data?: { community_name?: string } } | null) => {
+        if (isMounted) {
+          setCommunityName(body?.data?.community_name || 'Personal');
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setCommunityName('Personal');
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [post.community_id]);
 
   const handleToggleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -437,7 +464,6 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
       navigate(`/profile/${author.id}`);
       return;
     }
-    navigate(isAuthenticated ? '/login' : '/placeholder');
   };
 
   // ─── EXPANDED VARIANT (PostViewPage) ─────────────────────────────────────────
@@ -447,7 +473,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
         sx={{
           position: 'relative',
           bgcolor: 'background.paper',
-          borderRadius: 3,
+          borderRadius: 2,
           overflow: 'hidden',
           border: '1px solid rgba(255,255,255,0.06)',
           boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
@@ -462,7 +488,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
             top: 0,
             left: 0,
             right: 0,
-            height: 3,
+            height: 4,
             background: 'linear-gradient(90deg, #b388ff 0%, #69f0ae 100%)',
             opacity: 0.6,
             transition: 'opacity 0.3s ease',
@@ -485,7 +511,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
                     height: 48,
                     bgcolor: author?.avatarColor ?? '#7c4dff',
                     fontWeight: 700,
-                    fontSize: '1rem',
+                    fontSize: '1.2rem',
                     border: '2px solid rgba(255,255,255,0.1)',
                   }}
                 >
@@ -495,6 +521,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
               <Box
 
               >
+
                 <Typography
                   variant="subtitle1"
                   sx={{
@@ -527,7 +554,6 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
               <MoreHorizIcon />
             </IconButton>
           </Box>
-
           {/* Post Content */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Typography
@@ -575,9 +601,53 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
               </Box>
             )}
           </Box>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              bgcolor: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: 10,
+              px: 2.5,
+              py: 1,
+              width: 'fit-content',
+              transition: 'border 0.2s',
+              cursor: post.community_id ? 'pointer' : 'default',
+              '&:focus-within': { border: '1px solid rgba(179,136,255,0.5)' },
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (post.community_id) {
+                navigate(`/community/${post.community_id}`);
+              }
+            }}
+          >
+            <Typography
+              variant="caption"
+              sx={{
+                color: 'text.secondary',
+                fontWeight: 600,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                fontSize: '0.7rem',
 
+              }}
+            >
+              Community
+            </Typography>
+            <Box sx={{ width: '1px', height: 16, bgcolor: 'rgba(255,255,255,0.15)' }} />
+            <Typography sx={{
+              fontSize: '0.75rem',
+            }}>
+              {communityName}
+            </Typography>
+          </Box>
           {/* Post Actions */}
-          <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)' }} />
+          <Divider sx={{
+            borderColor: 'rgba(154, 78, 255, 0.25)',
+            background: 'linear-gradient(90deg, #b388ff 0%, #69f0ae 100%)',
+          }} />
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Button
               size="small"
@@ -709,8 +779,8 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
             </MenuItem>
           )}
         </Menu>
-        <PostEditDialog post={post} open={isEditOpen} onClose={() => setIsEditOpen(false)} />
-      </Box>
+        <PostEditDialog post={post} open={isEditOpen} onClose={() => setIsEditOpen(false)} communityName={communityName} />
+      </Box >
     );
   }
 
@@ -881,26 +951,6 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
           </IconButton>
 
         </Box>
-
-        {/* Right-aligned Bookmark Button */}
-        <IconButton
-          size="small"
-          onClick={handleToggleBookmark}
-          sx={{
-            color: isBookmarked ? 'primary.light' : 'text.secondary',
-            '&:hover': { color: 'primary.main', bgcolor: 'rgba(179,136,255,0.08)' },
-            alignSelf: 'flex-end'
-          }}
-          style={{
-            marginLeft: 'auto'
-          }}
-        >
-          {isBookmarked ? (
-            <BookmarkIcon fontSize="small" sx={{ color: 'primary.light' }} />
-          ) : (
-            <BookmarkBorderIcon fontSize="small" />
-          )}
-        </IconButton>
       </CardActions>
 
       {/* Options Dropdown Menu */}
@@ -958,7 +1008,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
           </MenuItem>
         )}
       </Menu>
-      <PostEditDialog post={post} open={isEditOpen} onClose={() => setIsEditOpen(false)} />
+      <PostEditDialog post={post} open={isEditOpen} onClose={() => setIsEditOpen(false)} communityName={communityName} />
     </Card >
   );
 }

@@ -7,7 +7,7 @@ import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Comment from '../Comment/Comment';
-import type { Comment as ApiComment } from '../../types/api';
+import type { Comment as ApiComment, RelationStatusMap } from '../../types/api';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import FetchErrorDialog from '../FetchErrorDialog';
@@ -36,6 +36,7 @@ export default function CommentsSection({ comments = EMPTY_COMMENTS, postId, com
   const [commentsCursor, setCommentsCursor] = useState<string | null>(null);
   const [loadingComments, setLoadingComments] = useState(false);
   const [hasFetchError, setHasFetchError] = useState(false);
+  const [commentLikeStatuses, setCommentLikeStatuses] = useState<RelationStatusMap>({});
 
   const loadComments = useCallback(async (nextCursor?: string | null) => {
     if (!postId) return;
@@ -48,6 +49,17 @@ export default function CommentsSection({ comments = EMPTY_COMMENTS, postId, com
       const page = body.data ?? [];
       setVisibleComments((current) => nextCursor ? [...current, ...page] : page);
       setCommentsCursor(body.cursor === 'null' ? null : body.cursor ?? null);
+      // Batch-fetch like statuses for the loaded comments
+      if (isAuthenticated && page.length) {
+        void fetch(`${BASE_URL}/comments/likes/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: page.map((c) => c.id) }),
+          credentials: 'include',
+        }).then(async (r) => r.ok ? await r.json() as { data?: RelationStatusMap } : null)
+          .then((statusBody) => { if (statusBody?.data) setCommentLikeStatuses((current) => ({ ...current, ...statusBody.data })); })
+          .catch(() => undefined);
+      }
     } catch {
       setHasFetchError(true);
     } finally {
@@ -267,6 +279,7 @@ export default function CommentsSection({ comments = EMPTY_COMMENTS, postId, com
           <Comment
             key={comment.id}
             comment={{ ...comment, replies: loadedReplies[comment.id] }}
+            initialLiked={commentLikeStatuses[comment.id]}
             canEdit={Boolean(currentUser && comment.user_id === currentUser.id)}
             communityAdminId={communityAdminId}
             onLoadReplies={(nextCursor) => loadReplies(comment, nextCursor)}

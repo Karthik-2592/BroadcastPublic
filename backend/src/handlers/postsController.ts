@@ -3,6 +3,7 @@ import { fail, id, ok, required } from "../http.ts";
 import { store } from "../mongodb.ts";
 import { neo4jRelations, numberValue } from "../neo4j.ts";
 import { queueFavoriteEvent } from "../services/favorites.ts";
+import { sendEvent } from "../services/events.ts";
 import type { Post, PostLikeRelationRequest, SaveRelationRequest } from "../types.ts";
 import { Router } from "express";
 import commentRouter from "./commentsController.ts";
@@ -82,7 +83,6 @@ export async function updatePost(req: Request, res: Response) {
   if (post.user_id !== sessionUserId(req))
     return fail(res, 403, "Only the post owner may edit it.");
   const updated = await store.updatePost(id(req), req.body as Partial<Post>);
-  if (updated) await neo4jRelations.setPostCommunity(updated.id, updated.community_id ?? null);
   return updated ? ok(res, updated) : fail(res, 404, "Post not found.");
 }
 export async function deletePost(req: Request, res: Response) {
@@ -97,15 +97,25 @@ export async function deletePost(req: Request, res: Response) {
   if (!isOwner && !isCommunityAdmin)
     return fail(res, 403, "Only the post owner or community admin may delete it.");
   const deleted = await store.deletePost(id(req));
-  if (deleted) await neo4jRelations.deletePostNode(id(req));
+  if (deleted) {
+    await neo4jRelations.deletePostNode(id(req));
+    sendEvent({
+      content_id: id(req),
+      content_type: "post",
+      action: "delete",
+      target_id: null,
+      timestamp: new Date().toISOString(),
+    });
+  }
   return ok(res, null, "Post deleted successfully.");
 }
 export async function feed(_req: Request, res: Response) {
   try {
     const page = await store.feed(typeof _req.query.cursor === "string" ? _req.query.cursor : undefined);
     return ok(res, page.items, "Operation completed successfully.", 200, page.nextCursor);
-  } catch {
-    return fail(res, 400, "Malformed cursor.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Malformed cursor.";
+    return fail(res, 400, message);
   }
 }
 export async function postLike(req: Request, res: Response): Promise<Response> {
@@ -150,9 +160,20 @@ export async function save(req: Request, res: Response): Promise<Response> {
   return ok(res, { saved: enabled, changed: Boolean(changed) });
 }
 
+export async function postLikeStatusBatch(req: Request, res: Response) {
+  const userId = sessionUserId(req);
+  const body = req.body as { ids?: string[] };
+  if (!body.ids || !Array.isArray(body.ids)) {
+    return fail(res, 400, "ids array is required.");
+  }
+  const statusMap = await neo4jRelations.postLikeStatusBatch(userId, body.ids);
+  return ok(res, statusMap);
+}
+
 const router = Router();
 router.get("/feed", feed);
 // Specific routes BEFORE generic /:id routes
+router.post("/likes/status", requireSession, postLikeStatusBatch);
 router.post("/likes", requireSession, postLike);
 router.delete("/likes", requireSession, postLike);
 router.post("/saves", requireSession, save);

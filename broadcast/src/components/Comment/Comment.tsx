@@ -39,6 +39,7 @@ interface CommentProps {
   onReplySubmitting?: () => void;
   onReplySubmissionFailed?: () => void;
   onReplyCreated?: (reply: ApiComment) => void;
+  initialLiked?: boolean;
 }
 
 function CommentEditDialog({ comment, open, onClose }: { comment: ApiComment; open: boolean; onClose: () => void }) {
@@ -78,7 +79,7 @@ function CommentEditDialog({ comment, open, onClose }: { comment: ApiComment; op
             <IconButton aria-label="Close edit comment" onClick={onClose} sx={{ color: 'text.secondary' }}><CloseRoundedIcon /></IconButton>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, p: 3 }}>
-            <Avatar src={currentUser?.profile_picture?.media_url ?? undefined} sx={{ width: 40, height: 40, bgcolor: 'primary.main', color: '#0f0f1a', fontWeight: 700 }}>{currentUser?.profile_name?.charAt(0) ?? currentUser?.username?.charAt(0) ?? '?'}</Avatar>
+            <Avatar src={currentUser?.profile_picture?.media_url ?? undefined} sx={{ width: 40, height: 40, bgcolor: 'primary.main', color: '#0f0f1a', fontWeight: 700, fontSize: '1.2rem' }}>{currentUser?.profile_name?.charAt(0) ?? currentUser?.username?.charAt(0) ?? '?'}</Avatar>
             <Box sx={{ flex: 1 }}>
               <Box sx={{ position: 'relative' }}>
                 <Box
@@ -118,7 +119,7 @@ function CommentEditDialog({ comment, open, onClose }: { comment: ApiComment; op
   );
 }
 
-export default function Comment({ comment, depth = 0, canEdit = false, communityAdminId = null, onLoadReplies, repliesLoading = false, repliesCursor = null, inPost = true, onReplySubmitting, onReplySubmissionFailed, onReplyCreated }: CommentProps) {
+export default function Comment({ comment, depth = 0, canEdit = false, communityAdminId = null, onLoadReplies, repliesLoading = false, repliesCursor = null, inPost = true, onReplySubmitting, onReplySubmissionFailed, onReplyCreated, initialLiked }: CommentProps) {
   const navigate = useNavigate();
   const { isAuthenticated, currentUser } = useAuth();
   const [replyOpen, setReplyOpen] = useState(false);
@@ -126,17 +127,15 @@ export default function Comment({ comment, depth = 0, canEdit = false, community
   const [optionsAnchor, setOptionsAnchor] = useState<null | HTMLElement>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
 
-  const [isLiked, setIsLiked] = useState(comment.isLiked ?? false);
+  const [isLiked, setIsLiked] = useState(initialLiked ?? comment.isLiked ?? false);
   const [likeCount, setLikeCount] = useState(comment.favorite_count);
   const author = comment.user_summary;
   const canManageComment = Boolean(canEdit || (communityAdminId && currentUser?.id && communityAdminId === currentUser.id));
 
   useEffect(() => {
     if (!isAuthenticated) { setIsLiked(false); return; }
-    void fetch(`${BASE_URL}/posts/${comment.post_id}/comments/${comment.id}/likes/status`, { credentials: 'include' })
-      .then((response) => response.ok ? response.json() : null)
-      .then((body: { data?: { active?: boolean } } | null) => setIsLiked(Boolean(body?.data?.active)));
-  }, [comment.id, isAuthenticated]);
+    if (initialLiked !== undefined) setIsLiked(initialLiked);
+  }, [initialLiked, isAuthenticated]);
 
   const avatarSize = depth === 0 ? 40 : 32;
   const isNested = depth > 0;
@@ -199,11 +198,11 @@ export default function Comment({ comment, depth = 0, canEdit = false, community
               width: avatarSize,
               height: avatarSize,
               bgcolor: author?.avatarColor ?? '#7c4dff',
-              fontSize: isNested ? '0.75rem' : '0.9rem',
+              fontSize: isNested ? '0.95rem' : '1.2rem',
               fontWeight: 600,
               border: isNested ? '2px solid rgba(179, 136, 255, 0.3)' : 'none',
               flexShrink: 0,
-              cursor: 'pointer'
+              cursor: 'pointer',
             }}
           >
             {(author?.profile_name ?? author?.username ?? '?').charAt(0)}
@@ -328,7 +327,7 @@ export default function Comment({ comment, depth = 0, canEdit = false, community
             >
               {likeCount}
             </Button>
-            {!isNested && inPost &&  (
+            {!isNested && inPost && (
               <Button
                 size="small"
                 startIcon={<ReplyIcon sx={{ fontSize: 15 }} />}

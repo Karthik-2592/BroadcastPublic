@@ -3,6 +3,7 @@ import { fail, id, ok, required } from "../http.ts";
 import { store } from "../mongodb.ts";
 import { neo4jRelations, numberValue } from "../neo4j.ts";
 import type { Community, MembershipRelationRequest, ModeratorRelationRequest } from "../types.ts";
+import { sendEvent } from "../services/events.ts";
 import { Router } from "express";
 import { requireSession, sessionUserId } from "../session.ts";
 import { mediaUrl, saveMedia, type UploadedFile } from "../media.ts";
@@ -84,8 +85,9 @@ export async function posts(req: Request, res: Response) {
   try {
     const page = await store.postsForCommunity(id(req), typeof req.query.cursor === "string" ? req.query.cursor : undefined, sort);
     return ok(res, page.items, "Operation completed successfully.", 200, page.nextCursor);
-  } catch {
-    return fail(res, 400, "Malformed cursor.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Malformed cursor.";
+    return fail(res, 400, message);
   }
 }
 export async function update(req: Request, res: Response) {
@@ -106,25 +108,31 @@ export async function remove(req: Request, res: Response) {
   if (sessionUserId(req) !== community.admin_id)
     return fail(res, 403, "Only the community admin may delete it.");
   const deleted = await store.deleteCommunity(id(req));
-  if (deleted) await neo4jRelations.deleteCommunityNode(id(req));
+  if (deleted) {
+    await neo4jRelations.deleteCommunityNode(id(req));
+    sendEvent({
+      content_id: id(req),
+      content_type: "community",
+      action: "delete",
+      target_id: null,
+      timestamp: new Date().toISOString(),
+    });
+  }
   return ok(res, null, "Community deleted successfully.");
 }
 export async function recommendations(_req: Request, res: Response) {
   try {
     const page = await store.communityRecommendations(typeof _req.query.cursor === "string" ? _req.query.cursor : undefined);
     return ok(res, await withMemberships(_req, page.items), "Operation completed successfully.", 200, page.nextCursor);
-  } catch {
-    return fail(res, 400, "Malformed cursor.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Malformed cursor.";
+    return fail(res, 400, message);
   }
 }
 export async function personalizedRecommendations(req: Request, res: Response) {
   const userId = String(req.params.userId);
   if (!(await store.user(userId))) return fail(res, 404, "User not found.");
-  const groups = await Promise.all([
-    neo4jRelations.communityRecommendationsByInterests(userId),
-    neo4jRelations.communityRecommendationsByFollowNetwork(userId),
-    neo4jRelations.communityRecommendationsByLikedPosts(userId),
-  ]);
+  const groups = await neo4jRelations.communityRecommendationsGrouped(userId);
   const ids = [...new Set(groups.flat())].slice(0, 8);
   return ok(res, await withMemberships(req, await store.communitiesByIds(ids)));
 }

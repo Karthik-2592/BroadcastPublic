@@ -1,20 +1,11 @@
 import { fork, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import type { EventQueue } from "../types.ts";
 
-export type FavoriteTarget = "post" | "comment";
-export type FavoriteEvent = {
-  target: FavoriteTarget;
-  targetId: string;
-  userId: string;
-  favorited: boolean;
-};
-
-export interface AggregationStatus {
+export interface EventWorkerStatus {
   processing: boolean;
   pendingEvents: number;
-  currentBatchSize: number;
-  currentBatchProgress: number;
   processedEventCount: number;
   lastStartedAt: string | null;
   lastCompletedAt: string | null;
@@ -22,27 +13,25 @@ export interface AggregationStatus {
 }
 
 let workerProcess: ChildProcess | null = null;
-let currentStatus: AggregationStatus = {
+let currentStatus: EventWorkerStatus = {
   processing: false,
   pendingEvents: 0,
-  currentBatchSize: 0,
-  currentBatchProgress: 0,
   processedEventCount: 0,
   lastStartedAt: null,
   lastCompletedAt: null,
   lastError: null,
 };
 
-export function getAggregationStatus(): AggregationStatus {
+export function getEventWorkerStatus(): EventWorkerStatus {
   return currentStatus;
 }
 
-export function startAggregationWorker(): void {
+export function startEventWorker(): void {
   if (workerProcess) return;
 
   const workerPath = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
-    "favorites-worker.ts",
+    "event-worker.ts",
   );
 
   const execArgv = process.execArgv.includes("--experimental-strip-types")
@@ -54,36 +43,29 @@ export function startAggregationWorker(): void {
     stdio: ["inherit", "inherit", "inherit", "ipc"],
   });
 
-  child.on("message", (message: { type?: string; status?: AggregationStatus }) => {
+  child.on("message", (message: { type?: string; status?: EventWorkerStatus }) => {
     if (message.type === "status" && message.status) {
       currentStatus = message.status;
     }
   });
 
   child.on("error", (error) => {
-    console.error("[favorites-worker] child process error:", error);
+    console.error("[event-worker] child process error:", error);
   });
 
   child.on("exit", (code, signal) => {
-    console.warn(`[favorites-worker] child process exited (code=${code}, signal=${signal})`);
+    console.warn(`[event-worker] child process exited (code=${code}, signal=${signal})`);
     workerProcess = null;
   });
 
   workerProcess = child;
-  console.log(`[favorites-worker] started child process pid=${child.pid}`);
+  console.log(`[event-worker] started child process pid=${child.pid}`);
 }
 
-export function queueFavoriteEvent(event: FavoriteEvent): void {
+export function sendEvent(event: EventQueue): void {
   if (workerProcess && workerProcess.connected) {
-    workerProcess.send({ type: "favorite", event });
+    workerProcess.send({ type: "event", event });
   } else {
-    console.warn("[favorites-worker] worker not connected, dropped favorite event:", event);
+    console.warn("[event-worker] worker not connected, dropped event:", event.content_type, event.action, event.content_id);
   }
-}
-
-export function flushFavoriteEvents(): Promise<void> {
-  if (workerProcess && workerProcess.connected) {
-    workerProcess.send({ type: "flush" });
-  }
-  return Promise.resolve();
 }

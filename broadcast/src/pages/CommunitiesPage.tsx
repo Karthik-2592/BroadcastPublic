@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -21,12 +21,13 @@ import { useAuth } from '../context/AuthContext';
 import CommunitySortTabs from '../components/Community/CommunitySortTabs';
 import CommunityRightSidebar from '../components/Community/CommunityRightSidebar';
 import PostCard from '../components/PostCard/PostCard';
-import type { Community, Post, Tag } from '../types/api';
+import type { Community, Post, RelationStatusMap, Tag } from '../types/api';
 import { BASE_URL } from '../config';
+
 
 export default function CommunitiesPage() {
   const navigate = useNavigate();
-  const { communityId  } = useParams<{ communityId: string }>();
+  const { communityId } = useParams<{ communityId: string }>();
   const { isAuthenticated, currentUser } = useAuth();
   const [community, setCommunity] = useState<Community | null>(null);
   const [sortTab, setSortTab] = useState<'new' | 'top'>('new');
@@ -43,6 +44,7 @@ export default function CommunitiesPage() {
   const [bannerImage, setBannerImage] = useState<string | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerError, setBannerError] = useState('');
+  const [likeStatuses, setLikeStatuses] = useState<RelationStatusMap>({});
   const MAX_BANNER_SIZE = 4 * 1024 * 1024;
   const isAdmin = isAuthenticated && community?.admin_id === currentUser?.id;
 
@@ -103,6 +105,18 @@ export default function CommunitiesPage() {
     navigate('/communities');
   };
 
+  const fetchLikeStatuses = useCallback((ids: string[]) => {
+    if (!isAuthenticated || !ids.length) return;
+    void fetch(`${BASE_URL}/posts/likes/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+      credentials: 'include',
+    }).then(async (response) => response.ok ? await response.json() as { data?: RelationStatusMap } : null)
+      .then((body) => { if (body?.data) setLikeStatuses((current) => ({ ...current, ...body.data })); })
+      .catch(() => undefined);
+  }, [isAuthenticated]);
+
   useEffect(() => {
     let active = true;
     setPostsLoading(true);
@@ -115,11 +129,12 @@ export default function CommunitiesPage() {
         const page = body?.data ?? [];
         setCommunityPosts(page);
         setPostsCursor(body?.cursor === 'null' ? null : body?.cursor ?? null);
+        fetchLikeStatuses(page.map((p) => p.id));
       })
       .catch(() => undefined)
       .finally(() => { if (active) setPostsLoading(false); });
     return () => { active = false; };
-  }, [community?.id, sortTab]);
+  }, [community?.id, sortTab, fetchLikeStatuses]);
 
   if (!community) return <Typography sx={{ p: 8, textAlign: 'center' }}>Nothing to see here</Typography>;
 
@@ -132,6 +147,7 @@ export default function CommunitiesPage() {
         if (!body?.data) return;
         setCommunityPosts((current) => [...current, ...body.data!]);
         setPostsCursor(body.cursor === 'null' ? null : body.cursor ?? null);
+        fetchLikeStatuses(body.data.map((p) => p.id));
       })
       .catch(() => undefined)
       .finally(() => setPostsLoading(false));
@@ -174,7 +190,7 @@ export default function CommunitiesPage() {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: '1fr 0.53fr',
+          gridTemplateColumns: '1fr 0.55fr',
           justifyContent: 'center',
           gap: 4,
           px: 4,
@@ -194,7 +210,7 @@ export default function CommunitiesPage() {
                   Nothing to see here
                 </Typography>
               ) : communityPosts.map((post) => (
-                <PostCard key={post.id} post={post} canEdit={Boolean(isAuthenticated && (post.user_id === currentUser?.id || community?.admin_id === currentUser?.id))} communityAdminId={community?.admin_id ?? null} />
+                <PostCard key={post.id} post={post} initialLiked={likeStatuses[post.id]} canEdit={Boolean(isAuthenticated && (post.user_id === currentUser?.id || community?.admin_id === currentUser?.id))} communityAdminId={community?.admin_id ?? null} />
               ))}
               {postsCursor && <Button variant="outlined" onClick={loadMorePosts} disabled={postsLoading}>
                 {postsLoading ? 'Loading…' : 'Load more posts'}

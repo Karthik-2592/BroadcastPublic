@@ -16,7 +16,32 @@ export default function PostViewPage() {
   const { currentUser, isAuthenticated } = useAuth();
   const [post, setPost] = useState<Post | null>(null);
   const [communityAdminId, setCommunityAdminId] = useState<string | null>(null);
-  useEffect(() => { if (postId) void fetch(`${BASE_URL}/posts/${postId}`, { credentials: 'include' }).then((response) => response.ok ? response.json() : null).then((body: { data?: Post } | null) => setPost(body?.data ?? null)); }, [postId]);
+  const [initialLiked, setInitialLiked] = useState<boolean | undefined>(undefined);
+  const [initialSaved, setInitialSaved] = useState<boolean | undefined>(undefined);
+
+  useEffect(() => {
+    if (!postId) return;
+    void fetch(`${BASE_URL}/posts/${postId}`, { credentials: 'include' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((body: { data?: Post } | null) => {
+        setPost(body?.data ?? null);
+        // Fetch like + save status for the expanded post if authenticated
+        if (isAuthenticated && body?.data?.id) {
+          const pid = body.data.id;
+          void Promise.all([
+            fetch(`${BASE_URL}/posts/likes/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [pid] }), credentials: 'include' }),
+            fetch(`${BASE_URL}/posts/${pid}/saves/status`, { credentials: 'include' }),
+          ]).then(async ([likeRes, saveRes]) => {
+            const [likeBody, saveBody] = await Promise.all([
+              likeRes.ok ? likeRes.json() as Promise<{ data?: Record<string, boolean> }> : null,
+              saveRes.ok ? saveRes.json() as Promise<{ data?: { active?: boolean } }> : null,
+            ]);
+            setInitialLiked(Boolean(likeBody?.data?.[pid]));
+            setInitialSaved(Boolean(saveBody?.data?.active));
+          }).catch(() => undefined);
+        }
+      });
+  }, [postId, isAuthenticated]);
 
   useEffect(() => {
     if (!post?.community_id) {
@@ -56,7 +81,7 @@ export default function PostViewPage() {
         }}
       >
         {/* ── Unified Post Card (Expanded View) ── */}
-        {post && <PostCard post={post} variant="expanded" canEdit={canManagePost} communityAdminId={communityAdminId} />}
+        {post && <PostCard post={post} variant="expanded" canEdit={canManagePost} communityAdminId={communityAdminId} initialLiked={initialLiked} initialSaved={initialSaved} />}
 
         {/* ── Comments Section ── */}
         <CommentsSection postId={postId} commentCount={post?.comment_count ?? 0} communityAdminId={communityAdminId} />
