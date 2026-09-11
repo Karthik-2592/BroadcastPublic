@@ -56,10 +56,10 @@ type CommunityDocument = Omit<Community, "id" | "admin_id" | "timestamp"> & {
 };
 type NotificationDocument = Omit<
   Notification,
-  "id" | "user_id" | "event_id" | "timestamp"
+  "id" | "target_id" | "event_id" | "timestamp" | "user_summary"
 > & {
   _id: ObjectId;
-  user_id: ObjectId;
+  target_id: ObjectId;
   event_id: ObjectId;
   timestamp: Date;
 };
@@ -134,7 +134,7 @@ const safeNotification = (notification: NotificationDocument): Notification => {
   return {
     ...value,
     id: apiId(_id),
-    user_id: apiId(notification.user_id),
+    target_id: apiId(notification.target_id),
     event_id: apiId(notification.event_id),
     timestamp: notification.timestamp.toISOString(),
   };
@@ -942,16 +942,61 @@ export class MongoStore {
         .then((items) => items.map((item) => safeCommunity(item))),
     );
   }
-  async notifications(userId?: string) {
-    const userObjectId = userId ? oid(userId) : null;
-    const filter: Filter<NotificationDocument> = userObjectId
-      ? { user_id: userObjectId }
-      : {};
-    return this.log("notifications.find", () =>
+  async createNotification(input: {
+    target_id: string;
+    event_type: string;
+    event_id: string;
+  }) {
+    const targetId = oid(input.target_id);
+    const eventId = oid(input.event_id);
+    if (!targetId || !eventId) return null;
+    return this.log("notifications.insertOne", async () => {
+      const notification: NotificationDocument = {
+        _id: new ObjectId(),
+        target_id: targetId,
+        event_type: input.event_type,
+        event_id: eventId,
+        read: false,
+        timestamp: new Date(),
+      };
+      await (await this.collection<NotificationDocument>("notifications")).insertOne(notification);
+      return safeNotification(notification);
+    });
+  }
+  async hasNotifications(targetId: string) {
+    const objectId = oid(targetId);
+    if (!objectId) return false;
+    return this.log("notifications.exists", () =>
       this.collection<NotificationDocument>("notifications")
-        .then((c) => c.find(filter).sort({ timestamp: -1 }).toArray())
-        .then((items) => items.map(safeNotification)),
+        .then((c) => c.findOne({ target_id: objectId, event_type: "user_follow" }, { projection: { _id: 1 } }))
+        .then(Boolean),
     );
+  }
+  async notifications(targetId: string, cursor?: string) {
+    const targetObjectId = oid(targetId);
+    if (!targetObjectId) return { items: [], nextCursor: "null" };
+    const filters = { target_id: targetId, event_type: "user_follow" };
+    const page = decodeCursor(cursor, filters, ["timestamp"]);
+    const limit = 5;
+    const items = await this.log("notifications.find", async () => {
+      const collection = await this.collection<NotificationDocument>("notifications");
+      const filter: Filter<NotificationDocument> = {
+        target_id: targetObjectId,
+        event_type: "user_follow",
+        ...(page.values?.timestamp ? { timestamp: { $lt: new Date(String(page.values.timestamp)) } } : {}),
+      };
+      return collection.find(filter).sort({ timestamp: -1 }).limit(limit + 1).toArray();
+    });
+    const pageItems = items.slice(0, limit).map(safeNotification);
+    const userIds = pageItems.map((item) => item.event_id);
+    const users = await this.usersByIds(userIds);
+    const summaries = new Map(users.map((user) => [user.id, userSummary(user)]));
+    const enriched = pageItems.map((item) => ({ ...item, user_summary: summaries.get(item.event_id) ?? null }));
+    const lastItem = items.length > limit ? items[limit - 1] : null;
+    return {
+      items: enriched,
+      nextCursor: createNextCursor(lastItem as Record<string, unknown> | null, "timestamp", filters),
+    };
   }
   async notification(id: string, read: boolean) {
     const objectId = oid(id);

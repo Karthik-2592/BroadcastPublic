@@ -97,11 +97,12 @@ export interface Community {
 
 export interface Notification {
   id: Id;
-  user_id: Id;
+  target_id: Id;
   event_type: string;
   event_id: Id;
   read: boolean;
   timestamp: string;
+  user_summary?: UserSummary | null;
 }
 
 // ── Generic API envelope ──────────────────────────────────────────────────────
