@@ -25,7 +25,6 @@ export interface UserSummary {
 export interface User {
   id: Id;
   username: string;
-  email: string;
   interests: string[];
   profile_name?: string;
   profile_picture: MediaMetadata | null;

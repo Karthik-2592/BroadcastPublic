@@ -32,7 +32,9 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import type { Post } from '../../types/api';
 import { EditedIndicator } from '../Reply/Reply';
 import { useAuth } from '../../context/AuthContext';
-import { BASE_URL } from '../../config';
+import { useCommunity } from '../../queries/communities';
+import { useTogglePostLike, useTogglePostSave } from '../../queries/likes';
+import { useUpdatePost, useDeletePost } from '../../queries/posts';
 
 function PostMediaCarousel({ media, placeholder, height }: { media?: unknown[]; placeholder?: string; height: number }) {
   const mediaItems = (media ?? []).map((item) => {
@@ -60,10 +62,10 @@ function PostMediaCarousel({ media, placeholder, height }: { media?: unknown[]; 
           position: 'relative',
           width: '100%',
           height,
-          borderRadius: 2,
+          borderRadius: 3,
           overflow: 'hidden',
           mb: 1.5,
-          border: '1px solid rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255, 255, 255, 0.18)',
           cursor: activeMedia ? 'pointer' : 'default',
         }}
       >
@@ -79,7 +81,7 @@ function PostMediaCarousel({ media, placeholder, height }: { media?: unknown[]; 
           sx={{ width: '100%', height: '100%', objectFit: 'cover', background: activeMedia ? undefined : placeholder, display: 'block' }}
         />
         {mediaItems.length > 1 && (
-          <Box sx={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 0.75, px: 1, py: 0.75, borderRadius: 9999, bgcolor: 'rgba(0,0,0,0.45)' }}>
+          <Box sx={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 0.75, px: 1, py: 0.75, border: '1px solid #40007cff', borderRadius: 9999, bgcolor: 'rgba(0, 0, 0, 1)' }}>
             {mediaItems.map((item, index) => (
               <Box
                 key={`${item}-${index}`}
@@ -153,6 +155,8 @@ function PostEditDialog({ post, open, onClose, communityName = 'Personal' }: { p
   const [tags, setTags] = useState<string[]>(post.tags);
   const [tagError, setTagError] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const updatePost = useUpdatePost();
+  const deletePost = useDeletePost();
 
   const handleOpen = () => {
     setTitle(post.title);
@@ -185,23 +189,26 @@ function PostEditDialog({ post, open, onClose, communityName = 'Personal' }: { p
       event.preventDefault();
       handleTagsProcess();
     }
-  };
+  }
 
   const handleEdit = async () => {
     handleTagsProcess();
-    await fetch(`${BASE_URL}/posts/${post.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, content: body, tags }),
-      credentials: 'include',
-    }).catch(() => undefined);
-    onClose();
+    try {
+      await updatePost.mutateAsync({ postId: post.id, title, content: body, tags });
+      onClose();
+    } catch (error) {
+      console.error('Failed to update post:', error);
+    }
   };
 
   const handleDelete = async () => {
-    await fetch(`${BASE_URL}/posts/${post.id}`, { method: 'DELETE', credentials: 'include' }).catch(() => undefined);
-    setIsDeleteOpen(false);
-    onClose();
+    try {
+      await deletePost.mutateAsync(post.id);
+      setIsDeleteOpen(false);
+      onClose();
+    } catch (error) {
+      console.error('Failed to delete post:', error);
+    }
   };
 
   return (
@@ -212,7 +219,22 @@ function PostEditDialog({ post, open, onClose, communityName = 'Personal' }: { p
         disableScrollLock={true}
         slotProps={{
           backdrop: { sx: { backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'brightness(0.5) blur(4px)' } },
-          paper: { sx: { width: '100%', maxWidth: 720, bgcolor: '#1a1a2e', color: 'text.primary', borderRadius: 3, border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 16px 48px rgba(0,0,0,0.6)', m: 2, overflow: 'hidden' } },
+          paper: {
+            sx: {
+              width: '100%',
+              maxWidth: 720,
+              bgcolor: '#1a1a2e',
+              color: 'text.primary',
+              borderRadius: 3,
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
+              m: 2,
+              overflow: 'hidden',
+              backgroundImage: 'none'
+            }
+          },
+
+
         }}
       >
         <Box sx={{ height: 2, background: 'linear-gradient(90deg, transparent, #b388ff, transparent)' }} />
@@ -233,10 +255,6 @@ function PostEditDialog({ post, open, onClose, communityName = 'Personal' }: { p
               fontWeight: 600,
               color: 'text.primary',
               mb: 4,
-              '& .MuiInputBase-input': {
-                border: '1px solid rgba(255,255,255,0.23)',
-                borderRadius: 60,
-              }
             }}
           />
           <Box sx={{
@@ -279,12 +297,10 @@ function PostEditDialog({ post, open, onClose, communityName = 'Personal' }: { p
                   padding: '16px 20px',
                   fontFamily: 'inherit',
                   fontSize: '1rem',
-                  border: '1px solid rgba(255, 255, 255, 0.23)',
                   lineHeight: 1.85,
                   color: 'inherit',
                   resize: 'none',
                   borderRadius: 4,
-                  mb: 4
                 },
                 '& .MuiFormLabel-root': {
                   fontSize: "1.2rem",
@@ -292,7 +308,7 @@ function PostEditDialog({ post, open, onClose, communityName = 'Personal' }: { p
               }}
             />
           </Box>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 3, ml: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 3, ml: 3, mt: 4 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Tags</Typography>
               <Input fullWidth value={tagsText}
@@ -322,10 +338,10 @@ function PostEditDialog({ post, open, onClose, communityName = 'Personal' }: { p
             )}
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', pt: 3 }}>
-            <Button color="error" variant="outlined" onClick={() => setIsDeleteOpen(true)}>Delete</Button>
+            <Button color="error" variant="outlined" onClick={() => setIsDeleteOpen(true)} disabled={deletePost.isPending}>Delete</Button>
             <Box sx={{ display: 'flex', gap: 1.5 }}>
-              <Button variant="outlined" onClick={onClose}>Cancel</Button>
-              <Button variant="contained" onClick={handleEdit}>Edit</Button>
+              <Button variant="outlined" onClick={onClose} disabled={updatePost.isPending || deletePost.isPending}>Cancel</Button>
+              <Button variant="contained" onClick={handleEdit} disabled={updatePost.isPending}>Edit</Button>
             </Box>
           </Box>
         </DialogContent>
@@ -344,6 +360,7 @@ function PostEditDialog({ post, open, onClose, communityName = 'Personal' }: { p
   );
 }
 
+
 interface PostCardProps {
   post: Post;
   variant?: 'compact' | 'expanded';
@@ -352,7 +369,6 @@ interface PostCardProps {
   initialLiked?: boolean;
   initialSaved?: boolean;
 }
-
 export default function PostCard({ post, variant = 'compact', canEdit = false, communityAdminId = null, initialLiked, initialSaved }: PostCardProps) {
   const navigate = useNavigate();
   const { isAuthenticated, currentUser } = useAuth();
@@ -361,11 +377,15 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
   const [isBookmarked, setIsBookmarked] = useState(initialSaved ?? false);
   const [optionsAnchor, setOptionsAnchor] = useState<null | HTMLElement>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [communityName, setCommunityName] = useState<string>(() => {
-    return (post as unknown as { community_name?: string; community_summary?: { community_name?: string } }).community_name ??
-      (post as unknown as { community_summary?: { community_name?: string } }).community_summary?.community_name ??
-      'Personal';
-  });
+  const { data: communityData } = useCommunity(post.community_id);
+  const toggleLike = useTogglePostLike();
+  const toggleSave = useTogglePostSave();
+  const fallbackCommunityName =
+    (post as unknown as { community_name?: string; community_summary?: { community_name?: string } }).community_name ??
+    (post as unknown as { community_summary?: { community_name?: string } }).community_summary?.community_name;
+  const communityName = !post.community_id
+    ? 'Global'
+    : (communityData?.community_name || fallbackCommunityName || 'Global');
 
   const isExpanded = variant === 'expanded';
   const author = post.user_summary;
@@ -377,31 +397,6 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
     if (initialSaved !== undefined) setIsBookmarked(initialSaved);
   }, [isAuthenticated, initialLiked, initialSaved]);
 
-  useEffect(() => {
-    if (!post.community_id) {
-      setCommunityName('Personal');
-      return;
-    }
-
-    let isMounted = true;
-    void fetch(`${BASE_URL}/communities/${post.community_id}`, { credentials: 'include' })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((body: { data?: { community_name?: string } } | null) => {
-        if (isMounted) {
-          setCommunityName(body?.data?.community_name || 'Personal');
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setCommunityName('Personal');
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [post.community_id]);
-
   const handleToggleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isAuthenticated) {
@@ -411,12 +406,12 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
     const next = !isLiked;
     setIsLiked(next);
     setLikeCount((current) => current + (next ? 1 : -1));
-    void fetch(`${BASE_URL}/posts/likes`, { method: next ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ post_id: post.id }), credentials: 'include' })
-      .then((response) => { if (!response.ok) throw new Error('Unable to update like') })
-      .catch(() => {
+    toggleLike.mutate({ postId: post.id, liked: next }, {
+      onError: () => {
         setIsLiked(next === false);
         setLikeCount((current) => current - (next ? 1 : -1));
-      });
+      },
+    });
   };
 
   const handleToggleBookmark = (e: React.MouseEvent) => {
@@ -427,9 +422,9 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
     }
     const next = !isBookmarked;
     setIsBookmarked(next);
-    void fetch(`${BASE_URL}/posts/saves`, { method: next ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ post_id: post.id }), credentials: 'include' })
-      .then((response) => { if (!response.ok) throw new Error('Unable to update bookmark'); })
-      .catch(() => setIsBookmarked(next === false));
+    toggleSave.mutate({ postId: post.id, saved: next }, {
+      onError: () => setIsBookmarked(next === false),
+    });
   };
 
   const handleOpenOptions = (e: React.MouseEvent<HTMLElement>) => {
@@ -473,7 +468,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
         sx={{
           position: 'relative',
           bgcolor: 'background.paper',
-          borderRadius: 2,
+          borderRadius: 3,
           overflow: 'hidden',
           border: '1px solid rgba(255,255,255,0.06)',
           boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
@@ -509,7 +504,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
                   sx={{
                     width: 48,
                     height: 48,
-                    bgcolor: author?.avatarColor ?? '#7c4dff',
+                    bgcolor: '#7c4dff',
                     fontWeight: 700,
                     fontSize: '1.2rem',
                     border: '2px solid rgba(255,255,255,0.1)',
@@ -799,7 +794,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
                 sx={{
                   width: 38,
                   height: 38,
-                  bgcolor: author?.avatarColor ?? '#7c4dff',
+                  bgcolor: '#7c4dff',
                   fontSize: '0.9rem',
                   fontWeight: 600,
                 }}

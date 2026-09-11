@@ -25,6 +25,7 @@ type UserDocument = Omit<User, "id"> & {
   _id: ObjectId;
   password: { password_hash: string; salt: string };
   joined_at?: Date;
+  
 };
 type PostDocument = Omit<
   Post,
@@ -87,7 +88,6 @@ const userSummary = (user: User): UserSummary => ({
 const safeUser = (user: UserDocument): User => ({
   id: apiId(user._id),
   username: user.username,
-  email: user.email,
   interests: user.interests,
   profile_name: user.profile_name,
   profile_picture: user.profile_picture ?? defaultMedia,
@@ -197,7 +197,6 @@ export class MongoStore {
       const user: UserDocument = {
         _id: new ObjectId(),
         username: input.username,
-        email: input.email,
         password: { password_hash: hash(input.password, salt), salt },
         interests: input.interests ?? [],
         profile_name: input.profile_name ?? "",
@@ -223,7 +222,7 @@ export class MongoStore {
     return this.log("users.authenticate", async () => {
       const user = await (
         await this.collection<UserDocument>("users")
-      ).findOne({ $or: [{ username: identity }, { email: identity }] });
+      ).findOne({ $or: [{ username: identity }, { email: identity }] }, { projection: { email: 0 } });
       return user &&
         hash(password, user.password.salt) === user.password.password_hash
         ? safeUser(user)
@@ -235,7 +234,7 @@ export class MongoStore {
     return objectId
       ? this.log("users.findOne", () =>
         this.collection<UserDocument>("users")
-          .then((c) => c.findOne({ _id: objectId }))
+          .then((c) => c.findOne({ _id: objectId }, { projection: { email: 0 } }))
           .then((user) => (user ? safeUser(user) : null)),
       )
       : null;
@@ -245,7 +244,7 @@ export class MongoStore {
     if (!objectIds.length) return [];
     return this.log("users.findByIds", () =>
       this.collection<UserDocument>("users")
-        .then((c) => c.find({ _id: { $in: objectIds } }).project({ password: 0 }).toArray())
+        .then((c) => c.find({ _id: { $in: objectIds } }).project({ password: 0, email: 0 }).toArray())
         .then((users) => users.map((user) => safeUser(user as UserDocument))),
     );
   }
@@ -264,7 +263,7 @@ export class MongoStore {
     return this.log("users.updateOne", async () => {
       const users = await this.collection<UserDocument>("users");
       await users.updateOne({ _id: objectId }, { $set: update });
-      const user = await users.findOne({ _id: objectId });
+      const user = await users.findOne({ _id: objectId }, { projection: { email: 0 } });
       return user ? safeUser(user) : null;
     });
   }
@@ -285,7 +284,7 @@ export class MongoStore {
         await this.collection<UserDocument>("users")
       )
         .find({ username: { $regex: query, $options: "i" } })
-        .project({ password: 0 })
+        .project({ password: 0, email: 0 })
         .toArray();
       console.log(`[mongo] users.search: ${users.length ? `found ${users.length}` : "not found"}`);
       return users.map((user) => safeUser(user as UserDocument));
@@ -294,7 +293,7 @@ export class MongoStore {
   async search(query: string) {
     const expression = { $regex: query, $options: "i" };
     const [users, posts, communities] = await Promise.all([
-      this.collection<UserDocument>("users").then((c) => c.find({ $or: [{ username: expression }, { profile_name: expression }] }).project({ password: 0 }).limit(10).toArray()),
+      this.collection<UserDocument>("users").then((c) => c.find({ $or: [{ username: expression }, { profile_name: expression }] }).project({ password: 0, email: 0 }).limit(10).toArray()),
       this.collection<PostDocument>("posts").then((c) => c.find({ title: expression }).limit(10).toArray()),
       this.collection<CommunityDocument>("communities").then((c) => c.find({ community_name: expression }).limit(10).toArray()),
     ]);
@@ -315,7 +314,7 @@ export class MongoStore {
               _id: { $ne: oid(id)! },
               interests: { $in: user.interests },
             })
-            .project({ password: 0 })
+            .project({ password: 0, email: 0 })
             .toArray(),
         )
         .then((users) => users.map((item) => safeUser(item as UserDocument))),

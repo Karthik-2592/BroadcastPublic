@@ -10,14 +10,19 @@ import { useEffect, useState } from 'react';
 import type { Post } from '../types/api';
 import { BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
+import { useCommunity } from '../queries/communities';
+import { usePostLikeStatus, usePostSaveStatus } from '../queries/likes';
 
 export default function PostViewPage() {
   const { postId } = useParams<{ postId: string }>();
   const { currentUser, isAuthenticated } = useAuth();
   const [post, setPost] = useState<Post | null>(null);
-  const [communityAdminId, setCommunityAdminId] = useState<string | null>(null);
-  const [initialLiked, setInitialLiked] = useState<boolean | undefined>(undefined);
-  const [initialSaved, setInitialSaved] = useState<boolean | undefined>(undefined);
+  const { data: community } = useCommunity(post?.community_id);
+  const communityAdminId = community?.admin_id ?? null;
+
+  // Like + save status — served from cache when coming from a feed list; fetches on cold load.
+  const { data: initialLiked } = usePostLikeStatus(postId, isAuthenticated);
+  const { data: initialSaved } = usePostSaveStatus(postId, isAuthenticated);
 
   useEffect(() => {
     if (!postId) return;
@@ -25,35 +30,8 @@ export default function PostViewPage() {
       .then((response) => response.ok ? response.json() : null)
       .then((body: { data?: Post } | null) => {
         setPost(body?.data ?? null);
-        // Fetch like + save status for the expanded post if authenticated
-        if (isAuthenticated && body?.data?.id) {
-          const pid = body.data.id;
-          void Promise.all([
-            fetch(`${BASE_URL}/posts/likes/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [pid] }), credentials: 'include' }),
-            fetch(`${BASE_URL}/posts/${pid}/saves/status`, { credentials: 'include' }),
-          ]).then(async ([likeRes, saveRes]) => {
-            const [likeBody, saveBody] = await Promise.all([
-              likeRes.ok ? likeRes.json() as Promise<{ data?: Record<string, boolean> }> : null,
-              saveRes.ok ? saveRes.json() as Promise<{ data?: { active?: boolean } }> : null,
-            ]);
-            setInitialLiked(Boolean(likeBody?.data?.[pid]));
-            setInitialSaved(Boolean(saveBody?.data?.active));
-          }).catch(() => undefined);
-        }
       });
-  }, [postId, isAuthenticated]);
-
-  useEffect(() => {
-    if (!post?.community_id) {
-      setCommunityAdminId(null);
-      return;
-    }
-
-    void fetch(`${BASE_URL}/communities/${post.community_id}`, { credentials: 'include' })
-      .then((response) => response.ok ? response.json() : null)
-      .then((body: { data?: { admin_id?: string | null } } | null) => setCommunityAdminId(body?.data?.admin_id ?? null))
-      .catch(() => setCommunityAdminId(null));
-  }, [post?.community_id]);
+  }, [postId]);
 
   const canManagePost = Boolean(post && isAuthenticated && (post.user_id === currentUser?.id || communityAdminId === currentUser?.id));
 

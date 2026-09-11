@@ -7,10 +7,11 @@ import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined';
 import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
 import type { User, UserSummary } from '../../types/api';
 import { displayName, userHandle } from '../../types/api';
 
-export default function ProfileDescription({ user, onEdit, isOwner = true, onFollow, onReport, isFollowing = false }: { user: User; onEdit?: () => void; isOwner?: boolean; onFollow?: () => void; onReport?: () => void; isFollowing?: boolean }) {
+export default function ProfileDescription({ user, onEdit, isOwner = true, onFollow, onReport, isFollowing = false, isFollowLoading = false }: { user: User; onEdit?: () => void; isOwner?: boolean; onFollow?: () => void; onReport?: () => void; isFollowing?: boolean; isFollowLoading?: boolean }) {
     return (
         <Box
             sx={{
@@ -93,7 +94,14 @@ export default function ProfileDescription({ user, onEdit, isOwner = true, onFol
                         ) : (
                             <>
                                 {onFollow && (
-                                    <Button variant={isFollowing ? 'outlined' : 'contained'} onClick={onFollow} sx={{ textTransform: 'none', borderRadius: 2 }}>{isFollowing ? 'Following' : 'Follow'}</Button>
+                                    <Button 
+                                        variant={isFollowing ? 'outlined' : 'contained'} 
+                                        onClick={onFollow} 
+                                        disabled={isFollowLoading}
+                                        sx={{ textTransform: 'none', borderRadius: 2 }}
+                                    >
+                                        {isFollowLoading ? <CircularProgress size={20} /> : (isFollowing ? 'Following' : 'Follow')}
+                                    </Button>
                                 )}
                                 {onReport && (
                                     <IconButton aria-label="Report profile" onClick={onReport} sx={{ color: 'error.light' }}><FlagOutlinedIcon /></IconButton>

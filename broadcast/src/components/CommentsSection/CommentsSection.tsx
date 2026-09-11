@@ -12,6 +12,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import FetchErrorDialog from '../FetchErrorDialog';
 import { BASE_URL } from '../../config';
+import { useQueryClient } from '@tanstack/react-query';
+import { seedCommentLikeStatuses } from '../../queries/likes';
+import { useCreateComment } from '../../queries/comments';
 
 interface CommentsSectionProps {
   comments?: ApiComment[];
@@ -27,6 +30,7 @@ const EMPTY_COMMENTS: ApiComment[] = [];
 export default function CommentsSection({ comments = EMPTY_COMMENTS, postId, commentCount, communityAdminId = null }: CommentsSectionProps) {
   const navigate = useNavigate();
   const { isAuthenticated, currentUser } = useAuth();
+  const queryClient = useQueryClient();
   const [commentText, setCommentText] = useState('');
   const [commentError, setCommentError] = useState('');
   const [loadedReplies, setLoadedReplies] = useState<Record<string, ApiComment[]>>({});
@@ -37,6 +41,8 @@ export default function CommentsSection({ comments = EMPTY_COMMENTS, postId, com
   const [loadingComments, setLoadingComments] = useState(false);
   const [hasFetchError, setHasFetchError] = useState(false);
   const [commentLikeStatuses, setCommentLikeStatuses] = useState<RelationStatusMap>({});
+  
+  const createComment = useCreateComment();
 
   const loadComments = useCallback(async (nextCursor?: string | null) => {
     if (!postId) return;
@@ -57,7 +63,13 @@ export default function CommentsSection({ comments = EMPTY_COMMENTS, postId, com
           body: JSON.stringify({ ids: page.map((c) => c.id) }),
           credentials: 'include',
         }).then(async (r) => r.ok ? await r.json() as { data?: RelationStatusMap } : null)
-          .then((statusBody) => { if (statusBody?.data) setCommentLikeStatuses((current) => ({ ...current, ...statusBody.data })); })
+          .then((statusBody) => {
+            if (statusBody?.data) {
+              setCommentLikeStatuses((current) => ({ ...current, ...statusBody.data }));
+              // Seed individual cache entries
+              seedCommentLikeStatuses(queryClient, statusBody.data);
+            }
+          })
           .catch(() => undefined);
       }
     } catch {
@@ -65,7 +77,7 @@ export default function CommentsSection({ comments = EMPTY_COMMENTS, postId, com
     } finally {
       setLoadingComments(false);
     }
-  }, [postId]);
+  }, [postId, isAuthenticated, queryClient]);
 
   useEffect(() => {
     setVisibleComments(comments);
@@ -105,15 +117,8 @@ export default function CommentsSection({ comments = EMPTY_COMMENTS, postId, com
     setCommentError('');
     if (!postId) return;
     try {
-      const response = await fetch(`${BASE_URL}/posts/${postId}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: commentText.trim() }),
-        credentials: 'include',
-      });
-      const body = await response.json() as { data?: ApiComment; message?: string };
-      if (!response.ok || !body.data) throw new Error(body.message ?? 'Unable to post comment.');
-      setVisibleComments((current) => [...current, body.data!]);
+      const newComment = await createComment.mutateAsync({ postId, content: commentText.trim() });
+      setVisibleComments((current) => [...current, newComment]);
       setCommentText('');
     } catch (error) {
       setCommentError(error instanceof Error ? error.message : 'Unable to post comment.');
@@ -217,6 +222,7 @@ export default function CommentsSection({ comments = EMPTY_COMMENTS, postId, com
               size="small"
               variant="contained"
               onClick={handleSubmitComment}
+              disabled={createComment.isPending}
               sx={{
                 background: 'linear-gradient(135deg, #b388ff 0%, #7c4dff 100%)',
                 color: '#fff',

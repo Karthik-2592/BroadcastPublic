@@ -15,7 +15,6 @@ export interface UserSummary {
   profile_name?: string;
   /** URL to the profile picture; null / undefined means no picture uploaded. */
   profile_picture?: string | null;
-  avatarColor?: string;
   post_count?: number;
   community_count?: number;
   joined_at?: string;
@@ -27,14 +26,12 @@ export interface UserSummary {
 export interface User {
   id: Id;
   username: string;
-  email: string;
   interests: string[];
   profile_name?: string;
   profile_picture?: MediaMetadata | null;
   profile_description?: string;
   follower_count: number;
   following_count: number;
-  avatarColor?: string;
   post_count?: number;
   community_count?: number;
   joined_at?: string;
@@ -88,22 +85,13 @@ export interface Community {
   admin_id: Id | null;
   tags: string[];
   community_guidelines?: string;
-  /** URL to the community banner image; null / undefined means no banner uploaded. */
   community_banner?: MediaMetadata | null;
   isMember: boolean;
-  /**
-   * UI-only: CSS gradient string shown as a fallback when community_banner is absent.
-   * Communities keep this field since branded gradients are part of their visual identity.
-   */
   bannerGradient?: string;
   /** Total number of members. */
   population: number;
   post_count: number;
   timestamp: string;
-  /** UI-only explore-page badge. */
-  badge?: 'Trending' | 'New';
-  /** UI-only explore-page join state. */
-  joinState?: 'join' | 'joined';
   recommendationReason?: string;
 }
 
@@ -240,17 +228,17 @@ export function formatCount(n: number): string {
 }
 
 /**
- * Returns the display name for a UserSummary, preferring profile_name.
+ * Returns the display name for a UserSummary or User, preferring profile_name.
  */
-export function displayName(user: UserSummary | null | undefined): string {
+export function displayName(user: UserSummary | User | null | undefined): string {
   if (!user) return 'Unknown';
   return user.profile_name ?? user.username;
 }
 
 /**
- * Returns the @handle string for a UserSummary.
+ * Returns the @handle string for a UserSummary or User.
  */
-export function userHandle(user: UserSummary | null | undefined): string {
+export function userHandle(user: UserSummary | User | null | undefined): string {
   if (!user) return '@unknown';
   return `@${user.username}`;
 }

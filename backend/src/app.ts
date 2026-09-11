@@ -18,6 +18,7 @@ import { uploadProfilePicture } from "./handlers/usersController.ts";
 import { uploadBanner } from "./handlers/communitiesController.ts";
 import { requireSession } from "./session.ts";
 import feed from "./handlers/feedController.ts";
+import { neo4jRelations } from "./neo4j.ts";
 
 export function createApp(): Express {
   const app = express();
@@ -39,11 +40,16 @@ export function createApp(): Express {
     } catch (error) {
       console.log("[mongo] health check failed", error);
     }
+    try {
+      connected = await neo4jRelations.ping();
+    } catch (error) {
+      console.log("[neo4j] health check failed", error);
+    }
     return res.status(connected ? 200 : 503).json({
       success: connected,
       message: connected
-        ? "Broadcast API and MongoDB are running."
-        : "MongoDB is unavailable.",
+        ? "Broadcast API, MongoDB and Neo4j are running."
+        : "One or more databases are unavailable.",
       data: { database: connected ? "connected" : "unavailable" },
     });
   });

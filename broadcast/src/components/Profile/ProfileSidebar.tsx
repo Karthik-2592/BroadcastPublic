@@ -9,13 +9,17 @@ import TableRow from '@mui/material/TableRow';
 import Divider from '@mui/material/Divider';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
-import type { User, UserSummary } from '../../types/api';
+import type { User, MediaMetadata } from '../../types/api';
 import { displayName, formatCount, userHandle } from '../../types/api';
+
+const getProfilePictureUrl = (profilePicture: MediaMetadata | null | undefined): string | undefined => {
+  return profilePicture?.media_url;
+};
 
 interface ProfileSidebarProps {
   user: User;
-  followers: UserSummary[];
-  following: UserSummary[];
+  followers: User[];
+  following: User[];
   showViewAll?: boolean;
   onViewFollowers?: () => void;
   onViewFollowing?: () => void;
@@ -25,7 +29,6 @@ export default function ProfileSidebar({ user, followers, following, showViewAll
   const followerCount = Number.isFinite(user.follower_count) ? user.follower_count : 0;
   const followingCount = Number.isFinite(user.following_count) ? user.following_count : 0;
   const joinedDate = user.joined_at ? new Date(user.joined_at).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }) : '—';
-
   return (
     <Box sx={{ position: 'sticky', top: 96, display: 'flex', flexDirection: 'column', gap: 3, width: '280px', minWidth: '280px' }}>
       <Card
@@ -95,7 +98,7 @@ export default function ProfileSidebar({ user, followers, following, showViewAll
                     '&:hover': { bgcolor: '#292935' } // hover:bg-surface-container-high
                   }}
                 >
-                  <Avatar src={follower.profile_picture ?? undefined} sx={{ width: 32, height: 32, bgcolor: '#343440' }}>{displayName(follower).charAt(0)}</Avatar>
+                  <Avatar src={getProfilePictureUrl(follower.profile_picture)} sx={{ width: 32, height: 32, bgcolor: '#343440' }}>{displayName(follower).charAt(0)}</Avatar>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography variant="body2" sx={{ color: '#e3e0f1', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {displayName(follower)}
@@ -138,7 +141,7 @@ export default function ProfileSidebar({ user, followers, following, showViewAll
                     '&:hover': { bgcolor: '#292935' }
                   }}
                 >
-                  <Avatar src={followed.profile_picture ?? undefined} sx={{ width: 32, height: 32, bgcolor: '#343440' }}>{displayName(followed).charAt(0)}</Avatar>
+                  <Avatar src={getProfilePictureUrl(followed.profile_picture)} sx={{ width: 32, height: 32, bgcolor: '#343440' }}>{displayName(followed).charAt(0)}</Avatar>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography variant="body2" sx={{ color: '#e3e0f1', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {displayName(followed)}

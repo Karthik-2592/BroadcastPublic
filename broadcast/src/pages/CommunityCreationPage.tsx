@@ -14,6 +14,7 @@ import CommunityTagSelector from '../components/Community/CommunityTagSelector';
 import type { Tag } from '../types/api';
 import { useNavigate } from 'react-router-dom';
 import { BASE_URL } from '../config';
+import { useCreateCommunity } from '../queries/communities';
 
 const NAME_MAX = 50;
 const DESC_MAX = 200;
@@ -33,6 +34,8 @@ export default function CommunityCreationPage() {
   const [descError, setDescError] = useState('');
   const [guidelinesError, setGuidelinesError] = useState('');
   const [bannerError, setBannerError] = useState('');
+  
+  const createCommunity = useCreateCommunity();
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -76,26 +79,18 @@ export default function CommunityCreationPage() {
 
     if (!valid) return;
     try {
-      const response = await fetch(`${BASE_URL}/communities`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          community_name: name,
-          community_desc: description,
-          community_guidelines: guidelines,
-          tags,
-        }),
-        credentials: 'include',
+      const createdCommunity = await createCommunity.mutateAsync({
+        communityName: name,
+        communityDesc: description,
+        communityGuidelines: guidelines,
+        tags: tags as string[],
       });
-      const body = await response.json() as { data?: { id?: string }; message?: string };
-      if (!response.ok || !body.data?.id) {
-        if (response.status === 409) setNameError('A community with this name already exists.');
-        throw new Error(body.message ?? 'Failed to create community.');
-      }
+      
+      // Handle banner upload separately (FormData special case)
       if (communityBanner) {
         const form = new FormData();
         form.append('media', communityBanner);
-        const upload = await fetch(`${BASE_URL}/communities/${body.data.id}/banner`, {
+        const upload = await fetch(`${BASE_URL}/communities/${createdCommunity.id}/banner`, {
           method: 'POST',
           body: form,
           credentials: 'include',
@@ -105,7 +100,8 @@ export default function CommunityCreationPage() {
           throw new Error('Community banner upload failed.');
         }
       }
-      navigate(`/community/${body.data.id}`);
+      
+      navigate(`/community/${createdCommunity.id}`);
     } catch (e) {
       console.error(e);
       // Optional: Handle error via state
@@ -415,8 +411,8 @@ export default function CommunityCreationPage() {
 
         {/* Action Bar */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', mt: 4 }}>
-          <Button variant="contained" color="primary" size="large" endIcon={<ArrowForwardIcon />} onClick={handleCreate}>
-            Create Community
+          <Button variant="contained" color="primary" size="large" endIcon={<ArrowForwardIcon />} onClick={handleCreate} disabled={createCommunity.isPending}>
+            {createCommunity.isPending ? 'Creating...' : 'Create Community'}
           </Button>
         </Box>
 

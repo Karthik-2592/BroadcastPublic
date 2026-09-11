@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { BASE_URL } from '../../config';
 import type { Comment as ApiComment } from '../../types/api';
+import { useCreateReply } from '../../queries/comments';
 
 const REPLY_MAX = 200;
 
@@ -35,6 +36,7 @@ export default function Reply({ open, onClose, parentCommentId, postId, onSubmit
   const { isAuthenticated, currentUser } = useAuth();
   const [replyText, setReplyText] = useState('');
   const [replyError, setReplyError] = useState('');
+  const createReply = useCreateReply();
 
   const handleSubmitReply = async () => {
     if (!isAuthenticated) {
@@ -50,15 +52,8 @@ export default function Reply({ open, onClose, parentCommentId, postId, onSubmit
     if (!postId || !parentCommentId) return;
     onSubmitting?.();
     try {
-      const response = await fetch(`${BASE_URL}/posts/${postId}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: replyText.trim(), root: parentCommentId }),
-        credentials: 'include',
-      });
-      const body = await response.json() as { data?: ApiComment; message?: string };
-      if (!response.ok || !body.data) throw new Error(body.message ?? 'Unable to post reply.');
-      onSubmitted?.(body.data);
+      const newReply = await createReply.mutateAsync({ postId, content: replyText.trim(), root: parentCommentId });
+      onSubmitted?.(newReply);
       setReplyText('');
       onClose?.();
     } catch (error) {
@@ -192,6 +187,7 @@ export default function Reply({ open, onClose, parentCommentId, postId, onSubmit
                   size="small"
                   variant="contained"
                   onClick={handleSubmitReply}
+                  disabled={createReply.isPending}
                   sx={{
                     background: 'linear-gradient(135deg, #b388ff 0%, #7c4dff 100%)',
                     color: '#fff',

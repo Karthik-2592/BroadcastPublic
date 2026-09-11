@@ -182,7 +182,7 @@ router.get("/:id/following", listRelatedUsers);
 router.get("/:id/follows/status", requireSession, followStatus);
 router.get("/:id", getUser);
 router.put("/:id", requireSession, updateUser);
+router.delete("/follows", requireSession, follow);
 router.delete("/:id", requireSession, deleteUser);
 router.post("/follows", requireSession, follow);
-router.delete("/follows", requireSession, follow);
 export default router;

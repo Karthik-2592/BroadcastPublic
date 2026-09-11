@@ -311,9 +311,9 @@ export default function TopBar() {
 
           {/* Account controls */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <IconButton size="small" sx={{ color: 'text.secondary' }}>
+            {isAuthenticated && <IconButton size="small" sx={{ color: 'text.secondary' }}>
               <NotificationsNoneOutlinedIcon fontSize="small" />
-            </IconButton>
+            </IconButton>}
 
             {!isAuthenticated && <Button
               variant="outlined"

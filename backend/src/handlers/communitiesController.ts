@@ -148,7 +148,7 @@ export async function moderate(req: Request, res: Response): Promise<Response> {
     !(await store.user(body.user_id!)) ||
     !community
   )
-    return fail(res, 404, "User or community not found.");
+    return fail(res, 404, "User or community not found. 6");
   if (community.admin_id !== adminId)
     return fail(res, 403, "Only the community admin may manage moderators.");
   const enabled = req.method === "POST";
@@ -175,11 +175,12 @@ export async function membership(
   const missing = required(body, ["community_id"]);
   if (missing.length)
     return fail(res, 400, `Missing required fields: ${missing.join(", ")}`);
+  console.log("delete", req.method, body.community_id, userId)
   if (
     !(await store.user(userId)) ||
     !(await store.community(body.community_id!))
   )
-    return fail(res, 404, "User or community not found.");
+    return fail(res, 404, "User or community not found. 7");
   const enabled = req.method === "POST";
   const changed = numberValue(
     await neo4jRelations.membership(userId, body.community_id!, enabled),
@@ -190,11 +191,6 @@ export async function membership(
       enabled ? 1 : -1,
     );
   return ok(res, { active: enabled, changed: Boolean(changed) });
-}
-export async function membershipStatus(req: Request, res: Response) {
-  const userId = sessionUserId(req);
-  if (!(await store.community(id(req)))) return fail(res, 404, "Community not found.");
-  return ok(res, { active: await neo4jRelations.isMember(userId, id(req)) });
 }
 export async function memberships(req: Request, res: Response) {
   const userId = sessionUserId(req);
@@ -209,12 +205,12 @@ r.get("/recommendations/:userId", personalizedRecommendations);
 r.get("/memberships", requireSession, memberships);
 r.post("/", requireSession, create);
 r.get("/:id/posts", posts);
-r.get("/:id/memberships/status", requireSession, membershipStatus);
 r.get("/:id", get);
 r.put("/:id", requireSession, update);
-r.delete("/:id", requireSession, remove);
 r.post("/moderators", requireSession, moderate);
 r.delete("/moderators", requireSession, moderate);
 r.post("/memberships", requireSession, membership);
 r.delete("/memberships", requireSession, membership);
+r.delete("/:id", requireSession, remove);
+
 export default r;

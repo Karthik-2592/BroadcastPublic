@@ -13,6 +13,7 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import AttachFileRoundedIcon from '@mui/icons-material/AttachFileRounded';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import { BASE_URL } from '../config';
+import { useCreatePost } from '../queries/posts';
 
 export default function PostSubmissionPage() {
   const [title, setTitle] = useState('');
@@ -29,48 +30,42 @@ export default function PostSubmissionPage() {
   const [tagError, setTagError] = useState(false);
 
   const [searchParams] = useSearchParams();
-  const [communityInput, setCommunityInput] = useState(searchParams.get('community') ?? '');
+  const [communityInput, setCommunityInput] = useState(searchParams.get('community') ?? 'Global');
 
   const [attachments, setAttachments] = useState<File[]>([]);
   const [attachmentError, setAttachmentError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const navigate = useNavigate();
+  const createPost = useCreatePost();
 
   const debouncedPostSubmitApi = useCallback(
     debounce(async (postData: { title: string, body: string, tags: string[], community: string, attachments: File[] }) => {
       try {
-        const response = await fetch(`${BASE_URL}/posts`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: postData.title,
-            content: postData.body,
-            tags: postData.tags,
-            community_name: postData.community || null,
-          }),
-          credentials: 'include',
+        const createdPost = await createPost.mutateAsync({
+          title: postData.title,
+          content: postData.body,
+          tags: postData.tags,
+          communityName: postData.community || null,
         });
-        const body = await response.json() as { data?: { id?: string }; message?: string };
-        if (!response.ok || !body.data?.id) throw new Error(body.message ?? 'Failed to create post.');
-        
-        // Handle media upload if any
+
+        // Handle media upload if any (FormData special case)
         if (postData.attachments.length > 0) {
           const form = new FormData();
           postData.attachments.forEach((file) => form.append('media', file));
-          const upload = await fetch(`${BASE_URL}/posts/${body.data.id}/media`, { method: 'POST', body: form, credentials: 'include' });
+          const upload = await fetch(`${BASE_URL}/posts/${createdPost.id}/media`, { method: 'POST', body: form, credentials: 'include' });
           if (!upload.ok) {
             if (upload.status === 413) setAttachmentError('Each image must be 2 MB or smaller.');
             throw new Error('Post media upload failed.');
           }
         }
 
-        navigate(`/post/${body.data.id}`);
+        navigate(`/post/${createdPost.id}`);
       } catch (e) {
         console.error(e);
       }
     }, 1000),
-    [navigate]
+    [navigate, createPost]
   );
 
   const handleTagsProcess = () => {
@@ -481,6 +476,7 @@ export default function PostSubmissionPage() {
             variant="contained"
             startIcon={<SendRoundedIcon />}
             onClick={handleSubmit}
+            disabled={createPost.isPending}
             sx={{
               background: 'linear-gradient(135deg, #b388ff 0%, #7c4dff 100%)',
               color: '#ffffff',
@@ -500,7 +496,7 @@ export default function PostSubmissionPage() {
           >
             <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5 }}>
               <Box sx={{ width: '1px', height: 16, bgcolor: 'rgba(255,255,255,0.25)' }} />
-              Post
+              {createPost.isPending ? 'Posting...' : 'Post'}
             </Box>
           </Button>
         </Box>

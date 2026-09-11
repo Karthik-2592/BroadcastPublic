@@ -53,7 +53,16 @@ export class Neo4jRelations {
       await session.close();
     }
   }
-
+  async ping() {
+    const session = this.session();
+    try {
+      await session.run("RETURN 1");
+      console.log("[neo4j] ping: success")
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
   async communityRecommendationsGrouped(userId: string, limit = 8): Promise<[string[], string[], string[]]> {
     const session = this.session();
     try {

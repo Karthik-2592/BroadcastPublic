@@ -24,7 +24,8 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import Reply, { EditedIndicator } from '../Reply/Reply';
 import type { Comment as ApiComment } from '../../types/api';
 import { useAuth } from '../../context/AuthContext';
-import { BASE_URL } from '../../config';
+import { useToggleCommentLike } from '../../queries/comments';
+import { useUpdateComment, useDeleteComment } from '../../queries/comments';
 
 interface CommentProps {
   comment: ApiComment;
@@ -47,6 +48,8 @@ function CommentEditDialog({ comment, open, onClose }: { comment: ApiComment; op
   const [commentText, setCommentText] = useState(comment.content);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const COMMENT_MAX = 200;
+  const updateComment = useUpdateComment();
+  const deleteComment = useDeleteComment();
 
   useEffect(() => {
     if (open) setCommentText(comment.content);
@@ -54,19 +57,22 @@ function CommentEditDialog({ comment, open, onClose }: { comment: ApiComment; op
 
   const handleEdit = async () => {
     if (!commentText.trim() || commentText.length > COMMENT_MAX) return;
-    await fetch(`${BASE_URL}/comments/${comment.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: commentText }),
-      credentials: 'include',
-    }).catch(() => undefined);
-    onClose();
+    try {
+      await updateComment.mutateAsync({ commentId: comment.id, content: commentText });
+      onClose();
+    } catch (error) {
+      console.error('Failed to update comment:', error);
+    }
   };
 
   const handleDelete = async () => {
-    await fetch(`${BASE_URL}/comments/${comment.id}`, { method: 'DELETE', credentials: 'include' }).catch(() => undefined);
-    setIsDeleteOpen(false);
-    onClose();
+    try {
+      await deleteComment.mutateAsync(comment.id);
+      setIsDeleteOpen(false);
+      onClose();
+    } catch (error) {
+      console.error('Failed to delete comment:', error);
+    }
   };
 
   return (
@@ -95,10 +101,10 @@ function CommentEditDialog({ comment, open, onClose }: { comment: ApiComment; op
               </Box>
               <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', my: 1.5 }} />
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Button color="error" variant="outlined" size="small" onClick={() => setIsDeleteOpen(true)}>Delete</Button>
+                <Button color="error" variant="outlined" size="small" onClick={() => setIsDeleteOpen(true)} disabled={deleteComment.isPending}>Delete</Button>
                 <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Button size="small" onClick={onClose} sx={{ color: 'text.secondary' }}>Cancel</Button>
-                  <Button size="small" variant="contained" onClick={handleEdit}>Edit</Button>
+                  <Button size="small" onClick={onClose} sx={{ color: 'text.secondary' }} disabled={updateComment.isPending || deleteComment.isPending}>Cancel</Button>
+                  <Button size="small" variant="contained" onClick={handleEdit} disabled={updateComment.isPending}>Edit</Button>
                 </Box>
               </Box>
             </Box>
@@ -126,6 +132,7 @@ export default function Comment({ comment, depth = 0, canEdit = false, community
   const [repliesOpen, setRepliesOpen] = useState(false);
   const [optionsAnchor, setOptionsAnchor] = useState<null | HTMLElement>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const toggleCommentLike = useToggleCommentLike();
 
   const [isLiked, setIsLiked] = useState(initialLiked ?? comment.isLiked ?? false);
   const [likeCount, setLikeCount] = useState(comment.favorite_count);
@@ -167,12 +174,12 @@ export default function Comment({ comment, depth = 0, canEdit = false, community
     const next = !isLiked;
     setIsLiked(next);
     setLikeCount((current) => current + (next ? 1 : -1));
-    void fetch(`${BASE_URL}/posts/${comment.post_id}/comments/likes`, { method: next ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ post_id: comment.post_id, comment_id: comment.id }), credentials: 'include' })
-      .then((response) => { if (!response.ok) throw new Error('Unable to update like'); })
-      .catch(() => {
+    toggleCommentLike.mutate({ postId: comment.post_id, commentId: comment.id, liked: next }, {
+      onError: () => {
         setIsLiked(next === false);
         setLikeCount((current) => current - (next ? 1 : -1));
-      });
+      },
+    });
   };
 
   const handleToggleReplies = async () => {
@@ -197,7 +204,7 @@ export default function Comment({ comment, depth = 0, canEdit = false, community
             sx={{
               width: avatarSize,
               height: avatarSize,
-              bgcolor: author?.avatarColor ?? '#7c4dff',
+              bgcolor: '#7c4dff',
               fontSize: isNested ? '0.95rem' : '1.2rem',
               fontWeight: 600,
               border: isNested ? '2px solid rgba(179, 136, 255, 0.3)' : 'none',

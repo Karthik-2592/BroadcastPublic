@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import List from '@mui/material/List';
@@ -15,8 +14,8 @@ import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import { useAuth } from '../../context/AuthContext';
 import { displayName, userHandle } from '../../types/api';
-import type { Community, UserSummary } from '../../types/api';
-import { BASE_URL } from '../../config';
+import type { UserSummary } from '../../types/api';
+import { useMyMemberships } from '../../queries/communities';
 
 // Navigation items corresponding to the wireframe's sidebar tabs
 const navItems = [
@@ -29,27 +28,8 @@ export default function LeftSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser, isAuthenticated } = useAuth();
-  const [communities, setCommunities] = useState<Community[]>([]);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setCommunities([]);
-      return;
-    }
-
-    let active = true;
-    void fetch(`${BASE_URL}/communities/memberships`, { credentials: 'include' })
-      .then((response) => response.ok ? response.json() : null)
-      .then((body: { data?: Community[] } | null) => {
-        if (!active) return;
-        setCommunities(Array.isArray(body?.data) ? body.data : []);
-      })
-      .catch(() => {
-        if (active) setCommunities([]);
-      });
-
-    return () => { active = false; };
-  }, [isAuthenticated, currentUser?.id]);
+  const { data: communities = [] } = useMyMemberships(isAuthenticated);
 
   return (
     <Box
@@ -133,10 +113,12 @@ export default function LeftSidebar() {
         {communities.map((community) => (
           <ListItemButton
             key={community.id}
-            sx={{ py: 0.8, 
-              px: 2.2, 
+            sx={{
+              py: 0.8,
+              px: 2.2,
               my: 1,
-              bgcolor: '#1a1a2e' }}
+              bgcolor: '#1a1a2e'
+            }}
             onClick={() => navigate('/community/' + community.id)}
           >
             <ListItemText
@@ -173,15 +155,25 @@ export default function LeftSidebar() {
         }}
         onClick={() => navigate(isAuthenticated && currentUser ? `/profile/${currentUser.id}` : '/login')}
       >
-        <Avatar sx={{ width: 32, height: 32, bgcolor: '#7c4dff', fontSize: '0.85rem' }}>
-          {currentUser ? displayName(currentUser as UserSummary).charAt(0).toUpperCase() : 'G'}
+        <Avatar
+          src={currentUser?.profile_picture?.media_url ?? undefined}
+          sx={{
+            width: 48,
+            height: 48,
+            bgcolor: '#7c4dff',
+            fontWeight: 700,
+            fontSize: '1.2rem',
+            border: '2px solid rgba(255,255,255,0.1)',
+          }}
+        >
+          {(currentUser?.profile_name ?? '').charAt(0)}
         </Avatar>
         <Box>
           <Typography variant="subtitle2" sx={{ color: 'text.primary', fontSize: '0.85rem', fontWeight: 500 }}>
-            {isAuthenticated && currentUser ? displayName(currentUser as UserSummary) : 'Join Broadcast'}
+            {isAuthenticated && currentUser ? displayName(currentUser as unknown as UserSummary) : 'Join Broadcast'}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            {isAuthenticated && currentUser ? userHandle(currentUser as UserSummary) : 'Sign in to get started'}
+            {isAuthenticated && currentUser ? userHandle(currentUser as unknown as UserSummary) : 'Sign in to get started'}
           </Typography>
         </Box>
       </Box>

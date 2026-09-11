@@ -5,60 +5,71 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import PostCard from '../PostCard/PostCard';
-import type { Post, RelationStatusMap } from '../../types/api';
+import type { RelationStatusMap } from '../../types/api';
 import UserRecommendations from './UserRecommendations';
 import { BASE_URL } from '../../config';
 import { useAuth } from '../../context/AuthContext';
+import { useInfiniteFeed } from '../../queries/posts';
+import { useQueryClient } from '@tanstack/react-query';
+import { seedPostLikeStatuses } from '../../queries/likes';
 
 export default function Feed({ endpoint = '/feed' }: { endpoint?: string }) {
   const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   const [showRecommendations] = useState(true);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [likeStatuses, setLikeStatuses] = useState<RelationStatusMap>({});
 
-  const fetchLikeStatuses = useCallback(async (ids: string[]) => {
-    if (!isAuthenticated || !ids.length) return;
-    try {
-      const response = await fetch(`${BASE_URL}/posts/likes/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids }),
-        credentials: 'include',
-      });
-      if (response.ok) {
-        const body = await response.json() as { data?: RelationStatusMap };
-        if (body.data) setLikeStatuses((current) => ({ ...current, ...body.data }));
-      }
-    } catch { /* non-critical, falls back to false */ }
-  }, [isAuthenticated]);
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = useInfiniteFeed(endpoint);
 
-  const loadPosts = useCallback(async (nextCursor?: string | null) => {
-    setLoading(true);
-    try {
-      const query = nextCursor ? `?cursor=${encodeURIComponent(nextCursor)}` : '';
-      const response = await fetch(`${BASE_URL}${endpoint}${query}`, { credentials: 'include' });
-      if (response.ok) {
-        const body = await response.json() as { data?: Post[]; cursor?: string };
-        const page = Array.isArray(body.data) ? body.data : [];
-        setPosts((current) => nextCursor ? [...current, ...page] : page);
-        setCursor(body.cursor === 'null' ? null : body.cursor ?? null);
-        void fetchLikeStatuses(page.map((p) => p.id));
-      } else if (!nextCursor) setPosts([]);
-    } catch {
-      if (!nextCursor) setPosts([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [endpoint, fetchLikeStatuses]);
+  const posts = useMemo(() => {
+    return data?.pages.flatMap((page) => page.posts) ?? [];
+  }, [data]);
 
-  useEffect(() => { void loadPosts(); }, [loadPosts]);
+  const fetchedLikeIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!isAuthenticated || !posts.length) return;
+    const newIds = posts.map((p) => p.id).filter((id) => !fetchedLikeIds.current.has(id));
+    if (!newIds.length) return;
+    newIds.forEach((id) => fetchedLikeIds.current.add(id));
+
+    void fetch(`${BASE_URL}/posts/likes/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: newIds }),
+      credentials: 'include',
+    })
+      .then(async (response) => {
+        if (response.ok) {
+          const body = (await response.json()) as { data?: RelationStatusMap };
+          if (body.data) {
+            setLikeStatuses((current) => ({ ...current, ...body.data }));
+            // Seed per-post cache entries so PostViewPage gets instant hits
+            seedPostLikeStatuses(queryClient, body.data);
+          }
+        }
+      })
+      .catch(() => undefined);
+  }, [isAuthenticated, posts, queryClient]);
 
   const firstPosts = posts.slice(0, 8);
   const remainingPosts = posts.slice(8);
+
+  if (isLoading) {
+    return (
+      <Box sx={{ width: '100%', maxWidth: 720, py: 8, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -85,9 +96,15 @@ export default function Feed({ endpoint = '/feed' }: { endpoint?: string }) {
           {remainingPosts.map((post) => (
             <PostCard key={post.id} post={post} initialLiked={likeStatuses[post.id]} />
           ))}
-          {cursor && <Button variant="outlined" onClick={() => void loadPosts(cursor)} disabled={loading}>
-            {loading ? <CircularProgress size={18} /> : 'Load more posts'}
-          </Button>}
+          {hasNextPage && (
+            <Button
+              variant="outlined"
+              onClick={() => void fetchNextPage()}
+              disabled={isFetchingNextPage}
+            >
+              {isFetchingNextPage ? <CircularProgress size={18} /> : 'Load more posts'}
+            </Button>
+          )}
         </>
       )}
     </Box>

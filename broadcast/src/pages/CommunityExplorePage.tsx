@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -10,40 +10,66 @@ import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
 import CircularProgress from '@mui/material/CircularProgress';
 import type { Community } from '../types/api';
 import { BASE_URL } from '../config';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  useRecommendedCommunities,
+  communityQueryKey,
+  recommendedCommunitiesQueryKey,
+  myMembershipsQueryKey,
+} from '../queries/communities';
 
 export default function CommunityExplorePage() {
   const navigate = useNavigate();
-  const [communities, setCommunities] = useState<Community[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
 
-  const loadCommunities = useCallback(async (nextCursor?: string | null) => {
-    setLoading(true);
-    try {
-      const query = nextCursor ? `?cursor=${encodeURIComponent(nextCursor)}` : '';
-      const response = await fetch(`${BASE_URL}/communities/recommendations${query}`, { credentials: 'include' });
-      if (!response.ok) throw new Error('Unable to load communities');
-      const body = await response.json() as { data?: Community[]; cursor?: string };
-      const page = Array.isArray(body.data) ? body.data : [];
-      setCommunities((current) => nextCursor ? [...current, ...page] : page);
-      setCursor(body.cursor === 'null' ? null : body.cursor ?? null);
-    } catch {
-      setCommunities((current) => nextCursor ? current : []);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useRecommendedCommunities();
 
-  useEffect(() => { void loadCommunities(); }, [loadCommunities]);
+  const communities = useMemo(() => {
+    return data?.pages.flatMap((page) => page.communities) ?? [];
+  }, [data]);
 
   const handleToggleJoin = (e: React.MouseEvent, communityId: string) => {
     e.stopPropagation();
     const community = communities.find((item) => item.id === communityId);
     const nextState = !community?.isMember;
-    setCommunities((current) => current.map((item) => item.id === communityId ? { ...item, isMember: nextState } : item));
-    void fetch(`${BASE_URL}/communities/memberships`, { method: nextState ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ community_id: communityId }), credentials: 'include' })
-      .then((response) => { if (!response.ok) throw new Error('Unable to update membership'); })
-      .catch(() => setCommunities((current) => current.map((item) => item.id === communityId ? { ...item, isMember: !nextState } : item)));
+
+    // Optimistically update the recommendations cache
+    queryClient.setQueryData(
+      recommendedCommunitiesQueryKey,
+      (old: { pages: Array<{ communities: Community[]; nextCursor: string | null }> } | undefined) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page) => ({
+            ...page,
+            communities: page.communities.map((c) =>
+              c.id === communityId ? { ...c, isMember: nextState } : c
+            ),
+          })),
+        };
+      }
+    );
+
+    void fetch(`${BASE_URL}/communities/memberships`, {
+      method: nextState ? 'POST' : 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ community_id: communityId }),
+      credentials: 'include',
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error('Unable to update membership');
+        void queryClient.invalidateQueries({ queryKey: communityQueryKey(communityId) });
+        // Keep sidebar in sync
+        void queryClient.invalidateQueries({ queryKey: myMembershipsQueryKey });
+      })
+      .catch(() => {
+        void queryClient.invalidateQueries({ queryKey: recommendedCommunitiesQueryKey });
+      });
   };
   return (
     <Box
@@ -237,8 +263,8 @@ export default function CommunityExplorePage() {
                 </Card>
               );
             })}
-            {cursor && <Button variant="outlined" onClick={() => void loadCommunities(cursor)} disabled={loading} sx={{ alignSelf: 'stretch' }}>
-              {loading ? <CircularProgress size={18} /> : 'Load more communities'}
+            {hasNextPage && <Button variant="outlined" onClick={() => void fetchNextPage()} disabled={isFetchingNextPage} sx={{ alignSelf: 'stretch' }}>
+              {isFetchingNextPage ? <CircularProgress size={18} /> : 'Load more communities'}
             </Button>}
           </Box>
         </Box>

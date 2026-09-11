@@ -33,7 +33,7 @@ import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import { BASE_URL } from '../config';
 
 const INTERESTS = [
-    "Art"
+  "Art"
   , "Business & Finance"
   , "Fashion & Beauty"
   , "Travelling"
@@ -156,6 +156,7 @@ function InterestsDialog({
               flexDirection: 'column',
               position: 'relative',
               overflow: 'hidden',
+              backgroundImage: 'none'
             },
           },
         }}

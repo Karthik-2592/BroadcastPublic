@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, type SyntheticEvent } from 'react';
+import { useEffect, useState, useCallback,  type SyntheticEvent } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Tabs from '@mui/material/Tabs';
@@ -10,6 +10,9 @@ import PostCard from '../PostCard/PostCard';
 import type { Comment as ApiComment, Post as ApiPost, RelationStatusMap } from '../../types/api';
 import CommentRow from '../Comment/Comment';
 import { useAuth } from '../../context/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { seedPostLikeStatuses, seedCommentLikeStatuses } from '../../queries/likes';
+import { useUserPosts, useUserComments, useUserSavedPosts } from '../../queries/users';
 import { BASE_URL } from '../../config';
 
 interface ProfileTabsProps {
@@ -17,47 +20,28 @@ interface ProfileTabsProps {
   sessionUserId?: string;
 }
 
-interface TabState<T> {
-  items: T[];
-  cursor: string | null;
-  hasLoaded: boolean;
-  loading: boolean;
-  loadingMore: boolean;
-  error: string | null;
-}
-
-const initialTabState = <T,>(): TabState<T> => ({
-  items: [],
-  cursor: null,
-  hasLoaded: false,
-  loading: false,
-  loadingMore: false,
-  error: null,
-});
-
 export default function ProfileTabs({ userId = 'user_1', sessionUserId = 'user_1' }: ProfileTabsProps) {
   const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   const isOwner = Boolean(isAuthenticated && userId && sessionUserId && userId === sessionUserId);
   const canViewPrivateTabs = isAuthenticated && isOwner;
 
   const [activeTab, setActiveTab] = useState(0);
 
-  const [postsState, setPostsState] = useState<TabState<ApiPost>>(initialTabState);
-  const [commentsState, setCommentsState] = useState<TabState<ApiComment>>(initialTabState);
-  const [savedState, setSavedState] = useState<TabState<ApiPost>>(initialTabState);
+  // TanStack Query hooks for user content
+  const postsQuery = useUserPosts(userId);
+  const commentsQuery = useUserComments(userId);
+  const savedPostsQuery = useUserSavedPosts(canViewPrivateTabs ? sessionUserId : null);
 
   const [postLikeStatuses, setPostLikeStatuses] = useState<RelationStatusMap>({});
   const [commentLikeStatuses, setCommentLikeStatuses] = useState<RelationStatusMap>({});
 
-  // Reset tab states when identity (userId or ownership) changes
+  // Reset tab when identity (userId or ownership) changes
   const identityKey = `${userId}:${sessionUserId}:${canViewPrivateTabs}`;
   const [lastIdentity, setLastIdentity] = useState(identityKey);
 
   if (lastIdentity !== identityKey) {
     setLastIdentity(identityKey);
-    setPostsState(initialTabState<ApiPost>());
-    setCommentsState(initialTabState<ApiComment>());
-    setSavedState(initialTabState<ApiPost>());
     setPostLikeStatuses({});
     setCommentLikeStatuses({});
     if (!canViewPrivateTabs && activeTab === 2) {
@@ -67,211 +51,86 @@ export default function ProfileTabs({ userId = 'user_1', sessionUserId = 'user_1
 
   const currentTab = activeTab === 2 && !canViewPrivateTabs ? 0 : activeTab;
 
-  const loadPosts = useCallback(
-    async (cursor?: string | null) => {
-      if (!userId) return;
-      const isInitial = !cursor;
-
-      setPostsState((prev) => ({
-        ...prev,
-        loading: isInitial,
-        loadingMore: !isInitial,
-        error: null,
-      }));
-
-      try {
-        const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
-        const response = await fetch(`${BASE_URL}/users/${userId}/posts${query}`, { credentials: 'include' });
-        if (!response.ok) throw new Error('Unable to load posts');
-        const body = (await response.json()) as { data?: ApiPost[]; cursor?: string };
-        const newPosts = Array.isArray(body.data) ? body.data : [];
-        const nextCursor = body.cursor === 'null' ? null : (body.cursor ?? null);
-
-        setPostsState((prev) => ({
-          ...prev,
-          items: isInitial ? newPosts : [...prev.items, ...newPosts],
-          cursor: nextCursor,
-          hasLoaded: true,
-          loading: false,
-          loadingMore: false,
-          error: null,
-        }));
-
-        if (isAuthenticated && newPosts.length > 0) {
-          void fetch(`${BASE_URL}/posts/likes/status`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: newPosts.map((p) => p.id) }),
-            credentials: 'include',
-          })
-            .then(async (r) => (r.ok ? ((await r.json()) as { data?: RelationStatusMap }) : null))
-            .then((b) => {
-              if (b?.data) {
-                setPostLikeStatuses((prev) => ({ ...prev, ...b.data }));
-              }
-            })
-            .catch(() => undefined);
+  // Helper functions to fetch like statuses for paginated data
+  const fetchPostLikeStatuses = useCallback(async (posts: ApiPost[]) => {
+    if (!isAuthenticated || posts.length === 0) return;
+    try {
+      const response = await fetch(`${BASE_URL}/posts/likes/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: posts.map((p) => p.id) }),
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const body = await response.json() as { data?: RelationStatusMap };
+        if (body.data) {
+          setPostLikeStatuses((prev) => ({ ...prev, ...body.data }));
+          seedPostLikeStatuses(queryClient, body.data);
         }
-      } catch (err) {
-        setPostsState((prev) => ({
-          ...prev,
-          loading: false,
-          loadingMore: false,
-          error: err instanceof Error ? err.message : 'Unable to load posts',
-        }));
       }
-    },
-    [userId, isAuthenticated],
-  );
-
-  const loadComments = useCallback(
-    async (cursor?: string | null) => {
-      if (!userId) return;
-      const isInitial = !cursor;
-
-      setCommentsState((prev) => ({
-        ...prev,
-        loading: isInitial,
-        loadingMore: !isInitial,
-        error: null,
-      }));
-
-      try {
-        const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
-        const response = await fetch(`${BASE_URL}/users/${userId}/comments${query}`, { credentials: 'include' });
-        if (!response.ok) throw new Error('Unable to load comments');
-        const body = (await response.json()) as { data?: ApiComment[]; cursor?: string };
-        const newComments = Array.isArray(body.data) ? body.data : [];
-        const nextCursor = body.cursor === 'null' ? null : (body.cursor ?? null);
-
-        setCommentsState((prev) => ({
-          ...prev,
-          items: isInitial ? newComments : [...prev.items, ...newComments],
-          cursor: nextCursor,
-          hasLoaded: true,
-          loading: false,
-          loadingMore: false,
-          error: null,
-        }));
-
-        if (isAuthenticated && newComments.length > 0) {
-          void fetch(`${BASE_URL}/comments/likes/status`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: newComments.map((c) => c.id) }),
-            credentials: 'include',
-          })
-            .then(async (r) => (r.ok ? ((await r.json()) as { data?: RelationStatusMap }) : null))
-            .then((b) => {
-              if (b?.data) {
-                setCommentLikeStatuses((prev) => ({ ...prev, ...b.data }));
-              }
-            })
-            .catch(() => undefined);
-        }
-      } catch (err) {
-        setCommentsState((prev) => ({
-          ...prev,
-          loading: false,
-          loadingMore: false,
-          error: err instanceof Error ? err.message : 'Unable to load comments',
-        }));
-      }
-    },
-    [userId, isAuthenticated],
-  );
-
-  const loadSavedPosts = useCallback(
-    async (cursor?: string | null) => {
-      if (!canViewPrivateTabs || !sessionUserId) return;
-      const isInitial = !cursor;
-
-      setSavedState((prev) => ({
-        ...prev,
-        loading: isInitial,
-        loadingMore: !isInitial,
-        error: null,
-      }));
-
-      try {
-        const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
-        const response = await fetch(`${BASE_URL}/users/${sessionUserId}/saved-posts${query}`, { credentials: 'include' });
-        if (!response.ok) throw new Error('Unable to load saved posts');
-        const body = (await response.json()) as { data?: ApiPost[]; cursor?: string };
-        const newSaved = Array.isArray(body.data) ? body.data : [];
-        const nextCursor = body.cursor === 'null' ? null : (body.cursor ?? null);
-
-        setSavedState((prev) => ({
-          ...prev,
-          items: isInitial ? newSaved : [...prev.items, ...newSaved],
-          cursor: nextCursor,
-          hasLoaded: true,
-          loading: false,
-          loadingMore: false,
-          error: null,
-        }));
-
-        if (isAuthenticated && newSaved.length > 0) {
-          void fetch(`${BASE_URL}/posts/likes/status`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: newSaved.map((p) => p.id) }),
-            credentials: 'include',
-          })
-            .then(async (r) => (r.ok ? ((await r.json()) as { data?: RelationStatusMap }) : null))
-            .then((b) => {
-              if (b?.data) {
-                setPostLikeStatuses((prev) => ({ ...prev, ...b.data }));
-              }
-            })
-            .catch(() => undefined);
-        }
-      } catch (err) {
-        setSavedState((prev) => ({
-          ...prev,
-          loading: false,
-          loadingMore: false,
-          error: err instanceof Error ? err.message : 'Unable to load saved posts',
-        }));
-      }
-    },
-    [canViewPrivateTabs, sessionUserId, isAuthenticated],
-  );
-
-  // Lazy-load data when a tab first becomes active
-  useEffect(() => {
-    if (!userId) return;
-
-    if (currentTab === 0) {
-      if (!postsState.hasLoaded && !postsState.loading && !postsState.error) {
-        void loadPosts();
-      }
-    } else if (currentTab === 1) {
-      if (!commentsState.hasLoaded && !commentsState.loading && !commentsState.error) {
-        void loadComments();
-      }
-    } else if (currentTab === 2 && canViewPrivateTabs) {
-      if (!savedState.hasLoaded && !savedState.loading && !savedState.error) {
-        void loadSavedPosts();
-      }
+    } catch (error) {
+      console.error('Failed to fetch post like statuses:', error);
     }
-  }, [
-    currentTab,
-    userId,
-    canViewPrivateTabs,
-    postsState.hasLoaded,
-    postsState.loading,
-    postsState.error,
-    commentsState.hasLoaded,
-    commentsState.loading,
-    commentsState.error,
-    savedState.hasLoaded,
-    savedState.loading,
-    savedState.error,
-    loadPosts,
-    loadComments,
-    loadSavedPosts,
-  ]);
+  }, [isAuthenticated, queryClient]);
+
+  const fetchCommentLikeStatuses = useCallback(async (comments: ApiComment[]) => {
+    if (!isAuthenticated || comments.length === 0) return;
+    try {
+      const response = await fetch(`${BASE_URL}/comments/likes/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: comments.map((c) => c.id) }),
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const body = await response.json() as { data?: RelationStatusMap };
+        if (body.data) {
+          setCommentLikeStatuses((prev) => ({ ...prev, ...body.data }));
+          seedCommentLikeStatuses(queryClient, body.data);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch comment like statuses:', error);
+    }
+  }, [isAuthenticated, queryClient]);
+
+  // Track which items we've already fetched like statuses for
+  const [fetchedPostIds, setFetchedPostIds] = useState<Set<string>>(new Set());
+  const [fetchedCommentIds, setFetchedCommentIds] = useState<Set<string>>(new Set());
+
+  // Fetch like statuses when new data is loaded
+  useEffect(() => {
+    const posts = postsQuery.data?.pages.flatMap((page) => page.posts) ?? [];
+    const newPosts = posts.filter((post) => !fetchedPostIds.has(post.id));
+    if (newPosts.length > 0 && !postsQuery.isFetching) {
+      void fetchPostLikeStatuses(newPosts);
+      setFetchedPostIds((prev) => new Set([...prev, ...newPosts.map((p) => p.id)]));
+    }
+  }, [postsQuery.data, postsQuery.isFetching, fetchPostLikeStatuses, fetchedPostIds]);
+
+  useEffect(() => {
+    const comments = commentsQuery.data?.pages.flatMap((page) => page.comments) ?? [];
+    const newComments = comments.filter((comment) => !fetchedCommentIds.has(comment.id));
+    if (newComments.length > 0 && !commentsQuery.isFetching) {
+      void fetchCommentLikeStatuses(newComments);
+      setFetchedCommentIds((prev) => new Set([...prev, ...newComments.map((c) => c.id)]));
+    }
+  }, [commentsQuery.data, commentsQuery.isFetching, fetchCommentLikeStatuses, fetchedCommentIds]);
+
+  useEffect(() => {
+    const savedPosts = savedPostsQuery.data?.pages.flatMap((page) => page.posts) ?? [];
+    const newSavedPosts = savedPosts.filter((post) => !fetchedPostIds.has(post.id));
+    if (newSavedPosts.length > 0 && !savedPostsQuery.isFetching) {
+      void fetchPostLikeStatuses(newSavedPosts);
+      setFetchedPostIds((prev) => new Set([...prev, ...newSavedPosts.map((p) => p.id)]));
+    }
+  }, [savedPostsQuery.data, savedPostsQuery.isFetching, fetchPostLikeStatuses, fetchedPostIds]);
+
+  // Reset fetched IDs when user changes
+  useEffect(() => {
+    setFetchedPostIds(new Set());
+    setFetchedCommentIds(new Set());
+  }, [userId, sessionUserId]);
 
   const handleChange = (_event: SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -372,37 +231,37 @@ export default function ProfileTabs({ userId = 'user_1', sessionUserId = 'user_1
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {currentTab === 2 ? (
             /* Saved Tab */
-            savedState.loading ? (
+            savedPostsQuery.isLoading ? (
               <Box sx={{ py: 8, display: 'flex', justifyContent: 'center' }}>
                 <CircularProgress size={32} sx={{ color: '#d4bbff' }} />
               </Box>
-            ) : savedState.error ? (
+            ) : savedPostsQuery.isError ? (
               <Box sx={{ py: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                <Typography sx={{ color: 'error.light', textAlign: 'center' }}>{savedState.error}</Typography>
+                <Typography sx={{ color: 'error.light', textAlign: 'center' }}>Unable to load saved posts</Typography>
                 <Button
                   variant="outlined"
                   size="small"
-                  onClick={() => void loadSavedPosts()}
+                  onClick={() => void savedPostsQuery.refetch()}
                   sx={{ textTransform: 'none', borderRadius: 2, color: '#d4bbff', borderColor: 'rgba(179,136,255,0.3)' }}
                 >
                   Retry
                 </Button>
               </Box>
-            ) : savedState.items.length === 0 ? (
+            ) : !savedPostsQuery.data || savedPostsQuery.data.pages.flatMap((page) => page.posts).length === 0 ? (
               <Typography sx={{ py: 8, textAlign: 'center', color: 'text.secondary' }}>
                 You have no saved posts
               </Typography>
             ) : (
               <>
-                {savedState.items.map((post) => (
+                {savedPostsQuery.data.pages.flatMap((page) => page.posts).map((post) => (
                   <PostCard key={post.id} post={post} initialLiked={postLikeStatuses[post.id]} canEdit={isOwner} />
                 ))}
-                {savedState.cursor && (
+                {savedPostsQuery.hasNextPage && (
                   <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1, pb: 2 }}>
                     <Button
                       variant="outlined"
-                      onClick={() => void loadSavedPosts(savedState.cursor)}
-                      disabled={savedState.loadingMore}
+                      onClick={() => void savedPostsQuery.fetchNextPage()}
+                      disabled={savedPostsQuery.isFetchingNextPage}
                       sx={{
                         textTransform: 'none',
                         borderRadius: 2,
@@ -413,7 +272,7 @@ export default function ProfileTabs({ userId = 'user_1', sessionUserId = 'user_1
                         '&:hover': { borderColor: '#d4bbff', backgroundColor: 'rgba(179,136,255,0.08)' },
                       }}
                     >
-                      {savedState.loadingMore ? (
+                      {savedPostsQuery.isFetchingNextPage ? (
                         <CircularProgress size={18} sx={{ color: '#d4bbff' }} />
                       ) : (
                         'Load more saved posts'
@@ -425,29 +284,29 @@ export default function ProfileTabs({ userId = 'user_1', sessionUserId = 'user_1
             )
           ) : currentTab === 1 ? (
             /* Comments Tab */
-            commentsState.loading ? (
+            commentsQuery.isLoading ? (
               <Box sx={{ py: 8, display: 'flex', justifyContent: 'center' }}>
                 <CircularProgress size={32} sx={{ color: '#d4bbff' }} />
               </Box>
-            ) : commentsState.error ? (
+            ) : commentsQuery.isError ? (
               <Box sx={{ py: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                <Typography sx={{ color: 'error.light', textAlign: 'center' }}>{commentsState.error}</Typography>
+                <Typography sx={{ color: 'error.light', textAlign: 'center' }}>Unable to load comments</Typography>
                 <Button
                   variant="outlined"
                   size="small"
-                  onClick={() => void loadComments()}
+                  onClick={() => void commentsQuery.refetch()}
                   sx={{ textTransform: 'none', borderRadius: 2, color: '#d4bbff', borderColor: 'rgba(179,136,255,0.3)' }}
                 >
                   Retry
                 </Button>
               </Box>
-            ) : commentsState.items.length === 0 ? (
+            ) : !commentsQuery.data || commentsQuery.data.pages.flatMap((page) => page.comments).length === 0 ? (
               <Typography sx={{ py: 8, textAlign: 'center', color: 'text.secondary' }}>
                 {isOwner ? 'You have not made any comments' : 'User has not made any comments'}
               </Typography>
             ) : (
               <>
-                {commentsState.items.map((comment) => (
+                {commentsQuery.data.pages.flatMap((page) => page.comments).map((comment) => (
                   <CommentRow
                     key={comment.id}
                     comment={comment}
@@ -456,12 +315,12 @@ export default function ProfileTabs({ userId = 'user_1', sessionUserId = 'user_1
                     inPost={false}
                   />
                 ))}
-                {commentsState.cursor && (
+                {commentsQuery.hasNextPage && (
                   <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1, pb: 2 }}>
                     <Button
                       variant="outlined"
-                      onClick={() => void loadComments(commentsState.cursor)}
-                      disabled={commentsState.loadingMore}
+                      onClick={() => void commentsQuery.fetchNextPage()}
+                      disabled={commentsQuery.isFetchingNextPage}
                       sx={{
                         textTransform: 'none',
                         borderRadius: 2,
@@ -472,7 +331,7 @@ export default function ProfileTabs({ userId = 'user_1', sessionUserId = 'user_1
                         '&:hover': { borderColor: '#d4bbff', backgroundColor: 'rgba(179,136,255,0.08)' },
                       }}
                     >
-                      {commentsState.loadingMore ? (
+                      {commentsQuery.isFetchingNextPage ? (
                         <CircularProgress size={18} sx={{ color: '#d4bbff' }} />
                       ) : (
                         'Load more comments'
@@ -484,37 +343,37 @@ export default function ProfileTabs({ userId = 'user_1', sessionUserId = 'user_1
             )
           ) : (
             /* Posts Tab (currentTab === 0) */
-            postsState.loading ? (
+            postsQuery.isLoading ? (
               <Box sx={{ py: 8, display: 'flex', justifyContent: 'center' }}>
                 <CircularProgress size={32} sx={{ color: '#d4bbff' }} />
               </Box>
-            ) : postsState.error ? (
+            ) : postsQuery.isError ? (
               <Box sx={{ py: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                <Typography sx={{ color: 'error.light', textAlign: 'center' }}>{postsState.error}</Typography>
+                <Typography sx={{ color: 'error.light', textAlign: 'center' }}>Unable to load posts</Typography>
                 <Button
                   variant="outlined"
                   size="small"
-                  onClick={() => void loadPosts()}
+                  onClick={() => void postsQuery.refetch()}
                   sx={{ textTransform: 'none', borderRadius: 2, color: '#d4bbff', borderColor: 'rgba(179,136,255,0.3)' }}
                 >
                   Retry
                 </Button>
               </Box>
-            ) : postsState.items.length === 0 ? (
+            ) : !postsQuery.data || postsQuery.data.pages.flatMap((page) => page.posts).length === 0 ? (
               <Typography sx={{ py: 8, textAlign: 'center', color: 'text.secondary' }}>
                 {isOwner ? 'You have not made any posts' : 'User has not made any posts'}
               </Typography>
             ) : (
               <>
-                {postsState.items.map((post) => (
+                {postsQuery.data.pages.flatMap((page) => page.posts).map((post) => (
                   <PostCard key={post.id} post={post} initialLiked={postLikeStatuses[post.id]} canEdit={isOwner} />
                 ))}
-                {postsState.cursor && (
+                {postsQuery.hasNextPage && (
                   <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1, pb: 2 }}>
                     <Button
                       variant="outlined"
-                      onClick={() => void loadPosts(postsState.cursor)}
-                      disabled={postsState.loadingMore}
+                      onClick={() => void postsQuery.fetchNextPage()}
+                      disabled={postsQuery.isFetchingNextPage}
                       sx={{
                         textTransform: 'none',
                         borderRadius: 2,
@@ -525,7 +384,7 @@ export default function ProfileTabs({ userId = 'user_1', sessionUserId = 'user_1
                         '&:hover': { borderColor: '#d4bbff', backgroundColor: 'rgba(179,136,255,0.08)' },
                       }}
                     >
-                      {postsState.loadingMore ? (
+                      {postsQuery.isFetchingNextPage ? (
                         <CircularProgress size={18} sx={{ color: '#d4bbff' }} />
                       ) : (
                         'Load more posts'

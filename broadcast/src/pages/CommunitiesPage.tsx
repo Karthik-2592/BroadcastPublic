@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -15,25 +15,37 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import UploadOutlinedIcon from '@mui/icons-material/UploadOutlined';
 import Fade from '@mui/material/Fade';
-import { useRef } from 'react';
+import CircularProgress from '@mui/material/CircularProgress';
 import CommunityTagSelector from '../components/Community/CommunityTagSelector';
 import { useAuth } from '../context/AuthContext';
 import CommunitySortTabs from '../components/Community/CommunitySortTabs';
 import CommunityRightSidebar from '../components/Community/CommunityRightSidebar';
 import PostCard from '../components/PostCard/PostCard';
-import type { Community, Post, RelationStatusMap, Tag } from '../types/api';
+import type { Community, RelationStatusMap, Tag } from '../types/api';
 import { BASE_URL } from '../config';
-
+import { useQueryClient } from '@tanstack/react-query';
+import { useCommunity, useToggleMembership, useUpdateCommunity, useDeleteCommunity } from '../queries/communities';
+import { useCommunityPosts } from '../queries/posts';
+import { seedPostLikeStatuses } from '../queries/likes';
 
 export default function CommunitiesPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { communityId } = useParams<{ communityId: string }>();
   const { isAuthenticated, currentUser } = useAuth();
+  const { data: communityData } = useCommunity(communityId);
+  console.log(communityData)
   const [community, setCommunity] = useState<Community | null>(null);
   const [sortTab, setSortTab] = useState<'new' | 'top'>('new');
-  const [communityPosts, setCommunityPosts] = useState<Post[]>([]);
-  const [postsCursor, setPostsCursor] = useState<string | null>(null);
-  const [postsLoading, setPostsLoading] = useState(false);
+  const {
+    data: postsData,
+    fetchNextPage: fetchNextCommunityPosts,
+    hasNextPage: hasNextCommunityPosts,
+    isFetchingNextPage: isFetchingNextCommunityPosts,
+  } = useCommunityPosts(community?.id, sortTab);
+  const communityPosts = useMemo(() => {
+    return postsData?.pages.flatMap((page) => page.posts) ?? [];
+  }, [postsData]);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isJoinPromptOpen, setIsJoinPromptOpen] = useState(false);
@@ -48,18 +60,40 @@ export default function CommunitiesPage() {
   const MAX_BANNER_SIZE = 4 * 1024 * 1024;
   const isAdmin = isAuthenticated && community?.admin_id === currentUser?.id;
 
-  useEffect(() => { void fetch(`${BASE_URL}/communities/${communityId}`, { credentials: 'include' }).then((response) => response.ok ? response.json() : null).then((body: { data?: Community } | null) => { const value = body?.data ?? null; setCommunity(value); setDescription(value?.community_desc ?? ''); setGuidelines(value?.community_guidelines ?? ''); setTags((value?.tags ?? []) as Tag[]); setBannerImage(value?.community_banner?.media_url ?? null); }); }, [communityId]);
+  // ── TanStack Query mutations ─────────────────────────────────────────────────
+  const toggleMembership = useToggleMembership();
+  const updateCommunity = useUpdateCommunity();
+  const deleteCommunity = useDeleteCommunity();
+
+  useEffect(() => {
+    if (!communityData) return;
+    setCommunity(communityData);
+    setDescription(communityData.community_desc ?? '');
+    setGuidelines(communityData.community_guidelines ?? '');
+    setTags((communityData.tags ?? []) as Tag[]);
+    setBannerImage(communityData.community_banner?.media_url ?? null);
+  }, [communityData]);
 
   const handleJoin = () => {
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
-    const nextState = !community?.isMember;
+    console.log("Once")
+
+    if (!community?.id) return;
+    const nextState = !(community?.isMember);
+    // Optimistic update
     setCommunity((current) => current ? { ...current, isMember: nextState } : current);
-    void fetch(`${BASE_URL}/communities/memberships`, { method: nextState ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ community_id: communityId }), credentials: 'include' })
-      .then((response) => { if (!response.ok) throw new Error('Unable to join community'); setIsJoinPromptOpen(false); })
-      .catch(() => setCommunity((current) => current ? { ...current, isMember: !nextState } : current));
+    toggleMembership.mutate({ communityId: community.id, isMember: nextState }, {
+      onSuccess: () => {
+        setIsJoinPromptOpen(false);
+      },
+      onError: () => {
+        // Roll back
+        setCommunity((current) => current ? { ...current, isMember: !nextState } : current);
+      },
+    });
   };
 
   const handleCreatePost = () => {
@@ -74,84 +108,77 @@ export default function CommunitiesPage() {
 
   const handleEdit = async () => {
     if (!community) return;
-    const response = await fetch(`${BASE_URL}/communities/${community.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ community_desc: description, community_guidelines: guidelines, tags }),
-      credentials: 'include',
-    }).catch(() => undefined);
-    if (!response?.ok) return;
-    if (bannerFile) {
-      const form = new FormData();
-      form.append('media', bannerFile);
-      const upload = await fetch(`${BASE_URL}/communities/${community.id}/banner`, {
-        method: 'POST',
-        body: form,
-        credentials: 'include',
+    try {
+      await updateCommunity.mutateAsync({
+        communityId: community.id,
+        communityDesc: description,
+        communityGuidelines: guidelines,
+        tags
       });
-      if (!upload.ok) return;
-      const body = await upload.json() as { data?: Community };
-      if (body.data) setCommunity(body.data);
-      setBannerFile(null);
+
+      // Handle banner upload separately (FormData special case)
+      if (bannerFile) {
+        const form = new FormData();
+        form.append('media', bannerFile);
+        const upload = await fetch(`${BASE_URL}/communities/${community.id}/banner`, {
+          method: 'POST',
+          body: form,
+          credentials: 'include',
+        });
+        if (!upload.ok) {
+          setBannerError('Banner upload failed');
+          return;
+        }
+        const body = await upload.json() as { data?: Community };
+        if (body.data) setCommunity(body.data);
+        setBannerFile(null);
+      }
+
+      setIsEditOpen(false);
+    } catch (error) {
+      console.error('Failed to update community:', error);
     }
-    setIsEditOpen(false);
   };
 
   const handleDelete = async () => {
     if (!community) return;
-    await fetch(`${BASE_URL}/communities/${community.id}`, { method: 'DELETE', credentials: 'include' }).catch(() => undefined);
-    setIsDeleteOpen(false);
-    setIsEditOpen(false);
-    navigate('/communities');
+    try {
+      await deleteCommunity.mutateAsync(community.id);
+      setIsDeleteOpen(false);
+      setIsEditOpen(false);
+      navigate('/communities');
+    } catch (error) {
+      console.error('Failed to delete community:', error);
+    }
   };
 
-  const fetchLikeStatuses = useCallback((ids: string[]) => {
-    if (!isAuthenticated || !ids.length) return;
+  const fetchedLikeIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!isAuthenticated || !communityPosts.length) return;
+    const newIds = communityPosts.map((p) => p.id).filter((id) => !fetchedLikeIds.current.has(id));
+    if (!newIds.length) return;
+    newIds.forEach((id) => fetchedLikeIds.current.add(id));
+
     void fetch(`${BASE_URL}/posts/likes/status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids }),
+      body: JSON.stringify({ ids: newIds }),
       credentials: 'include',
-    }).then(async (response) => response.ok ? await response.json() as { data?: RelationStatusMap } : null)
-      .then((body) => { if (body?.data) setLikeStatuses((current) => ({ ...current, ...body.data })); })
-      .catch(() => undefined);
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    let active = true;
-    setPostsLoading(true);
-    setPostsCursor(null);
-    if (!community) return;
-    fetch(`${BASE_URL}/communities/${community?.id}/posts?sort=${sortTab}`, { credentials: 'include' })
-      .then(async (response) => response.ok ? await response.json() as { data?: Post[]; cursor?: string } : null)
-      .then((body) => {
-        if (!active) return;
-        const page = body?.data ?? [];
-        setCommunityPosts(page);
-        setPostsCursor(body?.cursor === 'null' ? null : body?.cursor ?? null);
-        fetchLikeStatuses(page.map((p) => p.id));
+    })
+      .then(async (response) => {
+        if (response.ok) {
+          const body = (await response.json()) as { data?: RelationStatusMap };
+          if (body.data) {
+            setLikeStatuses((current) => ({ ...current, ...body.data }));
+            seedPostLikeStatuses(queryClient, body.data);
+          }
+        }
       })
-      .catch(() => undefined)
-      .finally(() => { if (active) setPostsLoading(false); });
-    return () => { active = false; };
-  }, [community?.id, sortTab, fetchLikeStatuses]);
+      .catch(() => undefined);
+  }, [isAuthenticated, communityPosts, queryClient]);
 
   if (!community) return <Typography sx={{ p: 8, textAlign: 'center' }}>Nothing to see here</Typography>;
-
-  const loadMorePosts = () => {
-    if (!postsCursor || postsLoading) return;
-    setPostsLoading(true);
-    fetch(`${BASE_URL}/communities/${community?.id}/posts?sort=${sortTab}&cursor=${encodeURIComponent(postsCursor)}`, { credentials: 'include' })
-      .then(async (response) => response.ok ? await response.json() as { data?: Post[]; cursor?: string } : null)
-      .then((body) => {
-        if (!body?.data) return;
-        setCommunityPosts((current) => [...current, ...body.data!]);
-        setPostsCursor(body.cursor === 'null' ? null : body.cursor ?? null);
-        fetchLikeStatuses(body.data.map((p) => p.id));
-      })
-      .catch(() => undefined)
-      .finally(() => setPostsLoading(false));
-  };
 
   return (
     <>
@@ -177,8 +204,8 @@ export default function CommunitiesPage() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}><ForumOutlinedIcon sx={{ color: 'text.secondary', fontSize: 18 }} /><Typography variant="body2">{community.post_count}</Typography></Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}><GroupOutlinedIcon sx={{ color: 'text.secondary', fontSize: 18 }} /><Typography variant="body2">{community.population}</Typography></Box>
               </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }} onClick={(event) => event.stopPropagation()}>
-                {!community.isMember && <Button variant="outlined" size="small" onClick={handleJoin}>Join</Button>}
+              <Box sx={{ display: 'flex', color: 'white', alignItems: 'center', gap: 1 }} onClick={(event) => event.stopPropagation()}>
+                {!isAdmin && <Button variant={community.isMember ? "outlined" : "contained"} size="small" onClick={handleJoin}>{community.isMember ? 'Joined' : 'Join'}</Button>}
                 <Button variant="contained" size="small" onClick={handleCreatePost}>Create post</Button>
                 {isAdmin && <IconButton aria-label="Edit community" onClick={() => setIsEditOpen(true)} sx={{ color: 'primary.light', bgcolor: 'rgba(179,136,255,0.1)', borderRadius: 2 }}><EditOutlinedIcon /></IconButton>}
               </Box>
@@ -212,9 +239,15 @@ export default function CommunitiesPage() {
               ) : communityPosts.map((post) => (
                 <PostCard key={post.id} post={post} initialLiked={likeStatuses[post.id]} canEdit={Boolean(isAuthenticated && (post.user_id === currentUser?.id || community?.admin_id === currentUser?.id))} communityAdminId={community?.admin_id ?? null} />
               ))}
-              {postsCursor && <Button variant="outlined" onClick={loadMorePosts} disabled={postsLoading}>
-                {postsLoading ? 'Loading…' : 'Load more posts'}
-              </Button>}
+              {hasNextCommunityPosts && (
+                <Button
+                  variant="outlined"
+                  onClick={() => void fetchNextCommunityPosts()}
+                  disabled={isFetchingNextCommunityPosts}
+                >
+                  {isFetchingNextCommunityPosts ? <CircularProgress size={18} /> : 'Load more posts'}
+                </Button>
+              )}
             </Box>
           </Fade>
         </Box>
@@ -256,7 +289,7 @@ export default function CommunitiesPage() {
                 {bannerError}
               </Typography>
             )}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 60, py: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 60 }}>
               <TextField
                 fullWidth
                 slotProps={{
@@ -269,7 +302,6 @@ export default function CommunitiesPage() {
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: 4,
-                    border: '1px solid rgba(255, 255, 255, 0.36)',
                     bgcolor: 'rgba(31, 19, 36, 0.53)'
                   },
                   '& . MuiFormLabel-root': {
@@ -286,7 +318,6 @@ export default function CommunitiesPage() {
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: 4,
-                  border: '1px solid rgba(255, 255, 255, 0.36)',
                   bgcolor: 'rgba(31, 19, 36, 0.53)'
                 },
                 '& . MuiFormLabel-root': {
@@ -305,7 +336,6 @@ export default function CommunitiesPage() {
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: 4,
-                  border: '1px solid rgba(255, 255, 255, 0.36)',
                   bgcolor: 'rgba(31, 19, 36, 0.53)'
                 },
                 '& . MuiFormLabel-root': {
@@ -314,8 +344,8 @@ export default function CommunitiesPage() {
               }}
             />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.06)', pt: 3 }}>
-              <Button color="error" variant="outlined" onClick={() => setIsDeleteOpen(true)}>Delete</Button>
-              <Box sx={{ display: 'flex', gap: 1.5 }}><Button variant="outlined" onClick={() => setIsEditOpen(false)}>Cancel</Button><Button variant="contained" onClick={handleEdit}>Edit</Button></Box>
+              <Button color="error" variant="outlined" onClick={() => setIsDeleteOpen(true)} disabled={deleteCommunity.isPending}>Delete</Button>
+              <Box sx={{ display: 'flex', gap: 1.5 }}><Button variant="outlined" onClick={() => setIsEditOpen(false)} disabled={updateCommunity.isPending || deleteCommunity.isPending}>Cancel</Button><Button variant="contained" onClick={handleEdit} disabled={updateCommunity.isPending}>Edit</Button></Box>
             </Box>
           </Box>
         </DialogContent>
