@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
@@ -14,17 +14,22 @@ import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import CircularProgress from '@mui/material/CircularProgress';
+import Avatar from '@mui/material/Avatar';
+import Badge from '@mui/material/Badge';
 import SearchIcon from '@mui/icons-material/Search';
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutlined';
 import NotificationsNoneOutlinedIcon from '@mui/icons-material/NotificationsNoneOutlined';
+import NotificationsActiveOutlinedIcon from '@mui/icons-material/NotificationsActiveOutlined';
 import CellTowerRoundedIcon from '@mui/icons-material/CellTowerRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { BASE_URL } from '../../config';
+import type { Notification } from '../../types/api';
+import { displayName, userHandle } from '../../types/api';
 
 type SearchResultType = 'post' | 'community' | 'user';
 
@@ -56,12 +61,63 @@ export default function TopBar() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [accountMenuAnchor, setAccountMenuAnchor] = useState<null | HTMLElement>(null);
+  const [notificationAnchor, setNotificationAnchor] = useState<null | HTMLElement>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationsCursor, setNotificationsCursor] = useState<string | null>(null);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [hasNotifications, setHasNotifications] = useState(false);
   const searchRequest = useRef(0);
 
   const handleLogout = () => {
     setAccountMenuAnchor(null);
     logout();
     navigate('/');
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setHasNotifications(false);
+      setNotifications([]);
+      setNotificationsCursor(null);
+      return;
+    }
+    let active = true;
+    void fetch(`${BASE_URL}/notifications/status`, { credentials: 'include' })
+      .then((response) => response.ok ? response.json() as Promise<{ data?: { hasNotifications?: boolean } }> : null)
+      .then((body) => {
+        if (active) setHasNotifications(Boolean(body?.data?.hasNotifications));
+      })
+      .catch(() => {
+        console.error('Unable to check notifications');
+        if (active) setHasNotifications(false);
+      });
+    return () => { active = false; };
+  }, [isAuthenticated]);
+
+  const loadNotifications = async (cursor?: string | null) => {
+    setNotificationsLoading(true);
+    try {
+      const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+      const response = await fetch(`${BASE_URL}/notifications${query}`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Unable to load notifications');
+      const body = await response.json() as { data?: Notification[]; cursor?: string };
+      const page = Array.isArray(body.data) ? body.data : [];
+      setNotifications((current) => cursor ? [...current, ...page] : page);
+      setNotificationsCursor(body.cursor === 'null' ? null : body.cursor ?? null);
+      setHasNotifications(false);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  const handleNotificationsClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (!isAuthenticated) return;
+    setNotificationAnchor(event.currentTarget);
+    setNotifications([]);
+    setNotificationsCursor(null);
+    void loadNotifications().catch((error: unknown) => {
+      console.error('Unable to load notifications:', error);
+    });
   };
 
   const submitSearch = async (query: string) => {
@@ -311,9 +367,61 @@ export default function TopBar() {
 
           {/* Account controls */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <IconButton size="small" sx={{ color: 'text.secondary' }}>
-              <NotificationsNoneOutlinedIcon fontSize="small" />
+            <IconButton
+              size="small"
+              aria-label="Notifications"
+              onClick={handleNotificationsClick}
+              sx={{ color: 'text.secondary' }}
+            >
+              <Badge color="error" variant="dot" invisible={!hasNotifications}>
+                {hasNotifications
+                  ? <NotificationsActiveOutlinedIcon fontSize="small" />
+                  : <NotificationsNoneOutlinedIcon fontSize="small" />}
+              </Badge>
             </IconButton>
+            <Menu
+              id="notifications-menu"
+              anchorEl={notificationAnchor}
+              open={Boolean(notificationAnchor)}
+              onClose={() => setNotificationAnchor(null)}
+              disableScrollLock
+              slotProps={{ paper: { sx: { width: 360, maxWidth: 'calc(100vw - 32px)', maxHeight: 420 } } }}
+            >
+              {notificationsLoading && notifications.length === 0 ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress size={22} /></Box>
+              ) : notifications.length === 0 ? (
+                <Typography sx={{ p: 2, color: 'text.secondary', fontSize: '0.85rem' }}>No notifications</Typography>
+              ) : (
+                <List disablePadding>
+                  {notifications.map((notification) => {
+                    const user = notification.user_summary;
+                    return (
+                      <ListItemButton
+                        key={notification.id}
+                        onClick={() => { setNotificationAnchor(null); if (user) navigate(`/profile/${user.id}`); }}
+                        sx={{ alignItems: 'center', gap: 1.5, px: 2, py: 1.25 }}
+                      >
+                        <Avatar src={user?.profile_picture ?? undefined} sx={{ width: 36, height: 36, bgcolor: '#343440' }}>
+                          {displayName(user).charAt(0)}
+                        </Avatar>
+                        <ListItemText
+                          primary={user ? `${displayName(user)} followed you` : 'A user followed you'}
+                          secondary={user ? userHandle(user) : undefined}
+                          slotProps={{ primary: { sx: { fontSize: '0.88rem', fontWeight: 600 } }, secondary: { sx: { fontSize: '0.75rem' } } }}
+                        />
+                      </ListItemButton>
+                    );
+                  })}
+                  {notificationsCursor && (
+                    <Box sx={{ p: 1 }}>
+                      <Button fullWidth variant="outlined" onClick={() => void loadNotifications(notificationsCursor).catch((error: unknown) => console.error('Unable to load more notifications:', error))} disabled={notificationsLoading}>
+                        {notificationsLoading ? <CircularProgress size={18} /> : 'Load more'}
+                      </Button>
+                    </Box>
+                  )}
+                </List>
+              )}
+            </Menu>
 
             {!isAuthenticated && <Button
               variant="outlined"

@@ -109,6 +109,10 @@ async function handleCommunityDelete(communityId: string) {
   }
 }
 
+async function handleNotificationDelete(notificationId: string) {
+  await store.deleteNotification(notificationId);
+}
+
 async function routeEvent(event: EventQueue) {
   const { content_type, action, content_id } = event;
   if (content_type === "user" && action === "delete") {
@@ -121,6 +125,8 @@ async function routeEvent(event: EventQueue) {
     await handleCommentDelete(content_id);
   } else if (content_type === "community" && action === "delete") {
     await handleCommunityDelete(content_id);
+  } else if (content_type === "notification" && action === "delete") {
+    await handleNotificationDelete(content_id);
   }
   // Ignore post_favorite / comment_fav or other event types exclusively owned by favorites_worker
 }

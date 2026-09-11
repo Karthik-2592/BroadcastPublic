@@ -160,6 +160,13 @@ export async function follow(req: Request, res: Response): Promise<Response> {
       body.followed_id!,
       enabled ? 1 : -1,
     );
+  if (enabled && changed) {
+    await store.createNotification({
+      target_id: body.followed_id!,
+      event_type: "user_follow",
+      event_id: followerId,
+    });
+  }
   if (!enabled && !changed)
     return fail(res, 409, "The follower was not following this user.");
   return ok(res, { active: enabled, changed: Boolean(changed) });

@@ -174,9 +174,9 @@ const collections: CollectionDefinition[] = [
     validator: {
       $jsonSchema: {
         bsonType: "object",
-        required: ["user_id", "event_type", "event_id"],
+        required: ["target_id", "event_type", "event_id"],
         properties: {
-          user_id: { bsonType: "objectId" },
+          target_id: { bsonType: "objectId" },
           event_type: { bsonType: "string" },
           timestamp: { bsonType: "date" },
           event_id: { bsonType: "objectId" },
@@ -260,7 +260,7 @@ async function initialize() {
       ]);
     await database
       .collection("notifications")
-      .createIndex({ user_id: 1, timestamp: -1 });
+      .createIndex({ target_id: 1, timestamp: -1 });
     console.log(`[mongo:init] indexes: created or verified in ${databaseName}`);
   } finally {
     await client.close();
