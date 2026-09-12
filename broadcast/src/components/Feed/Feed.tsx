@@ -5,21 +5,25 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import PostCard from '../PostCard/PostCard';
 import type { RelationStatusMap } from '../../types/api';
 import UserRecommendations from './UserRecommendations';
 import { BASE_URL } from '../../config';
 import { useAuth } from '../../context/AuthContext';
 import { useInfiniteFeed } from '../../queries/posts';
+import { useUserRecommendations } from '../../queries/users';
 import { useQueryClient } from '@tanstack/react-query';
 import { seedPostLikeStatuses } from '../../queries/likes';
+import { useState } from 'react';
 
 export default function Feed({ endpoint = '/feed' }: { endpoint?: string }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, currentUser } = useAuth();
   const queryClient = useQueryClient();
-  const [showRecommendations] = useState(true);
   const [likeStatuses, setLikeStatuses] = useState<RelationStatusMap>({});
+  const recommendations = useUserRecommendations(
+    isAuthenticated ? currentUser?.id : undefined,
+  );
 
   const {
     data,
@@ -92,11 +96,13 @@ export default function Feed({ endpoint = '/feed' }: { endpoint?: string }) {
           {firstPosts.map((post) => (
             <PostCard key={post.id} post={post} initialLiked={likeStatuses[post.id]} />
           ))}
-          {showRecommendations && <UserRecommendations />}
+          {isAuthenticated && !recommendations.isLoading && recommendations.data && (
+            <UserRecommendations users={recommendations.data} />
+          )}
           {remainingPosts.map((post) => (
             <PostCard key={post.id} post={post} initialLiked={likeStatuses[post.id]} />
           ))}
-          {hasNextPage && (
+          {hasNextPage ? (
             <Button
               variant="outlined"
               onClick={() => void fetchNextPage()}
@@ -104,7 +110,9 @@ export default function Feed({ endpoint = '/feed' }: { endpoint?: string }) {
             >
               {isFetchingNextPage ? <CircularProgress size={18} /> : 'Load more posts'}
             </Button>
-          )}
+          ) :<Box sx={{ py: 2, textAlign: 'center', color: 'text.secondary' }}>
+              You have reached the end
+            </Box>}
         </>
       )}
     </Box>

@@ -8,8 +8,22 @@ const USER_RECOMMENDATION_SIZE = 4;
 const COMMUNITY_RECOMMENDATION_SIZE = 8;
 const FEED_TTL_MS = 60 * 60 * 1000; // 1 hour
 
+const FEED_REASON = {
+  chronological: 0,
+  followedUserLiked: 1,
+  joinedCommunity: 2,
+} as const;
+
+type FeedReasonCode = (typeof FEED_REASON)[keyof typeof FEED_REASON];
+
+const FEED_REASON_TEXT: Record<Exclude<FeedReasonCode, 0>, string> = {
+  [FEED_REASON.followedUserLiked]: "Liked by someone you follow",
+  [FEED_REASON.joinedCommunity]: "From a community you joined",
+};
+
 type SessionFeed = {
   postIds: string[];
+  postReasonCodes: Record<string, FeedReasonCode>;
   userRecommendationIds: string[];
   communityRecommendationIds: string[];
   createdAt: number;
@@ -29,12 +43,20 @@ async function generateFeedRecommendations(userId: string) {
     store.feedIds(FEED_BUFFER_CAPACITY),
   ]);
 
+  const postReasonCodes: Record<string, FeedReasonCode> = {};
+  for (const postId of neo4jData.posts[0]) {
+    postReasonCodes[postId] = FEED_REASON.followedUserLiked;
+  }
+  for (const postId of neo4jData.posts[1]) {
+    postReasonCodes[postId] ??= FEED_REASON.joinedCommunity;
+  }
+
   const recommendedPosts = [...new Set([...neo4jData.posts[0], ...neo4jData.posts[1]])];
   const postIds = [...new Set([...recommendedPosts, ...chronological])].slice(0, FEED_BUFFER_CAPACITY);
   const userRecommendationIds = [...new Set(neo4jData.users.flat())].slice(0, USER_RECOMMENDATION_SIZE);
   const communityRecommendationIds = [...new Set(neo4jData.communities.flat())].slice(0, COMMUNITY_RECOMMENDATION_SIZE);
 
-  return { postIds, userRecommendationIds, communityRecommendationIds };
+  return { postIds, postReasonCodes, userRecommendationIds, communityRecommendationIds };
 }
 
 async function initialize(userId: string) {
@@ -48,10 +70,11 @@ async function initialize(userId: string) {
   const pending = initializing.get(userId);
   if (pending) return pending;
   const creation = generateFeedRecommendations(userId)
-    .then(({ postIds, userRecommendationIds, communityRecommendationIds }) => {
+    .then(({ postIds, postReasonCodes, userRecommendationIds, communityRecommendationIds }) => {
       const now = Date.now();
       const state: SessionFeed = {
         postIds,
+        postReasonCodes,
         userRecommendationIds,
         communityRecommendationIds,
         createdAt: now,
@@ -76,7 +99,13 @@ export class FeedService {
     const ids = state.postIds.slice(page.offset, page.offset + limit);
     const posts = await store.postsByIds(ids);
     const byId = new Map(posts.map((post) => [post.id, post]));
-    const available = ids.flatMap((id) => byId.has(id) ? [byId.get(id)!] : []);
+    const available = ids.flatMap((id) => {
+      const post = byId.get(id);
+      if (!post) return [];
+      const reasonCode = state.postReasonCodes[id];
+      const recommendationReason = reasonCode && FEED_REASON_TEXT[reasonCode];
+      return [recommendationReason ? { ...post, recommendationReason } : post];
+    });
     const next = page.offset + limit < state.postIds.length
       ? encodeLegacyCursor({ offset: page.offset + limit, filters: { feed: userId } } as LegacyCursorPayload)
       : END_CURSOR;

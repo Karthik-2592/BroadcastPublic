@@ -11,8 +11,8 @@ dotenv.config({
 
 
 export const env = {
-  sessionSecret: process.env.SESSION_SECRET ?? "aa766a17980eac1d4467f13052654de02184505904c1f7ac870ff790fc5c1866",
-  port: Number(process.env.PORT ?? 3001),
+  sessionSecret: process.env.SESSION_SECRET ?? "default_session_secret",
+  port: Number(process.env.PORT ?? 3000),
   mongoUri: process.env.MONGODB_URI ?? "mongodb://127.0.0.1:27017",
   mongoDatabase: process.env.MONGODB_DATABASE ?? "broadcast",
   mongoServerSelectionTimeoutMs: Number(
@@ -32,6 +32,8 @@ export const env = {
   sampleCommunityCount: Number(process.env.SAMPLE_COMMUNITY_COUNT ?? 4),
   samplePostCount: Number(process.env.SAMPLE_POST_COUNT ?? 12),
   sampleCommentCount: Number(process.env.SAMPLE_COMMENT_COUNT ?? 24),
+  sampleNotificationCount: Number(process.env.SAMPLE_NOTIFICATION_COUNT ?? 8),
+  sampleCommentFavoriteCount: Number(process.env.SAMPLE_COMMENT_FAVORITE_COUNT ?? 16),
   bucketStorageURL: process.env.BUCKET_STORAGE_URL ?? "B:/Databases/MediaBucket",
   mediaServerPort: Number(process.env.MEDIA_SERVER_PORT ?? 3002),
   mediaServerURL: process.env.MEDIA_SERVER_URL ?? "http://localhost:3002",

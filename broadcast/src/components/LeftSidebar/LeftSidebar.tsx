@@ -161,6 +161,7 @@ export default function LeftSidebar() {
             width: 48,
             height: 48,
             bgcolor: '#7c4dff',
+            color: 'white',
             fontWeight: 700,
             fontSize: '1.2rem',
             border: '2px solid rgba(255,255,255,0.1)',

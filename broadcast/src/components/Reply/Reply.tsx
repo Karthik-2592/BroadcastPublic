@@ -90,7 +90,7 @@ export default function Reply({ open, onClose, parentCommentId, postId, onSubmit
               width: 32,
               height: 32,
               bgcolor: 'primary.main',
-              color: '#0f0f1a',
+              color: '#ffffff',
               fontSize: '0.75rem',
               fontWeight: 700,
               flexShrink: 0,

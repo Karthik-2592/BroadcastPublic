@@ -145,8 +145,8 @@ export default function CommentsSection({ comments = EMPTY_COMMENTS, postId, com
           sx={{
             width: 40,
             height: 40,
-            bgcolor: 'primary.main',
-            color: '#0f0f1a',
+            bgcolor: 'rgb(124,77,255)',
+            color: '#ffffff',
             fontWeight: 700,
             fontSize: '0.9rem',
             flexShrink: 0,

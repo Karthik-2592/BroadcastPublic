@@ -11,8 +11,6 @@ const neo4jUsername = env.neo4jUsername;
 const neo4jPassword = env.neo4jPassword;
 const neo4jDatabase = env.neo4jDatabase;
 
-console.log(neo4jPassword);
-
 type MongoEntity = { _id: ObjectId; community_id?: ObjectId | null };
 type MongoCommunity = MongoEntity & { admin_id: ObjectId };
 type RelationPair = { userId: string; targetId: string };
@@ -91,6 +89,11 @@ async function seed() {
 
     const session = driver.session({ database: neo4jDatabase });
     try {
+      // Fetch existing interests from Neo4j
+      const interestsResult = await session.run("MATCH (i:INTEREST) RETURN i.interest AS interest");
+      const interests = interestsResult.records.map((record) => record.get("interest") as string);
+      console.log(`[neo4j:seed] found ${interests.length} interests`);
+
       await write(
         session,
         "entity nodes",
@@ -111,6 +114,32 @@ async function seed() {
         userId: randomChoice(userIds),
         communityId: community._id.toHexString(),
       }));
+
+      // Create community-interest (ASSOCIATED_WITH) relations
+      const communityInterests: { communityId: string; interest: string }[] = [];
+      for (const community of communities) {
+        const numInterests = Math.floor(Math.random() * 3) + 1; // 1-3 interests per community
+        const shuffledInterests = [...interests].sort(() => Math.random() - 0.5);
+        for (let i = 0; i < Math.min(numInterests, shuffledInterests.length); i++) {
+          communityInterests.push({
+            communityId: community._id.toHexString(),
+            interest: shuffledInterests[i],
+          });
+        }
+      }
+
+      // Create user-interest (INTERESTED_IN) relations
+      const userInterests: { userId: string; interest: string }[] = [];
+      for (const user of users) {
+        const numInterests = Math.floor(Math.random() * 4) + 1; // 1-4 interests per user
+        const shuffledInterests = [...interests].sort(() => Math.random() - 0.5);
+        for (let i = 0; i < Math.min(numInterests, shuffledInterests.length); i++) {
+          userInterests.push({
+            userId: user._id.toHexString(),
+            interest: shuffledInterests[i],
+          });
+        }
+      }
 
       await write(
         session,
@@ -169,8 +198,29 @@ async function seed() {
          SET relationEdge.authorization = "MODERATOR"`,
         { relations: moderators },
       );
+
+      await write(
+        session,
+        "ASSOCIATED_WITH relations",
+        `UNWIND $relations AS relation
+         MATCH (community:COMMUNITY {community_id: relation.communityId}),
+               (interest:INTEREST {interest: relation.interest})
+         MERGE (community)-[:ASSOCIATED_WITH]->(interest)`,
+        { relations: communityInterests },
+      );
+
+      await write(
+        session,
+        "INTERESTED_IN relations",
+        `UNWIND $relations AS relation
+         MATCH (user:USER {user_id: relation.userId}),
+               (interest:INTEREST {interest: relation.interest})
+         MERGE (user)-[:INTERESTED_IN]->(interest)`,
+        { relations: userInterests },
+      );
+
       console.log(
-        `[neo4j:seed] complete: users=${userIds.length} posts=${postIds.length} communities=${communityIds.length}`,
+        `[neo4j:seed] complete: users=${userIds.length} posts=${postIds.length} communities=${communityIds.length} communityInterests=${communityInterests.length} userInterests=${userInterests.length}`,
       );
     } finally {
       await session.close();

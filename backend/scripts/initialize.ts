@@ -230,8 +230,6 @@ async function initialize() {
       .collection("posts")
       .createIndexes([
         { key: { user_id: 1, time_created: -1 } },
-        { key: { community_id: 1, popularity_score: -1 } },
-        { key: { tags: 1, popularity_score: -1 } },
         { key: { popularity_score: -1 } },
         { key: { time_created: -1 } },
         { key: { community_id: 1, time_created: -1 } },
@@ -242,7 +240,6 @@ async function initialize() {
       .createIndexes([
         { key: { post_id: 1, root: 1 } },
         { key: { user_id: 1, timestamp: -1 } },
-        { key: { post_id: 1, root: 1, timestamp: 1 } },
         { key: { root: 1, timestamp: 1 } },
       ]);
     await database
@@ -255,7 +252,6 @@ async function initialize() {
       .collection("communities")
       .createIndexes([
         { key: { community_name: 1 }, unique: true },
-        { key: { tags: 1 } },
         { key: { population: -1 } },
       ]);
     await database

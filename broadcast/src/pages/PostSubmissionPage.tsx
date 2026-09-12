@@ -407,7 +407,7 @@ export default function PostSubmissionPage() {
           )}
         </Box>
         {/* Attached Files List */}
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 3 }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 3, mt: 2 }}>
           {attachments.map((file, index) => (
             <Chip
               key={index}

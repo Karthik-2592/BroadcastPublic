@@ -85,7 +85,7 @@ function CommentEditDialog({ comment, open, onClose }: { comment: ApiComment; op
             <IconButton aria-label="Close edit comment" onClick={onClose} sx={{ color: 'text.secondary' }}><CloseRoundedIcon /></IconButton>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, p: 3 }}>
-            <Avatar src={currentUser?.profile_picture?.media_url ?? undefined} sx={{ width: 40, height: 40, bgcolor: 'primary.main', color: '#0f0f1a', fontWeight: 700, fontSize: '1.2rem' }}>{currentUser?.profile_name?.charAt(0) ?? currentUser?.username?.charAt(0) ?? '?'}</Avatar>
+            <Avatar src={currentUser?.profile_picture?.media_url ?? undefined} sx={{ width: 40, height: 40, bgcolor: 'primary.main', color: '#ffffff', fontWeight: 700, fontSize: '1.2rem' }}>{currentUser?.profile_name?.charAt(0) ?? currentUser?.username?.charAt(0) ?? '?'}</Avatar>
             <Box sx={{ flex: 1 }}>
               <Box sx={{ position: 'relative' }}>
                 <Box
@@ -204,6 +204,7 @@ export default function Comment({ comment, depth = 0, canEdit = false, community
             sx={{
               width: avatarSize,
               height: avatarSize,
+              color:'white',
               bgcolor: '#7c4dff',
               fontSize: isNested ? '0.95rem' : '1.2rem',
               fontWeight: 600,

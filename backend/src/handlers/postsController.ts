@@ -23,7 +23,7 @@ interface PostBody {
 export async function createPost(req: Request, res: Response) {
   const body = req.body as Partial<PostBody>;
   const userId = sessionUserId(req);
-  const missing = required(body, ["title", "content"]);
+  const missing = required(body, ["title"]);
   if (missing.length)
     return fail(res, 400, `Missing required fields: ${missing.join(", ")}`);
   if (typeof body.title !== "string" || body.title.length > 75)

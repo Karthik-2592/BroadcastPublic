@@ -367,11 +367,12 @@ export default function TopBar() {
 
           {/* Account controls */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <IconButton
-              size="small"
-              aria-label="Notifications"
-              onClick={handleNotificationsClick}
-              sx={{ color: 'text.secondary' }}
+            {isAuthenticated && (
+              <IconButton
+                size="small"
+                aria-label="Notifications"
+                onClick={handleNotificationsClick}
+                sx={{ color: 'text.secondary' }}
             >
               <Badge color="error" variant="dot" invisible={!hasNotifications}>
                 {hasNotifications
@@ -379,6 +380,7 @@ export default function TopBar() {
                   : <NotificationsNoneOutlinedIcon fontSize="small" />}
               </Badge>
             </IconButton>
+            )}
             <Menu
               id="notifications-menu"
               anchorEl={notificationAnchor}

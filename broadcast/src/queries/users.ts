@@ -1,6 +1,6 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BASE_URL } from '../config';
-import type { User, Post, Comment } from '../types/api';
+import type { User, UserSummary, Post, Comment } from '../types/api';
 
 // ── Query keys ─────────────────────────────────────────────────────────────────
 
@@ -33,6 +33,9 @@ export const userCommentsQueryKey = (userId?: string | null) =>
 export const userSavedPostsQueryKey = (userId?: string | null) =>
   ['user-saved-posts', userId] as const;
 
+export const userRecommendationsQueryKey = (userId?: string | null) =>
+  ['user-recommendations', userId] as const;
+
 // ── Fetch helpers ──────────────────────────────────────────────────────────────
 
 async function fetchUserSummaries(
@@ -59,6 +62,22 @@ export function useProfile(userId?: string | null) {
       const body = (await response.json()) as { data?: User };
       if (!body.data) throw new Error('Missing profile data');
       return body.data;
+    },
+    enabled: Boolean(userId),
+  });
+}
+
+/** Recommended users for the authenticated feed. */
+export function useUserRecommendations(userId?: string | null) {
+  return useQuery({
+    queryKey: userRecommendationsQueryKey(userId),
+    queryFn: async () => {
+      const response = await fetch(`${BASE_URL}/users/${userId!}/recommendations`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Unable to load user recommendations');
+      const body = (await response.json()) as { data?: UserSummary[] };
+      return Array.isArray(body.data) ? body.data : [];
     },
     enabled: Boolean(userId),
   });

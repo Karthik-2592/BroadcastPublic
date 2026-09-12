@@ -505,6 +505,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
                     width: 48,
                     height: 48,
                     bgcolor: '#7c4dff',
+                    color: 'white',
                     fontWeight: 700,
                     fontSize: '1.2rem',
                     border: '2px solid rgba(255,255,255,0.1)',
@@ -795,6 +796,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
                   width: 38,
                   height: 38,
                   bgcolor: '#7c4dff',
+                  color: 'white',
                   fontSize: '0.9rem',
                   fontWeight: 600,
                 }}
@@ -821,11 +823,7 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
                 </Typography>
               </Box>
 
-              {post.recommendationReason && (
-                <Typography variant="caption" sx={{ display: 'block', color: 'secondary.light', fontSize: '0.72rem', textAlign: 'right', mt: 0.5 }}>
-                  {post.recommendationReason}
-                </Typography>
-              )}
+
             </Box>
           </Box>
 
@@ -946,6 +944,12 @@ export default function PostCard({ post, variant = 'compact', canEdit = false, c
           </IconButton>
 
         </Box>
+                  <Box sx={{flex:1}}></Box>
+              {post.recommendationReason && (
+                <Typography variant="caption" sx={{ display: 'block', color: 'secondary.light', fontSize: '0.72rem', mt: 0.5, ml:'auto' }}>
+                  {post.recommendationReason}
+                </Typography>
+              )}
       </CardActions>
 
       {/* Options Dropdown Menu */}

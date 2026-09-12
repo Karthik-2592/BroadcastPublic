@@ -19,11 +19,12 @@ import type {
   UserSummary,
 } from "./types.ts";
 import { env } from "./config/env.ts";
-import { decodeCursor, createNextCursor } from "./cursor.ts";
+import { decodeCursor, createNextCursor, encodeCursor } from "./cursor.ts";
 
 type UserDocument = Omit<User, "id"> & {
   _id: ObjectId;
   password: { password_hash: string; salt: string };
+  email: string;
   joined_at?: Date;
   
 };
@@ -197,6 +198,7 @@ export class MongoStore {
       const user: UserDocument = {
         _id: new ObjectId(),
         username: input.username,
+        email: input.email,
         password: { password_hash: hash(input.password, salt), salt },
         interests: input.interests ?? [],
         profile_name: input.profile_name ?? "",
@@ -491,17 +493,37 @@ export class MongoStore {
   async trending(cursor?: string) {
     const page = decodeCursor(cursor, {}, ["popularity_score"]);
     const limit = 10;
-    const filter = page.values?.popularity_score !== undefined
-      ? { popularity_score: { $lt: page.values.popularity_score } }
-      : {};
+    const score = page.values?.popularity_score;
+    const popularityScore = score === undefined ? undefined : Number(score);
+    const postId = typeof page.values?.id === "string" ? oid(page.values.id) : null;
+    const filter: Filter<PostDocument> = popularityScore === undefined
+      ? {}
+      : postId
+        ? {
+          $or: [
+            { popularity_score: { $lt: popularityScore } },
+            { popularity_score: popularityScore, _id: { $lt: postId } },
+          ],
+        }
+        : { popularity_score: { $lt: popularityScore } };
     const posts = await this.log("posts.trending.find", () =>
       this.collection<PostDocument>("posts")
-        .then((c) => c.find(filter as Filter<PostDocument>).sort({ popularity_score: -1 }).limit(limit + 1).toArray())
+        .then((c) => c.find(filter).sort({ popularity_score: -1, _id: -1 }).limit(limit + 1).toArray())
         .then((items) => items.map(safePost)),
     );
     const items = posts.slice(0, limit);
     const lastItem = posts.length > limit ? posts[limit - 1] : null;
-    return { items, nextCursor: createNextCursor(lastItem as Record<string, unknown> | null, "popularity_score", {}, "desc") };
+    const nextCursor = lastItem
+      ? encodeCursor({
+        values: {
+          popularity_score: lastItem.popularity_score,
+          id: lastItem.id,
+        },
+        filters: {},
+        direction: "desc",
+      })
+      : "null";
+    return { items, nextCursor };
   }
   async incrementPostFavoriteCount(postId: string, delta: number) {
     const objectId = oid(postId);

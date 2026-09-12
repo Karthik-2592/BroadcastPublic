@@ -6,18 +6,36 @@ export const feedQueryKey = (endpoint: string = '/feed') => ['feed', endpoint] a
 export const communityPostsQueryKey = (communityId?: string | null, sort: 'new' | 'top' = 'new') =>
   ['community-posts', communityId, sort] as const;
 
+type PaginatedPostsResponse = {
+  data?: Post[];
+  cursor?: string | null;
+};
+
+type PaginatedPostsPage = {
+  posts: Post[];
+  nextCursor: string | null;
+};
+
+function cursorQuery(endpoint: string, cursor: string | null) {
+  if (!cursor) return endpoint;
+  const separator = endpoint.includes('?') ? '&' : '?';
+  return `${endpoint}${separator}cursor=${encodeURIComponent(cursor)}`;
+}
+
+function parsePostsPage(body: PaginatedPostsResponse): PaginatedPostsPage {
+  return {
+    posts: Array.isArray(body.data) ? body.data : [],
+    nextCursor: body.cursor && body.cursor !== 'null' ? body.cursor : null,
+  };
+}
+
 export function useInfiniteFeed(endpoint: string = '/feed') {
   return useInfiniteQuery({
     queryKey: feedQueryKey(endpoint),
     queryFn: async ({ pageParam }) => {
-      const query = pageParam ? `?cursor=${encodeURIComponent(pageParam)}` : '';
-      const response = await fetch(`${BASE_URL}${endpoint}${query}`, { credentials: 'include' });
+      const response = await fetch(`${BASE_URL}${cursorQuery(endpoint, pageParam)}`, { credentials: 'include' });
       if (!response.ok) throw new Error('Unable to load feed');
-      const body = (await response.json()) as { data?: Post[]; cursor?: string };
-      return {
-        posts: Array.isArray(body.data) ? body.data : [],
-        nextCursor: body.cursor === 'null' ? null : body.cursor ?? null,
-      };
+      return parsePostsPage((await response.json()) as PaginatedPostsResponse);
     },
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -29,17 +47,10 @@ export function useCommunityPosts(communityId?: string | null, sortTab: 'new' | 
     queryKey: communityPostsQueryKey(communityId, sortTab),
     queryFn: async ({ pageParam }) => {
       if (!communityId) return { posts: [], nextCursor: null };
-      const cursorQuery = pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : '';
-      const response = await fetch(
-        `${BASE_URL}/communities/${communityId}/posts?sort=${sortTab}${cursorQuery}`,
-        { credentials: 'include' }
-      );
+      const endpoint = `/communities/${encodeURIComponent(communityId)}/posts?sort=${sortTab}`;
+      const response = await fetch(`${BASE_URL}${cursorQuery(endpoint, pageParam)}`, { credentials: 'include' });
       if (!response.ok) throw new Error('Unable to load community posts');
-      const body = (await response.json()) as { data?: Post[]; cursor?: string };
-      return {
-        posts: Array.isArray(body.data) ? body.data : [],
-        nextCursor: body.cursor === 'null' ? null : body.cursor ?? null,
-      };
+      return parsePostsPage((await response.json()) as PaginatedPostsResponse);
     },
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
