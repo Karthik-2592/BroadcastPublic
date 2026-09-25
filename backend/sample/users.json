@@ -1,0 +1,677 @@
+[
+  {
+    "_id": {
+      "$oid": "751f70a38ae4aaf3309c147c"
+    },
+    "username": "emmaj_tech",
+    "email": "emmaj_tech@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Games",
+      "Fashion & Beauty",
+      "Nature"
+    ],
+    "profile_name": "Emma Johnson",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (6).png",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Freelance writer and content creator. I talk about tech and lifestyle.",
+    "follower_count": 103,
+    "following_count": 238,
+    "joined_at": {
+      "$date": "2023-04-05T03:17:06.806Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "a0c1a62667a14dbbbf1bb6be"
+    },
+    "username": "noah_w",
+    "email": "noah_w@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Fashion & Beauty",
+      "Business & Finance"
+    ],
+    "profile_name": "Noah Williams",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (4).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Digital artist and designer. I love creating beautiful interfaces.",
+    "follower_count": 382,
+    "following_count": 229,
+    "joined_at": {
+      "$date": "2025-11-22T06:53:28.408Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "3072448f784914d6ee4a2763"
+    },
+    "username": "liv_brown99",
+    "email": "liv_brown99@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Fashion & Beauty",
+      "Business & Finance"
+    ],
+    "profile_name": "Olivia Brown",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (7).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Tech lead by day, gamer by night. Always learning.",
+    "follower_count": 129,
+    "following_count": 142,
+    "joined_at": {
+      "$date": "2026-05-02T13:02:01.185Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "24ba1d7906de39a745504500"
+    },
+    "username": "liamjones_dev",
+    "email": "liamjones_dev@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Nature",
+      "Fashion & Beauty"
+    ],
+    "profile_name": "Liam Jones",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (8).png",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Culinary student experimenting with fusion recipes.",
+    "follower_count": 173,
+    "following_count": 258,
+    "joined_at": {
+      "$date": "2026-04-13T23:46:10.586Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "2652f4c79fbaee1b4e1b8b47"
+    },
+    "username": "ava_creates",
+    "email": "ava_creates@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Technology",
+      "Pop Culture"
+    ],
+    "profile_name": "Ava Garcia",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (4).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Full-stack developer building scalable web applications.",
+    "follower_count": 17,
+    "following_count": 155,
+    "joined_at": {
+      "$date": "2026-06-10T10:13:52.061Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "0a2a6a2aef530bb45b962b54"
+    },
+    "username": "eli_m",
+    "email": "eli_m@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Books"
+    ],
+    "profile_name": "Elijah Miller",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (8).png",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Music producer and sound engineer. Let's collaborate!",
+    "follower_count": 43,
+    "following_count": 163,
+    "joined_at": {
+      "$date": "2025-09-30T02:44:37.494Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "4aaf85700fd05265baa28d8f"
+    },
+    "username": "sophia_d",
+    "email": "sophia_d@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Sports"
+    ],
+    "profile_name": "Sophia Davis",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (3).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Coffee enthusiast, avid reader, and weekend hiker.",
+    "follower_count": 185,
+    "following_count": 92,
+    "joined_at": {
+      "$date": "2024-10-05T04:48:59.140Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "a3bd02d7d2cbf476dd0b2f0d"
+    },
+    "username": "mateo_rod",
+    "email": "mateo_rod@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Art",
+      "Science"
+    ],
+    "profile_name": "Mateo Rodriguez",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (5).png",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Indie game developer working on my first major release.",
+    "follower_count": 199,
+    "following_count": 93,
+    "joined_at": {
+      "$date": "2025-03-23T12:20:31.627Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "97e6322f7548452edb32a256"
+    },
+    "username": "isa_martinez",
+    "email": "isa_martinez@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "News & Politics"
+    ],
+    "profile_name": "Isabella Martinez",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (7).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Amateur photographer exploring the city streets.",
+    "follower_count": 449,
+    "following_count": 283,
+    "joined_at": {
+      "$date": "2023-10-19T05:31:56.393Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "792337e2700c1ab882125e5d"
+    },
+    "username": "lucas_h",
+    "email": "lucas_h@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Art",
+      "Travelling",
+      "Nature"
+    ],
+    "profile_name": "Lucas Hernandez",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (3).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Data scientist analyzing trends and predicting the future.",
+    "follower_count": 113,
+    "following_count": 105,
+    "joined_at": {
+      "$date": "2024-05-12T22:08:01.574Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "8ea3a17a4f7d62af44220075"
+    },
+    "username": "mia_lopez",
+    "email": "mia_lopez@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Fashion & Beauty",
+      "Business & Finance"
+    ],
+    "profile_name": "Mia Lopez",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (1).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Freelance writer and content creator. I talk about tech and lifestyle.",
+    "follower_count": 135,
+    "following_count": 88,
+    "joined_at": {
+      "$date": "2025-12-09T10:29:09.355Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "0c05241e61af2627086e59d3"
+    },
+    "username": "levi_g",
+    "email": "levi_g@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Nature",
+      "Food"
+    ],
+    "profile_name": "Levi Gonzalez",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (4).png",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Indie game developer working on my first major release.",
+    "follower_count": 313,
+    "following_count": 142,
+    "joined_at": {
+      "$date": "2023-09-06T15:33:46.312Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "2ea78437bb63ea83f493711a"
+    },
+    "username": "amelia_p",
+    "email": "amelia_p@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Travelling"
+    ],
+    "profile_name": "Amelia Perez",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (3).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Tech lead by day, gamer by night. Always learning.",
+    "follower_count": 101,
+    "following_count": 254,
+    "joined_at": {
+      "$date": "2025-04-12T01:35:58.422Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "129f1b38b440e27243af2c75"
+    },
+    "username": "mason_w",
+    "email": "mason_w@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Technology"
+    ],
+    "profile_name": "Mason Wilson",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (2).png",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Digital artist and designer. I love creating beautiful interfaces.",
+    "follower_count": 486,
+    "following_count": 106,
+    "joined_at": {
+      "$date": "2025-04-12T13:02:38.084Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "4415375070d142019ddec9be"
+    },
+    "username": "harper_a",
+    "email": "harper_a@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Travelling",
+      "Fashion & Beauty"
+    ],
+    "profile_name": "Harper Anderson",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (6).png",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Freelance writer and content creator. I talk about tech and lifestyle.",
+    "follower_count": 310,
+    "following_count": 191,
+    "joined_at": {
+      "$date": "2023-08-20T05:51:18.182Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "81a0859e0884ed27ae6580f8"
+    },
+    "username": "ethan_t",
+    "email": "ethan_t@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Technology",
+      "Games",
+      "Art"
+    ],
+    "profile_name": "Ethan Thomas",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (3).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Coffee enthusiast, avid reader, and weekend hiker.",
+    "follower_count": 339,
+    "following_count": 45,
+    "joined_at": {
+      "$date": "2025-12-03T06:13:26.741Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "0890c8409cb30a4007b64624"
+    },
+    "username": "evelyn_t",
+    "email": "evelyn_t@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Business & Finance"
+    ],
+    "profile_name": "Evelyn Taylor",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (2).png",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Culinary student experimenting with fusion recipes.",
+    "follower_count": 320,
+    "following_count": 29,
+    "joined_at": {
+      "$date": "2024-10-14T15:11:58.887Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "6d386c780435bbe8d2e7f09f"
+    },
+    "username": "james_m",
+    "email": "james_m@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "News & Politics",
+      "Travelling"
+    ],
+    "profile_name": "James Moore",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (7).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Coffee enthusiast, avid reader, and weekend hiker.",
+    "follower_count": 170,
+    "following_count": 136,
+    "joined_at": {
+      "$date": "2025-12-27T04:13:21.666Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "0109a528ccdb3dcd5d5db5bc"
+    },
+    "username": "charlotte_j",
+    "email": "charlotte_j@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Travelling",
+      "News & Politics",
+      "Business & Finance"
+    ],
+    "profile_name": "Charlotte Jackson",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (3).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Minimalist lifestyle advocate and sustainability enthusiast.",
+    "follower_count": 280,
+    "following_count": 149,
+    "joined_at": {
+      "$date": "2023-11-02T09:11:40.806Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "08e0d1b94844244e42def5c6"
+    },
+    "username": "alex_m",
+    "email": "alex_m@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Fashion & Beauty",
+      "Business & Finance"
+    ],
+    "profile_name": "Alexander Martin",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (6).png",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Tech lead by day, gamer by night. Always learning.",
+    "follower_count": 302,
+    "following_count": 223,
+    "joined_at": {
+      "$date": "2025-10-06T08:12:22.308Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "f197adce5b72753d8d16d6cb"
+    },
+    "username": "luna_lee",
+    "email": "luna_lee@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Films & TV",
+      "Health"
+    ],
+    "profile_name": "Luna Lee",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (8).png",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Culinary student experimenting with fusion recipes.",
+    "follower_count": 463,
+    "following_count": 206,
+    "joined_at": {
+      "$date": "2025-05-30T22:55:46.276Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "d73e1053d5456ce95c836e41"
+    },
+    "username": "seb_white",
+    "email": "seb_white@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Food",
+      "Travelling"
+    ],
+    "profile_name": "Sebastian White",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (5).png",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Tech lead by day, gamer by night. Always learning.",
+    "follower_count": 39,
+    "following_count": 269,
+    "joined_at": {
+      "$date": "2023-11-10T09:38:45.448Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "3d3ed0e10bdb4303cb209a5c"
+    },
+    "username": "avery_h",
+    "email": "avery_h@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Games",
+      "Art",
+      "Technology"
+    ],
+    "profile_name": "Avery Harris",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (2).png",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Travel blogger seeking the next adventure.",
+    "follower_count": 55,
+    "following_count": 55,
+    "joined_at": {
+      "$date": "2024-12-13T21:57:02.059Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "b06206907d5f64ef64c9e12d"
+    },
+    "username": "mike_clark",
+    "email": "mike_clark@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Business & Finance",
+      "Fashion & Beauty",
+      "Travelling"
+    ],
+    "profile_name": "Michael Clark",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (3).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Culinary student experimenting with fusion recipes.",
+    "follower_count": 453,
+    "following_count": 158,
+    "joined_at": {
+      "$date": "2026-02-16T02:36:41.860Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "d617bed9285a5cdfda861561"
+    },
+    "username": "eleanor_l",
+    "email": "eleanor_l@example.com",
+    "password": {
+      "password_hash": "a4387d89694b7e8d626359f518ab5069be01ec1cf822eb3519808a385418b760",
+      "salt": "dummy_salt"
+    },
+    "interests": [
+      "Books",
+      "Games"
+    ],
+    "profile_name": "Eleanor Lewis",
+    "profile_picture": {
+      "media_id": 1,
+      "media_url": "/ProfilePictures/profile  (3).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "profile_description": "Amateur photographer exploring the city streets.",
+    "follower_count": 193,
+    "following_count": 22,
+    "joined_at": {
+      "$date": "2023-06-27T04:32:40.651Z"
+    }
+  }
+]

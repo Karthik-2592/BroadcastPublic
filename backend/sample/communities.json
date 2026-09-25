@@ -1,0 +1,126 @@
+[
+  {
+    "_id": {
+      "$oid": "5dd43215e2ad821173223d6d"
+    },
+    "community_name": "Frontend Masters",
+    "community_desc": "A place for frontend developers to share tips, tricks, and resources on React, Vue, Angular, and more.",
+    "community_guidelines": "Be respectful. No self-promotion. Keep it related to frontend.",
+    "population": 792,
+    "community_banner": {
+      "media_id": 1,
+      "media_url": "/CommunityBanners/banner (1).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "admin_id": {
+      "$oid": "08e0d1b94844244e42def5c6"
+    },
+    "tags": [
+      "tips"
+    ],
+    "post_count": 7,
+    "timestamp": {
+      "$date": "2024-05-24T00:50:01.442Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "493990253e25fd6a4f89de7d"
+    },
+    "community_name": "Digital Nomads",
+    "community_desc": "For those who work remotely and travel the world. Share your favorite spots and tips for balancing work and travel.",
+    "community_guidelines": "Share actionable advice. Respect local cultures in posts.",
+    "population": 265,
+    "community_banner": {
+      "media_id": 1,
+      "media_url": "/CommunityBanners/banner (5).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "admin_id": {
+      "$oid": "97e6322f7548452edb32a256"
+    },
+    "tags": [
+      "discussion",
+      "ideas"
+    ],
+    "post_count": 3,
+    "timestamp": {
+      "$date": "2024-04-28T13:52:09.720Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "f6c9049fc902ee271d1894f1"
+    },
+    "community_name": "Healthy Living",
+    "community_desc": "Discuss nutrition, workouts, mental health, and overall wellness strategies.",
+    "community_guidelines": "No medical advice. Be supportive.",
+    "population": 201,
+    "community_banner": {
+      "media_id": 1,
+      "media_url": "/CommunityBanners/banner (5).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "admin_id": {
+      "$oid": "8ea3a17a4f7d62af44220075"
+    },
+    "tags": [
+      "news"
+    ],
+    "post_count": 7,
+    "timestamp": {
+      "$date": "2026-01-18T23:25:17.840Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "ce2b1695b252c3c6d42a5426"
+    },
+    "community_name": "Indie Game Devs",
+    "community_desc": "Showcase your work in progress, get feedback, and discuss game design and mechanics.",
+    "community_guidelines": "Constructive feedback only. Tag your engines.",
+    "population": 206,
+    "community_banner": {
+      "media_id": 1,
+      "media_url": "/CommunityBanners/banner (4).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "admin_id": {
+      "$oid": "3d3ed0e10bdb4303cb209a5c"
+    },
+    "tags": [
+      "community",
+      "learning",
+      "discussion"
+    ],
+    "post_count": 4,
+    "timestamp": {
+      "$date": "2024-02-17T01:39:55.564Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "d6d35f1589f9cb3d41a15b3c"
+    },
+    "community_name": "Bookworms Hub",
+    "community_desc": "A cozy corner for book lovers to review, recommend, and discuss their latest reads.",
+    "community_guidelines": "Use spoiler tags. Respect different tastes.",
+    "population": 649,
+    "community_banner": {
+      "media_id": 1,
+      "media_url": "/CommunityBanners/banner (2).jpg",
+      "mime_type": "image/jpeg"
+    },
+    "admin_id": {
+      "$oid": "751f70a38ae4aaf3309c147c"
+    },
+    "tags": [
+      "community",
+      "ideas"
+    ],
+    "post_count": 4,
+    "timestamp": {
+      "$date": "2026-08-02T11:55:54.552Z"
+    }
+  }
+]
